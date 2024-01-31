@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Help{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<h1>Messages</h1>
+<div class="accordion mt-3 mb-3" id="accordionFAQ">
+  {% for message in messages %}
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{loop.index}}" aria-expanded="true" aria-controls="collapse{{loop.index}}">
+        <strong>{{loop.index}}</strong> - {{ message.short }}
+      </button>
+    </h2>
+    <div id="collapse{{loop.index}}" class="accordion-collapse collapse {% if loop.index==1 %}show{% endif %}" data-bs-parent="#accordionFAQ">
+      <div class="accordion-body">
+        {{ message.long | safe }}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

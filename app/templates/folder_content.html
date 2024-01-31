@@ -1,0 +1,21 @@
+{% if folder_content | length > 0 %}
+<p>Root folder: <b>{{ data.complete_folder_path }}</b></p>
+<p>This is the content of the data folder you will be working with:</p>
+<ul>
+    {% for item in folder_content %}
+    <li>
+        {{ item }}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+    {%if data.permission %}
+        {% if data.folder %}
+        <p>A new folder will be created at <b>{{ data.complete_folder_path }}</b>.</p>
+        {% else %}
+        <p>There is no content in folder: <b>{{ data.complete_folder_path }}</b>.</p>
+        {% endif %}
+    {% else %}
+        <p>Your account does not have permission to create this folder: <b>{{ data.complete_folder_path }}</b>.</p>
+    {% endif%}
+{% endif %}

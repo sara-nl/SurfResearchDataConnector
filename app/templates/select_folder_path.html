@@ -1,0 +1,9 @@
+<select name="folder_path" class="form-select" >
+    {% for folder_path in folder_paths %}
+        {% if folder_path == data.folder_path %}
+        <option value="{{folder_path}}" selected>{{ folder_path }}</option>
+        {% else %}
+            <option value="{{folder_path}}">{{ folder_path }}</option>
+        {% endif %}
+    {% endfor %}
+</select>

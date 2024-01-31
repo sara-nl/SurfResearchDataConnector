@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% from "macros.html" import load_async with context %}
+
+{% block title %}Connect{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+
+{% if not preview %}
+<h1>Upload</h1>
+<p>Upload data from your Research Drive to your connected repositories. Your data is always only uploaded and never published. You can review your data on the repository platform and then decide to publish from within that platform.</p>
+{% endif %}
+
+{% if data.connected==True %}
+    {% if data.query_status==None or data.query_status=='ready' %}
+        <form method="post" action="/upload" class="needs-validation mt-3 mb-3" novalidate >
+            <div {% if preview %} hidden {% endif %}>
+                <!-- async loading repo selection -->
+                {{ load_async("repo_selection", "/repo-selection") }}
+                <!-- end async -->
+                <div class="form-group mt-3 mb-3">
+                    <label for="Folder">Select the folder to upload:</label>
+                    <!-- async loading folder paths -->
+                    {{ load_async("folderpaths", "/folder-paths") }}
+                    <!-- end async -->
+                </div>
+                <h2>Metadata</h2>
+                <div id="show_meta">Please select a repository. The repository specific metadata fields will show here.</div>
+            </div>
+            {% if not preview %}
+
+                <!-- ### BEGIN PREVIEW BUTTON -->
+                <input type="text" name="preview" value="true" hidden>
+                <button type="submit" class="btn btn-secondary">Preview Upload</button>
+                <!-- ### END PREVIEW BUTTON -->
+
+            {% else %}
+
+                <!-- ### BEGIN PREVIEW ### -->
+                <h1>Upload - Preview</h1>
+            
+                <h2>Repo</h2>
+                <!-- async loading check connection -->
+                {{ load_async("check_connection", "/check-connection") }}
+                <!-- end async -->
+
+                <h2>Data Folder to upload</h2>
+                <!-- async loading folder content -->
+                {{ load_async("foldercontent", "/folder-content") }}
+                <!-- end async -->
+
+                <h2>Metadata</h2>
+                
+                <!-- async loading metadata -->
+                {% if data.repo=='figshare' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=figshare") }}
+                {% endif %}
+                {% if data.repo=='zenodo' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=zenodo") }}
+                {% endif %}
+                {% if data.repo=='osf' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=osf") }}
+                {% endif%}
+                {% if data.repo=='dataverse' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=dataverse") }}
+                {% endif%}
+                {% if data.repo=='irods' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=irods") }}
+                {% endif%}
+                {% if data.repo=='sharekit' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=sharekit") }}
+                {% endif%}
+                <!-- end async -->
+
+                <!-- ### END PREVIEW ### -->
+
+                <a href="/upload" class="btn btn-secondary">Back</a>
+                <button type="submit" class="btn btn-primary">Start Upload</button>
+                <div class="form-check mt-3 mb-3">
+                    <input class="form-check-input" type="checkbox" id="flexUploadZip" value="" name="use_zip">
+                    <label class="form-check-label" for="flexUploadZip">
+                        Check to upload all files as 1 zipfile.
+                    </label>
+                </div>
+                <div class="form-check mt-3 mb-3">
+                    <input class="form-check-input" type="checkbox" id="flexCheckUpload" value="" name="start_upload">
+                    <label class="form-check-label" for="flexCheckUpload">
+                        Check to confirm start of upload.
+                    </label>
+                </div>
+            
+            {% endif %}
+        </form>
+    {% else %}
+
+        <!-- ### BEGIN STATUS TABLE ### -->
+        <div id="status">
+            <div class="position-absolute top-50 start-50 translate-middle" style="width: 100%; height: 100%; background-color: lightgray; opacity: 0.1; overflow: hidden;">
+                <div class="spinner-border position-absolute top-50 start-50 translate-middle" role="status">
+                    <span class="visually-hidden">Connecting...</span>
+                </div>
+            </div>
+        </div>
+        <script>
+            $(document).ready(function(){
+                setInterval(() => {
+                    $("#status").load("/status");
+                }, 2000);
+            });
+        </script>
+        <!-- ### END STATUS TABLE ### -->
+    
+        {% endif %}
+{% else %}
+
+    <!-- BEGIN NOT CONNECTED -->
+    <p>Please connect first.</p>
+    <a href="/connect"><button class="btn btn-primary">Connect</button></a>
+    <!-- END NOT CONNECTED -->
+
+{% endif %}
+
+{% endblock %}
+
+{% block script %}
+<script>
+    form_validate();
+</script>
+{% endblock %}

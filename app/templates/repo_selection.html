@@ -1,0 +1,61 @@
+{% from "macros.html" import load_async with context %}
+
+<!-- NOTE: only show inputes for repos that are configured for making connections. Grey out the once that the user has not yet connected to. -->
+<div class="form-group mt-3 mb-3">
+    <p>Select a repository:</p>
+    {% for service in registered_services %}
+    {% if service != 'owncloud' %}
+    {% set imgfilepath = '/img/'+service+'.png' %}
+    {% set access_token_name = service +'_access_token' %}
+    <div class="form-check form-check-inline mt-3 mb-3 col-3">
+        <input class="form-check-input" type="radio" name="selected_repo" id="radio-{{service}}" value="{{service}}"
+            {% if service == data.repo %} checked {% endif %}
+            {% if access_token_name not in data %}disabled{% endif %} required >
+        <label for="radio-{{service}}"><img src="{{ url_for('static', filename = imgfilepath) }}"
+                alt="{{service}}" {% if access_token_name not in data %}style="-webkit-filter: grayscale(100%); filter: grayscale(100%); opacity: 0.4;"{% endif %}></label>
+        {% set service_description = service+'_description' %}
+        {% set service_website = service+'_website' %}
+        <p><small>{{ all_vars[service_description] }}</small></p>
+        {% if access_token_name in data %}
+        <p><small><a href="{{ all_vars[service_website] }}" target="_blank" >Go to {{ service }}</a></small></p>
+        {% else %}
+        <p><small><a href="/connect">Connect to {{ service }}</a></small></p>
+        {% endif %}
+    </div>
+
+    {% endif %}
+    {% endfor %}
+</div>
+
+<script>
+    // This will load the correct metadata fields when the user changes the repo.
+$('input[type=radio][name=selected_repo]').change(function() {
+    if (this.value == 'figshare') {
+        $("#show_meta").load("/metadata?repo=figshare");
+    }
+    else if (this.value == 'zenodo') {
+        $("#show_meta").load("/metadata?repo=zenodo");
+    }
+    else if (this.value == 'osf') {
+        $("#show_meta").load("/metadata?repo=osf");
+    }
+    else if (this.value == 'dataverse') {
+        $("#show_meta").load("/metadata?repo=dataverse");
+    }
+    else if (this.value == 'irods') {
+        $("#show_meta").load("/metadata?repo=irods");
+    }
+    else if (this.value == 'sharekit') {
+        $("#show_meta").load("/metadata?repo=sharekit");
+    }
+
+});
+</script>
+{% for service in registered_services %}
+{% if service == data.repo %}
+<script>
+    $('input[type=radio][name=selected_repo][value={{service}}]').attr('checked',true);
+    $("#show_meta").load("/metadata?repo={{service}}");
+</script>
+{% endif %}
+{% endfor %}

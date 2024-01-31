@@ -1,0 +1,28 @@
+{% if query_status_history|length > 0 %}
+<div class="table-responsive-sm mt-3 mb-3">
+    <table class="table table-striped table-hover table-sm table-bordered">
+        <thead class="table-primary">
+            <tr>
+            <th scope="col">#</th>
+            <th scope="col">Local (folder)</th>
+            <th scope="col">Remote (url, doi, repo)</th>
+            <th scope="col">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in query_status_history %}
+            <tr>
+                <th scope="row">{{ item.time_created }}</th>
+                <td><a href="{{drive_url}}/index.php/apps/files?dir=//{{ item.folder }}" target="_top" rel="noopener noreferrer">{{ item.folder }}</a></td>
+                {% if 'http' in item.url %}
+                <td><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.url }}</a></td>
+                {% else %}
+                <td>{{ item.url }}</td>
+                {% endif %}
+                <td><a href="/history/{{ item.id }}">{{ item.status }}</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}

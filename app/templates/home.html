@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+{% if not data.connected and not data.failed %}
+<!-- <script>
+    var a = document.createElement('a');
+    a.href= '{{ data.srdr_url }}/login';
+    a.target = '_top';
+    document.body.appendChild(a);
+    a.click();
+</script> -->
+<!-- <div class="position-absolute top-50 start-50 translate-middle">
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Connecting...</span>
+    </div>
+</div> -->
+{% endif %}
+<h1>Welcome to SURF Research Data Connector</h1>
+<h4>Your extension for connecting research data</h4>
+<p>
+    Surf Research Data Connector is an extension that will allow you to easily pull (open) data from and push data to different research data publication
+    service repositories. Some of the major repositories that are supported are:
+</p>
+<ul>
+    <li>Dataverse</li>
+    <li>Zenodo</li>
+    <li>Figshare</li>
+    <li>OSF</li>
+</ul>
+<h4>Download data</h4>
+<p>
+    In the backend the extension uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>pull open data</b>.
+    To see which repositories are currently supported for pulling open data, please check out: <a
+        href="https://j535d165.github.io/datahugger/repositories/" target="new">the Datahugger Supported Repositories
+        page</a>.
+</p>
+<p>
+    Get started in two easy steps:
+</p>
+<ol>
+    {% if not data.connected %}
+    <li><a href="/connect">Connect</a> to your research drive.</li>
+    {% else %}
+    <li><b>Connect</b>: you are already connected as {{ data.username }}.<br><a href="/connect">Disconnect here</a> from your research drive.</li>
+    {% endif %}
+    <li><a href="/retrieve">Download</a> open data or <a href="/download">download</a> private data from your connected repository.</li>
+</ol>
+
+<p>Search for open Research Data in most Datahugger supported repositories using <a href="https://cse.google.com/cse?cx=762961cffaa1c4546" target="_blank">Google</a>.</p>
+<p>Search for open Research Data in most Datahugger supported dataverse repositories using <a href="https://www.re3data.org" target="_blank">re3data</a>.</p>
+
+<h4>Connect to private repos</h4>
+<p>The extension also allows you to <a href="/connect">connect</a> to your private repositories on supported platforms. This enables you to download your own data or data that has been shared with you on these repositories.</p>
+<p>The extension also enables you to upload data to your connected repositories.</p>
+<p>Currently the following repo platforms are supported:</p>
+<ul>
+    <li>Figshare</li>
+    <li>Zenodo</li>
+    <li>OSF</li>
+    <li>Dataverse</li>
+    <li>iRods</li>
+    <li>Sharekit</li>
+</ul>
+
+<p>
+    Get started in three easy steps:
+</p>
+<ol>
+    {% if not data.connected %}
+    <li><a href="/connect">Connect</a> to your research drive.</li>
+    {% else %}
+    <li><b>Connect</b>: you are already connected as {{ data.username }}.<br><a href="/connect">Disconnect here</a> from your research drive.</li>
+    {% endif %}
+    <li><a href="/connect">Connect</a> to one or more repositories.</li>
+    <li><a href="/download">Download</a> or <a href="/upload">Upload</a> private data.</li>
+</ol>
+
+{% endblock %}

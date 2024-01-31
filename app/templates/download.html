@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% from "macros.html" import load_async with context %}
+
+{% block title %}Connect{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<!-- ### BEGIN HELPER LOGIC ### -->
+{% if data.connected==True %}
+    {% if data.query_status==None or data.query_status=='ready' %}
+        {% set vars = {'folder_exists_message' : False, 'url_exists_message' : False} %}
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    {% if message=='Data folder already exists on your drive. Please check the box if you want to use this folder.' %}
+                        {% if vars.update({'folder_exists_message': True}) %} {% endif%}
+                    {% endif %}
+                    {% if message=='Data has already been downloaded from this url. Please check the box if you want to download again from this url.' %}
+                        {% if vars.update({'url_exists_message': True}) %} {% endif%}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    {% endif %}
+{% endif %}
+<!-- END BEGIN HELPER LOGIC ### -->
+
+{% if not preview %}
+<h1>Download</h1>
+<p>Download data from your connected repositories to your Research Drive.</p>
+{% endif %}
+
+{% if data.connected==True %}
+{% if data.query_status==None or data.query_status=='ready' %}
+<form method="post" action="/download" class="needs-validation mt-3 mb-3" novalidate>
+    <div {% if preview %} hidden {% endif %}>
+        <!-- async loading repo selection -->
+        {{ load_async("repo_selection", "/repo-selection") }}
+        <!-- end async -->
+        
+        <div class="form-group mt-3 mb-3">
+            <label for="Url">Url: </label>
+            <input type="url" pattern="https://.*" class="form-control" name="url" value="{{data.url}}"
+                placeholder="A private or preview url" required>
+            <div class="invalid-feedback">
+                Please fill out a preview url to a private research dataset.
+            </div>
+        </div>
+
+        {% if (vars.url_exists_message==True or data.accept_url_in_history==True) and check_accept_url_in_history_first!=None %}
+        <div class="form-check mt-3 mb-3">
+            <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {%
+                endif %} id="flexCheckUrl" name="accept_url_in_history">
+            <label class="form-check-label" for="flexCheckUrl">
+                Check this to retrieve even if this url is in your history of downloads.
+            </label>
+        </div>
+        {% endif %}
+        <div class="form-group mt-3 mb-3">
+            <label for="Folder">Data Folder Path: </label>
+
+            <!-- async loading folder paths -->
+            {{ load_async("folderpaths", "/folder-paths") }}
+            <!-- end async -->
+
+            <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder"
+                required>
+            <div class="invalid-feedback">
+                Please fill out the folder name where you want store the data.
+            </div>
+        </div>
+
+        {% if (vars.folder_exists_message==True or data.accept_folder_exist==True) and check_accept_folder_first!=None
+        %}
+        <div class="form-check mt-3 mb-3">
+            <input class="form-check-input" type="checkbox" value="" {% if data.accept_folder_exist %} checked {% endif
+                %} id="flexCheckFolder" name="accept_folder_exist">
+            <label class="form-check-label" for="flexCheckFolder">
+                Check this to retrieve even if this folder already exists on your drive. The data will be added to the
+                folder.
+            </label>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not preview %}
+
+    <!-- ### BEGIN PREVIEW BUTTON -->
+    <input type="text" name="preview" value="true" hidden>
+    <button type="submit" class="btn btn-secondary">Preview Download</button>
+    <!-- ### END PREVIEW BUTTON -->
+
+    {% else %}
+
+    <!-- ### BEGIN PREVIEW ### -->
+    <h1>Download - Preview</h1>
+    
+    <h2>Drive Storage</h2>
+    <!-- async loading quote_text -->
+    {{ load_async("quota_text", "/quota-text") }}
+    <!-- end async -->
+
+    <h2>Data Folder</h2>
+    <!-- async loading folder content -->
+    {{ load_async("foldercontent", "/folder-content") }}
+    <!-- end async -->
+
+    <h2>Data Set</h2>
+
+    <!-- async loading check connection -->
+    {{ load_async("check_connection", "/check-connection") }}
+    <!-- end async -->
+
+    <!-- Needs specific implementation for the private repo choosen-->
+
+    <!-- async loading metadata -->
+    {{ load_async("private_metadata", "/private-metadata") }}
+    <!-- end async -->
+
+    <!-- async loading repocontent -->
+    {{ load_async("repocontent", "/repocontent") }}
+    <!-- end async -->
+
+    <!-- ### END PREVIEW ### -->
+
+    {% endif %}
+</form>
+
+{% else %}
+
+<!-- ### BEGIN STATUS TABLE ### -->
+<div id="status">
+    <div class="position-absolute top-50 start-50 translate-middle"
+        style="width: 100%; height: 100%; background-color: lightgray; opacity: 0.1; overflow: hidden;">
+        <div class="spinner-border position-absolute top-50 start-50 translate-middle" role="status">
+            <span class="visually-hidden">Connecting...</span>
+        </div>
+    </div>
+</div>
+<script>
+    $(document).ready(function () {
+        setInterval(() => {
+            $("#status").load("/status");
+        }, 2000);
+    });
+</script>
+<!-- ### END STATUS TABLE ### -->
+
+{% endif %}
+{% else %}
+
+<!-- BEGIN NOT CONNECTED -->
+<p>Please connect first.</p>
+<a href="/connect"><button class="btn btn-primary">Connect</button></a>
+<!-- END NOT CONNECTED -->
+
+{% endif %}
+
+{% endblock %}
+
+{% block script %}
+<script>
+    form_validate();
+</script>
+{% endblock %}

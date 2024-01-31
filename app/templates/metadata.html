@@ -1,0 +1,428 @@
+{% if data.repo == 'irods' %}
+<p>These are customized <b>required</b> metadata fields for <b>Irods</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+<!-- required but disabled fields for irods -->
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Discipline">Discipline</label>
+        <input type="text" class="form-control" placeholder="Discipline of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Language">Language</label>
+        <input type="text" class="form-control" placeholder="Language of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Tag">Tag</label>
+        <input type="text" class="form-control" placeholder="Tag of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Retention period">Retention period</label>
+        <input type="text" class="form-control" placeholder="Retention period of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Data classification">Data classification</label>
+        <input type="text" class="form-control" placeholder="Data classification of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="License">License</label>
+        <input type="text" class="form-control" placeholder="License of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Data package access">Data package access</label>
+        <input type="text" class="form-control" placeholder="Data package access of the project" disabled>
+        <small>Please select the value for this field in the Irods portal.</small>
+    </div>
+</div>
+
+{% elif data.repo == 'dataverse' %}
+<p>These are customized <b>required</b> metadata fields for <b>Dataverse</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Subject">Subject</label>
+        <input type="text" class="form-control" name="subject" value="{{data.metadata.subject}}" placeholder="Subject of the project" disabled>
+        <small>Please select the subject for your project in the Dataverse portal. As default it will be set to: 'Other'.</small>
+        <div class="invalid-feedback">
+            Please fill out the subject for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Contact name">Contact name</label>
+        <input type="text" class="form-control" name="contact_name" value="{{data.metadata.contact_name}}" placeholder="Name of the contact person of the project" {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the name of the contact person for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Contact email">Contact email</label>
+        <input type="email" class="form-control" name="contact_email" value="{{data.metadata.contact_email}}" placeholder="Email of the contact person of the project" {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the email of the contact person for your project.
+        </div>
+    </div>
+</div>
+
+
+{% elif data.repo == 'osf' %}
+<p>These are customized <b>required</b> metadata fields for <b>Osf</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="" placeholder="Author of the project" disabled>
+        <small>Please fill out the author for your project in the OSF portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="" placeholder="Affiliation of the project" disabled>
+        <small>Please fill out the affiliation for your project in the OSF portal.</small>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>   
+</div>
+
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Tags">Tags</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" {% if disabled %} disabled {% endif %}>
+        <small>Seperate your tags by commas.</small>
+        <div class="invalid-feedback">
+            Please fill out the tags for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Categories">Categories</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled>
+        <small>Please fill out the category for your project in the OSF portal. Default will be 'project'.</small>
+        <div class="invalid-feedback">
+            Please fill out the categories for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="License">License</label>
+        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="Licence of the project" disabled >
+        <small>Please fill out the license for your project in the OSF portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the license for your project.
+        </div>
+    </div>
+</div>
+
+{% elif data.repo == 'zenodo' %}
+<p>These are customized <b>required</b> metadata fields for <b>Zenodo</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>   
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Publication date">Publication date</label>
+        <input type="date" class="form-control" name="publication_date" value="{{data.metadata.publication_date}}" placeholder="Publication date of the project" {% if disabled %} disabled {% endif %}>
+        <small>In case your upload was already published elsewhere, please use the date of the first publication.</small>
+        <div class="invalid-feedback">
+            Please fill out the publication date for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Tags">Tags</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" disabled >
+        <small>Please fill out the tags for your project in the Zenodo portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the tags for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Categories">Categories</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled >
+        <small>Please fill out the categories for your project in the Zenodo portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the categories for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="License">License</label>
+        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="Licence of the project" disabled >
+        <small>Please fill out the license for your project in the Zenodo portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the license for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Publisher">Publisher</label>
+        <input type="text" class="form-control" name="publisher" value="{{data.metadata.publisher}}" placeholder="Publisher of the project" {% if disabled %} disabled {% endif %} >
+        <div class="invalid-feedback">
+            Please fill out the publisher for your project.
+        </div>
+    </div>
+</div>
+
+{% elif data.repo == 'figshare' %}
+<p>These are customized <b>required</b> metadata fields for <b>Figshare</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="" placeholder="Author of the project" disabled>
+        <small>Please fill out the author for your project in the Figshare portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="" placeholder="Affiliation of the project" disabled>
+        <small>Please fill out the affiliation for your project in the Figshare portal.</small>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>   
+</div>
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Tags">Tags</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" disabled>
+        <small>Please fill out the tags for your project in the Figshare portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the tags for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Categories">Categories</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled>
+        <small>Please fill out the categories for your project in the Figshare portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the categories for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Licence">Licence</label>
+        <input type="text" class="form-control" name="licence" value="{{data.metadata.licence}}" placeholder="Licence of the project" disabled>
+        <small>Please fill out the licence for your project in the Figshare portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the licence for your project.
+        </div>
+    </div>
+</div>
+
+{% else %}
+<p>These are general fields. Fields specificly for <b>{{data.repo}}</b> still need to be implemented. Most of below fields will still work. So go ahead and fill some out.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Publication date">Publication date</label>
+        <input type="date" class="form-control" name="publication_date" value="{{data.metadata.publication_date}}" placeholder="Publication date of the project" {% if disabled %} disabled {% endif %}>
+        <small>In case your upload was already published elsewhere, please use the date of the first publication.</small>
+        <div class="invalid-feedback">
+            Please fill out the publication date for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% block script %}
+    <script>
+        form_validate();
+    </script>
+{% endblock %}

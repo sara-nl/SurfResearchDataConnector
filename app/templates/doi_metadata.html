@@ -1,0 +1,22 @@
+{% if doi_metadata | length > 0 %}
+<div class="table-responsive-sm mt-3 mb-3">
+    <table class="table table-striped table-hover table-sm table-bordered">
+        <tbody>
+            {% for item in doi_metadata %}
+            <tr>
+                <td><b>{{ item | upper }}</b></td>
+                {% if item == 'abstract' %}
+                <td>{{ doi_metadata[item] | striptags }}</td>
+                {% else %}
+                <td>{{ doi_metadata[item]}}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>Metadata on the dataset could not be retrieved. Please use the DOI or DOI url to check the metadata of this dataset.</p>
+<p>Please see if you can find the DOI on this page: <a href="{{ data.url }}" target="_blank" rel="noopener noreferrer">{{ data.url }}</a>.</p>
+<p>Alternatively, you <a href="/download">download</a> using a repository service you are <a href="/connect">connected</a> to. This may return more metadata.</p>
+{% endif %}

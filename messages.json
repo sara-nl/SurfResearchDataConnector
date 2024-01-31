@@ -1,0 +1,54 @@
+[
+    {
+        "short": "started",
+        "long": "Retrieval process started."
+    },
+    {
+        "short": "url in history",
+        "long": "Url in history. We will pull the data again."
+    },
+    {
+        "short": "start data retrieval",
+        "long": "Start data retrieval from url."
+    },
+    {
+        "short": "data retrieved",
+        "long": "Data retrieved from url."
+    },
+    {
+        "short": "failed to retrieve data",
+        "long": "Failed to retrieve data from url."
+    },
+    {
+        "short": "folder already exists.",
+        "long": "Folder already exists. We will use the existing folder."
+    },
+    {
+        "short": "ready",
+        "long": "Retrieval process completed."
+    },
+    {
+        "short": "connected",
+        "long": "The app is connected to research drive."
+    },
+    {
+        "short": "failed to connect",
+        "long": "Failed to connect the app to research drive."
+    },
+    {
+        "short": "disconnected",
+        "long": "Disonnected the app from research drive."
+    },
+    {
+        "short": "failed to create folder",
+        "long": "Failed to create a folder on research drive."
+    },
+    {
+        "short": "failed to push file",
+        "long": "Failed to push a file to research drive."
+    },
+    {
+        "short": "failed to login to webdav",
+        "long": "Failed to login to webdav."
+    }
+]

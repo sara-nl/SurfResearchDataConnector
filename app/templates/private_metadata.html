@@ -1,0 +1,21 @@
+{% if private_metadata | length > 0 %}
+<div class="table-responsive-sm mt-3 mb-3">
+    <table class="table table-striped table-hover table-sm table-bordered">
+        <tbody>
+            {% for item in private_metadata %}
+            <tr>
+                <td><b>{{ item | upper }}</b></td>
+                {% if item == 'abstract' or item == 'description' %}
+                <td>{{ private_metadata[item] | striptags }}</td>
+                {% else %}
+                <td>{{ private_metadata[item]}}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>Metadata on the dataset could not be retrieved. Please use the DOI or DOI url to check the metadata of this dataset.</p>
+<p>Please see if you can find the DOI on this page: <a href="{{ data.url }}" target="_blank" rel="noopener noreferrer">{{ data.url }}</a>.</p>
+{% endif %}

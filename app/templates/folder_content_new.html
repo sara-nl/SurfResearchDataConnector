@@ -1,0 +1,83 @@
+{% if folder_content | length > 0 %}
+<p>Root folder: <b>{{ data.complete_folder_path }}</b></p>
+<p>This is the content of the data folder you will be working with NEW:</p>
+<ul id="myUL">
+    {% for item in folder_content %}
+    <li><span class="caret">{{ item.folder }}</span>
+        <ul class="nested">
+            {% for subitem in item.subfolders %}
+                <li><span class="caret">{{ subitem.folder }}</span></li>
+            {% endfor %}
+            {% for subitem in item.files %}
+                <li>{{ subitem }}/li>
+            {% endfor %}
+
+        </ul>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+    {%if data.permission %}
+        {% if data.folder %}
+        <p>A new folder will be created at <b>{{ data.complete_folder_path }}</b>.</p>
+        {% else %}
+        <p>There is no content in folder: <b>{{ data.complete_folder_path }}</b>.</p>
+        {% endif %}
+    {% else %}
+        <p>Your account does not have permission to create this folder: <b>{{ data.complete_folder_path }}</b>.</p>
+    {% endif%}
+{% endif %}
+
+<style>
+    /* Remove default bullets */
+ul, #myUL {
+  list-style-type: none;
+}
+
+/* Remove margins and padding from the parent ul */
+#myUL {
+  margin: 0;
+  padding: 0;
+}
+
+/* Style the caret/arrow */
+.caret {
+  cursor: pointer;
+  user-select: none; /* Prevent text selection */
+}
+
+/* Create the caret/arrow with a unicode, and style it */
+.caret::before {
+  content: "\25B6";
+  color: black;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* Rotate the caret/arrow icon when clicked on (using JavaScript) */
+.caret-down::before {
+  transform: rotate(90deg);
+}
+
+/* Hide the nested list */
+.nested {
+  display: none;
+}
+
+/* Show the nested list when the user clicks on the caret/arrow (with JavaScript) */
+.active {
+  display: block;
+} 
+</style>
+
+<script>
+var toggler = document.getElementsByClassName("caret");
+var i;
+
+for (i = 0; i < toggler.length; i++) {
+  toggler[i].addEventListener("click", function() {
+    this.parentElement.querySelector(".nested").classList.toggle("active");
+    this.classList.toggle("caret-down");
+  });
+} 
+</script>
