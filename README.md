@@ -62,3 +62,6 @@ EMBED_APP_URL: https://aperture.data.surfsara.nl/index.php/apps/external/1
 ### Provide the correct environment variables to the SRDC app.
 
 Fill out  the variables in the env.ini.
+
+## TODO
+* Complete deployment instructions
