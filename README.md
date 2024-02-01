@@ -63,5 +63,37 @@ EMBED_APP_URL: https://aperture.data.surfsara.nl/index.php/apps/external/1
 
 Fill out  the variables in the env.ini.
 
+## Local development setup
+
+Everything needed for a local setup of the app is located in the ./local folder.
+
+### Minikube
+The setup can be done on a minikube cluster.
+More info on minikube can be found here: https://minikube.sigs.k8s.io/docs/start/
+First install minikube on your system.
+On linux you can run the minikube.sh script, but you do need to customize it to match your setup.
+
+### Run as local flask app in debug mode
+To run the app simply as a local flask app run:
+```
+flask --app run run
+```
+If you go to http://127.0.0.1:5000/ the app will open the home page and try to automatically connect using Oauth2.
+If this is not setup (yet) you can go to http://127.0.0.1:5000/connect and connect using an app password.
+
+### Config
+The app reads all the config variables from the env.ini file.
+Make sure that you set all the LOCAL_XXX variables to match your local app.
+
+### SQlite db
+The app will try to find a sql database if you have this setup in the config.
+If a database connection cannot be initiated the app will try to use a local sqlite database.
+To create the sqlite database run:
+
+```
+flask db init
+flask db upgrade
+```
+
 ## TODO
 * Complete deployment instructions
