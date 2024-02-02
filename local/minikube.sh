@@ -13,8 +13,12 @@
 #
 # Simply comment out the steps you want to skip.
 ##############################################
-
 echo "######## Setting up minikube ##########"
+
+echo "#######################################"
+echo "Set driver to docker"
+minikube config set driver docker
+
 echo "#######################################"
 echo "start with a new minikube cluster"
 
@@ -24,11 +28,7 @@ minikube delete
 
 echo "#######################################"
 echo "Start up a new minikube cluster with kubernetes version 1.23.0"
-minikube start --kubernetes-version=v1.23.0 --mount-string="/home/dave/Projects/surfresearchdataretriever:/RRDS" --mount
-
-echo "#######################################"
-echo "Set driver to docker"
-minikube config set driver docker
+minikube start --kubernetes-version=v1.23.0 --mount-string="/home/dave/Projects/data-retriever:/RRDS" --mount
 
 echo "#######################################"
 echo "Enable the ingress addon"
