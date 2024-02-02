@@ -18,7 +18,7 @@ from rocrate.rocrate import ROCrate
 from rocrate.model.person import Person
 from rocrate.model.dataset import Dataset
 from functools import lru_cache
-
+import xml.etree.ElementTree as ET
 
 
 try:
@@ -373,6 +373,8 @@ def update_history(username, folder, url, status):
         status (str): status of the data import
     """
     logger.info(f"update_history: {status}")
+    # status can be up to 128 chars long
+    status = status[:128]
     query_status[(username, folder, url)] = status
     with app.app_context():
         history = History(username=username,
@@ -482,104 +484,6 @@ def run_import(username, password, folder, url):
     update_history(username, folder, url, 'start pushing dataset to storage')
     push_data(username, password, folder, url)
     update_history(username, folder, url, 'ready')
-
-
-def get_app_passwords(token):
-    """will get the available app passwords using the authtoken
-
-    Args:
-        token (str): the authtoken
-
-    Returns:
-        json: all the available app passwords
-    """
-    url = f"{drive_url}/index.php/settings/personal/authtokens"
-
-    # This function relies on a Cookie and will actually work without the bearer token.
-    headers = {
-        # 'Authorization': f'Bearer {token}',
-        'Cookie': ''
-    }
-
-    response = requests.request("GET", url, headers=headers)
-
-    if response.status_code == 200:
-        return response.json()
-
-
-def delete_app_password(id, token):
-    """will delete the app password
-
-    Args:
-        id (int): id of the app password
-        token (str): the authtoken
-
-    Returns:
-        bool: True if deletion is succesful
-    """
-    id = str(id)
-    url = f"{drive_url}/index.php/settings/personal/authtokens/{id}"
-
-    # This function relies on a Cookie and will actually work without the bearer token.
-    headers = {
-        # 'Authorization': f'Bearer {token}',
-        'Cookie': ''
-    }
-
-    response = requests.request("DELETE", url, headers=headers)
-
-    if response.status_code == 200:
-        return True
-
-
-def remove_app_password(token):
-    """Get all passwords and remove the ones that are named 'SRDR'
-
-    Args:
-        token (str): the auth token
-
-    Returns:
-        bool: True if removal was succesful
-    """
-    try:
-        app_passwords = get_app_passwords(token)
-        for pw in app_passwords:
-            if pw['name'] == 'SRDR':
-                delete_app_password(pw['id'], token)
-        return True
-    except:
-        return False
-
-
-def create_app_password(token):
-    """Will remove the current app password if there is any.
-    Then it will create a new one.
-
-    Args:
-        token (str): the auth token
-
-    Returns:
-        json: the response from the call that creates the app password.
-    """
-
-    return
-    
-    remove_app_password(token)
-
-    # Now recreate the app password with name 'SRDR'
-    url = f"{drive_url}/index.php/settings/personal/authtokens"
-
-    payload = {'name': 'SRDR'}
-
-    # This function relies on a Cookie and will actually work without the bearer token.
-    headers = {
-        # 'Authorization': f'Bearer {token}',
-        'Cookie': ''    }
-
-    response = requests.request("POST", url, headers=headers, data=payload)
-
-    if response.status_code == 200:
-        return response.json()
 
 
 def get_quota_text(username, password):
@@ -885,6 +789,41 @@ def get_raw_folders(username, password, folder):
     list_of_paths = get_folder_content(username, password, folder)
     # logger.error(list_of_paths)
     return parse_folder_structure(list_of_paths, folder)
+
+
+def get_user_info(token):
+    """Gets the OC userinfo
+
+    Args:
+        token (str): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    url = f"{drive_url}/index.php/apps/oauth2/api/v1/userinfo"
+    headers = {'Authorization': f'Bearer {token}'}
+    response = requests.request("GET", url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+ 
+
+def get_webdav_token(token, username):
+    """Will get a webdav token.
+
+    Args:
+        token (str): the auth token
+        username (str): the sub from userinfo
+    Returns:
+        str: the webdav token that has been set as app password under the name RDC
+    """
+    url = f"{drive_url}/ocs/v1.php/RDC/token/{username}"
+    headers = {'Authorization': f'Bearer {token}'}
+    response = requests.request("GET", url, headers=headers)
+    if response.status_code == 200:
+        tree = ET.fromstring(response.text)
+        for webdavtoken in tree.iter('token'):
+            return webdavtoken.text
+
 
 if __name__ == "__main__":
     from prettyprinter import pprint

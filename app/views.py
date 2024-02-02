@@ -1,15 +1,18 @@
-from app.models import app, History
+from app.models import app, db, History
 from app.connections import oauth, registered_services, oauth_services, token_based_services
-from app.utils import run_import, make_connection
-from app.utils import create_app_password, remove_app_password
+from app.utils import run_import, make_connection, get_webdav_token
+from app.utils import get_user_info
 from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, query_status
-from app.utils import get_folders, get_folder_content, get_files_info, get_raw_folders
+from app.utils import get_folders, get_folder_content, get_files_info, check_checksums, update_history, push_data, get_raw_folders
 from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission
 from app.repos import run_export, check_connection, get_private_metadata, get_repocontent
 from threading import Thread
-from flask import request, session, flash, render_template, redirect
+from flask import request, session, flash, render_template, url_for, redirect
 from app.globalvars import *
 import logging
+import math
+import os
+import requests
 import json
 from sqlalchemy import and_
 from app.repos import run_private_import
@@ -110,8 +113,6 @@ def connect():
     try:
         if request.method == "POST":
             if 'disconnect' in request.form:
-                if 'access_token' in session:
-                    remove_app_password(session['access_token'])
                 session.clear()
                 session.pop('_flashes', None)
                 flash('research drive disconnected')
@@ -272,12 +273,14 @@ def upload():
             if 'preview' in request.form:
                 preview = True
 
-                # get the repo
-                session['repo'] = request.form['selected_repo']
+                if 'selected_repo' in request.form and request.form['selected_repo']!='none':
+                    # get the repo
+                    session['repo'] = request.form['selected_repo']
 
-                # needed for getting the right statusses remote can either be the url or repo
-                session['remote'] = request.form['selected_repo']
-                
+                    # needed for getting the right statusses remote can either be the url or repo
+                    session['remote'] = request.form['selected_repo']
+                else:
+                    flash('Please select a repository.')                
                 # get the folder and set it to session folder
                 session['folder_path'] = request.form['folder_path']
                 session['complete_folder_path'] = request.form['folder_path']
@@ -792,11 +795,9 @@ def authorize(service=None):
             oauth_token = oauth.owncloud.token
             access_token = oauth_token['access_token']
             refresh_token = oauth_token['refresh_token']
-            remove_app_password(access_token)
-            app_password = create_app_password(access_token)
-            username = app_password['loginName']
-            password = app_password['token']
-
+            user_info = get_user_info(access_token)
+            username = user_info['sub']
+            password = get_webdav_token(access_token, username)
             session.clear()
             if make_connection(username, password):
                 session['username'] = username
@@ -811,7 +812,7 @@ def authorize(service=None):
                 flash('failed to connect')
                 session['failed'] = True
         except:
-            flash('failed to connect')
+            flash(f'failed to connect')
             session['failed'] = True
     elif service in registered_services:
         try:
