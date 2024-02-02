@@ -7,26 +7,32 @@
 {% endblock %}
 
 {% block content %}
-<h1>Connect</h1>
+{% if data.connected==true %}
+<h1>Connections</h1>
 <p>Manage all your connections.</p>
+{% else %}
+<h1>Connect</h1>
+<p>Connect to your Research Drive first.</p>
+{% endif %}
+
 <h2>Surf Research Drive</h2>
 <img src="{{ url_for('static', filename = '/img/surf.png' ) }}" alt="surf">
 {% if data.connected==true %}
     <div class="row mt-3 mb-3">
         <p>
-            You are connected to: {{data.username}}
+            You are connected as: <b>{{data.username}}</b>
         </p>
     </div>
     
     <div class="row mt-3 mb-3">
         <form method="post" action="" class="needs-validation" novalidate>
             <input type="hidden" class="form-control" name="disconnect" value=True>
-            <button type="submit" class="btn btn-primary">Disconnect</button>
+            <button type="submit" class="btn btn-secondary">Disconnect</button>
         </form>    
     </div>
 
     <!-- BEGIN OAUTH SERVICES -->
-    <h2>Connect to private repositories using Oauth</h2>
+    <h2>Manage your connections to private repositories using Oauth</h2>
     <div>
     {% for service in oauth_services %}
     <div class="form-check-inline col-3 mt-3 mb-3">
@@ -48,7 +54,7 @@
         <div class="row mt-3 mb-3">
             <form method="post" action="" class="needs-validation" novalidate>
                 <input type="hidden" class="form-control" name="{{service}}_disconnect" value=True>
-                <button type="submit" class="btn btn-primary">Disconnect</button>
+                <button type="submit" class="btn btn-secondary">Disconnect</button>
             </form>    
         </div>
     {% else %}
@@ -58,7 +64,7 @@
             </p>
         </div>
         <div class="row mt-3 mb-3">
-            <a href="/login/{{service}}" target="_top"><button class="btn btn-primary">Connect by OAUTH</button></a>
+            <a href="/login/{{service}}" target="_top"><button class="btn btn-secondary">Connect by OAUTH</button></a>
         </div>
     {% endif %}
     </div>
@@ -67,7 +73,7 @@
     <!-- END OAUTH SERVICES -->
 
     <!-- BEGIN TOKEN SERVICES -->
-    <h2>Connect to private repositories using Basic Auth</h2>
+    <h2>Manage your connections to private repositories using Basic Auth</h2>
     <div>
     {% for service in token_based_services %}
     <div class="form-check-inline col-3 mt-3 mb-3">
@@ -89,7 +95,7 @@
         <div class="row mt-3 mb-3">
             <form method="post" action="" class="needs-validation" novalidate>
                 <input type="hidden" class="form-control" name="{{service}}_disconnect" value=True>
-                <button type="submit" class="btn btn-primary">Disconnect</button>
+                <button type="submit" class="btn btn-secondary">Disconnect</button>
             </form>    
         </div>
     {% else %}
@@ -115,7 +121,7 @@
                         Please fill out an application token for connecting.
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Connect</button>
+                <button type="submit" class="btn btn-secondary">Connect</button>
             </form>
         </div>
     {% endif %}
@@ -125,15 +131,15 @@
     <!-- END TOKEN SERVICES -->
 
 {% else %}
-    <!-- <div class="row mt-3 mb-3">
-        <a href="/login" target="_top"><button class="btn btn-primary">Connect by OAUTH</button></a>
-    </div> -->
+    <div class="row mt-3 mb-3">
+        <a href="/login" target="_top"><button class="btn btn-secondary">Connect by OAUTH</button></a>
+    </div>
 
     <div class="row mtb-3">
         <form method="post" action="" class="needs-validation" novalidate>
             <div class="form-group">
                 <label for="Username">Username: </label>
-                <input type="email" class="form-control" name="username" value="{{data.username}}" required>
+                <input type="text" class="form-control" name="username" value="{{data.username}}" required>
                 <div class="invalid-feedback">
                     Please fill out your Research Drive Username
                 </div>
@@ -149,7 +155,7 @@
                 </div>
                 <P>You can generate an application password <a href="{{drive_url}}/index.php/settings/personal?sectionid=security#apppasswords" target="_top">here</a>.</P>
             </div>
-            <button type="submit" class="btn btn-primary">Connect</button>
+            <button type="submit" class="btn btn-secondary">Connect</button>
         </form>
     </div>
 {% endif %}

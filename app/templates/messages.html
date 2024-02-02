@@ -12,7 +12,7 @@
   {% for message in messages %}
   <div class="accordion-item">
     <h2 class="accordion-header">
-      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{loop.index}}" aria-expanded="true" aria-controls="collapse{{loop.index}}">
+      <button class="accordion-button bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{loop.index}}" aria-expanded="true" aria-controls="collapse{{loop.index}}">
         <strong>{{loop.index}}</strong> - {{ message.short }}
       </button>
     </h2>

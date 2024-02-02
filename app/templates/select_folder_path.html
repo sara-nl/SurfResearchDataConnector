@@ -1,9 +1,13 @@
-<select name="folder_path" class="form-select" >
+<select name="folder_path" class="form-select" required>
+    <option></option>
     {% for folder_path in folder_paths %}
-        {% if folder_path == data.folder_path %}
-        <option value="{{folder_path}}" selected>{{ folder_path }}</option>
+        {% if folder_path == data.complete_folder_path %}
+        <option value="{{folder_path}}" selected='selected' >{{ folder_path }}</option>
         {% else %}
             <option value="{{folder_path}}">{{ folder_path }}</option>
         {% endif %}
     {% endfor %}
 </select>
+<div class="invalid-feedback">
+    Please select a folder path!
+</div>

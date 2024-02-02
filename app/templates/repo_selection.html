@@ -22,9 +22,14 @@
         <p><small><a href="/connect">Connect to {{ service }}</a></small></p>
         {% endif %}
     </div>
-
     {% endif %}
     {% endfor %}
+    <div class="form-check form-check-inline mt-3 mb-3 col-3">
+        <input class="form-check-input" type="radio" name="selected_repo" id="radio-none" value="none" required hidden>
+        <div class="invalid-feedback">
+            Please select a repository!
+        </div>
+    </div>
 </div>
 
 <script>

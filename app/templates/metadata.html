@@ -10,7 +10,7 @@
     </div>
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the author for your project.
         </div>
@@ -19,7 +19,7 @@
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" required {% if disabled %} disabled {% endif %}>
         <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
         <div class="invalid-feedback">
             Please fill out the affiliation for your project.
@@ -29,7 +29,7 @@
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
         <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
             Please fill out the description for your project.
         </div>
@@ -95,7 +95,7 @@
     </div>
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the author for your project.
         </div>
@@ -104,7 +104,7 @@
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" required {% if disabled %} disabled {% endif %}>
         <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
         <div class="invalid-feedback">
             Please fill out the affiliation for your project.
@@ -122,7 +122,7 @@
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
         <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
             Please fill out the description for your project.
         </div>
@@ -132,14 +132,14 @@
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Contact name">Contact name</label>
-        <input type="text" class="form-control" name="contact_name" value="{{data.metadata.contact_name}}" placeholder="Name of the contact person of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="contact_name" value="{{data.metadata.contact_name}}" placeholder="Name of the contact person of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the name of the contact person for your project.
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Contact email">Contact email</label>
-        <input type="email" class="form-control" name="contact_email" value="{{data.metadata.contact_email}}" placeholder="Email of the contact person of the project" {% if disabled %} disabled {% endif %}>
+        <input type="email" class="form-control" name="contact_email" value="{{data.metadata.contact_email}}" placeholder="Email of the contact person of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the email of the contact person for your project.
         </div>
@@ -182,7 +182,7 @@
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
         <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
             Please fill out the description for your project.
         </div>
@@ -192,7 +192,7 @@
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Tags">Tags</label>
-        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" required {% if disabled %} disabled {% endif %}>
         <small>Seperate your tags by commas.</small>
         <div class="invalid-feedback">
             Please fill out the tags for your project.
@@ -231,7 +231,7 @@
     </div>
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the author for your project.
         </div>
@@ -241,7 +241,7 @@
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" required {% if disabled %} disabled {% endif %}>
         <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
         <div class="invalid-feedback">
             Please fill out the affiliation for your project.
@@ -249,7 +249,7 @@
     </div>   
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Publication date">Publication date</label>
-        <input type="date" class="form-control" name="publication_date" value="{{data.metadata.publication_date}}" placeholder="Publication date of the project" {% if disabled %} disabled {% endif %}>
+        <input type="date" class="form-control" name="publication_date" value="{{data.metadata.publication_date}}" placeholder="Publication date of the project" required {% if disabled %} disabled {% endif %}>
         <small>In case your upload was already published elsewhere, please use the date of the first publication.</small>
         <div class="invalid-feedback">
             Please fill out the publication date for your project.
@@ -260,7 +260,7 @@
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
         <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
             Please fill out the description for your project.
         </div>
@@ -297,7 +297,7 @@
     </div>
     <div class="form-group col-6 mt-3 mb-3">
         <label for="Publisher">Publisher</label>
-        <input type="text" class="form-control" name="publisher" value="{{data.metadata.publisher}}" placeholder="Publisher of the project" {% if disabled %} disabled {% endif %} >
+        <input type="text" class="form-control" name="publisher" value="{{data.metadata.publisher}}" placeholder="Publisher of the project" required {% if disabled %} disabled {% endif %} >
         <div class="invalid-feedback">
             Please fill out the publisher for your project.
         </div>
@@ -337,7 +337,7 @@
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
         <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
             Please fill out the description for your project.
         </div>

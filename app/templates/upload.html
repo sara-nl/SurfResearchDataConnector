@@ -79,7 +79,7 @@
                 <!-- ### END PREVIEW ### -->
 
                 <a href="/upload" class="btn btn-secondary">Back</a>
-                <button type="submit" class="btn btn-primary">Start Upload</button>
+                <button type="submit" class="btn btn-secondary">Start Upload</button>
                 <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" id="flexUploadZip" value="" name="use_zip">
                     <label class="form-check-label" for="flexUploadZip">
@@ -87,12 +87,14 @@
                     </label>
                 </div>
                 <div class="form-check mt-3 mb-3">
-                    <input class="form-check-input" type="checkbox" id="flexCheckUpload" value="" name="start_upload">
+                    <input class="form-check-input" type="checkbox" id="flexCheckUpload" value="" name="start_upload" required>
                     <label class="form-check-label" for="flexCheckUpload">
                         Check to confirm start of upload.
                     </label>
-                </div>
-            
+                    <div class="invalid-feedback">
+                        Please check this box to confirm upload!
+                    </div>
+                </div> 
             {% endif %}
         </form>
     {% else %}
@@ -119,7 +121,7 @@
 
     <!-- BEGIN NOT CONNECTED -->
     <p>Please connect first.</p>
-    <a href="/connect"><button class="btn btn-primary">Connect</button></a>
+    <a href="/connect"><button class="btn btn-secondary">Connect</button></a>
     <!-- END NOT CONNECTED -->
 
 {% endif %}

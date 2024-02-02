@@ -19,24 +19,39 @@
 <body>
     <div class="container">
         <div class="row">
-            <div class="col-12">
-                <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                    <ul class="navbar-nav mr-auto">
-                        <li class="nav-item"><a class="nav-link" href="/">HOME</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/connect">CONNECT</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/retrieve">DOWNLOAD</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/upload">UPLOAD</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/history">HISTORY</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/faq">FAQ</a></li>
-                    </ul>
-                </nav>
-            </div>
+            <nav class="navbar navbar-light">
+                {% if data.connected==true %}
+                    <div class="m-1">You are connected as: <b>{{data.username}}</b></div>
+                    <div class="m-1">
+                        <button class="btn btn-light"><a class="nav-link" href="/connect">YOUR CONNECTIONS</a></button>
+                    </div>
+                {% else %}
+                    <div class="m-1">You are not connected yet.</div>
+                    <div class="m-1">
+                        <button class="btn btn-light"><a class="nav-link" href="/connect">CONNECT</a></button>
+                    </div>
+                {% endif %}
+            </nav>
+        </div>
+
+        <div class="row">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <ul class="navbar-nav mr-auto">
+                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/">HOME</a></button></li>
+                    {% if data.connected==true %}
+                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/upload">UPLOAD</a></button></li>
+                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/retrieve">DOWNLOAD</a></button></li>
+                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/history">HISTORY</a></button></li>
+                    {% endif %}
+                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/faq">FAQ</a></button></li>
+                </ul>  
+            </nav>
         </div>
         <div class="row">
             <div class="col-12">
                 {% with messages = get_flashed_messages() %}
                 {% if messages %}
-                <div class="alert alert-primary show" id="flashmessages">
+                <div class="alert alert-secondary show" id="flashmessages">
                     <ul class="list-group">
                         {% for message in messages %}
                         <li class="list-group-item">{{ message }}</li>
