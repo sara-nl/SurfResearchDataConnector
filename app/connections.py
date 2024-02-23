@@ -5,7 +5,7 @@ try:
     from app.globalvars import *
 except:
     # for testing this file locally
-    from models import app
+    from models import app, db, History
     from globalvars import *
     print("testing")
 

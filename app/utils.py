@@ -26,7 +26,7 @@ try:
     from app.globalvars import *
 except:
     # for testing this file locally
-    # from models import app, db, History
+    from models import app, db, History
     from globalvars import *
     print("testing")
 
@@ -38,6 +38,38 @@ oc = owncloud.Client(drive_url)
 
 global query_status
 query_status = {}
+
+global canceled
+canceled = {}
+
+global summary
+summary = {}
+
+
+def set_canceled(username, b):
+    """set the username to True in the global canceled var (dict)
+    Is useful for passing the canceled by user action to a thread
+    that is processing in the background.
+
+    Args:
+        username (str): the username in the session
+        b (bool): True is user has caneled the process, otherwise False
+    """
+    canceled[username] = b
+
+
+def get_canceled(username):
+    """Get the canceled status for a user.
+
+    Args:
+        username (str): the username in the session
+
+    Returns:
+        bool: True is user has canceled the process
+    """
+    if username in canceled:
+        return canceled[username]
+    return False
 
 
 def get_data(url, folder, username=None,):
@@ -66,9 +98,9 @@ def get_data(url, folder, username=None,):
                        url=url, status=message)
 
 
-@lru_cache(maxsize=1)
+# @lru_cache(maxsize=1)
 def get_files_info(url):
-    """_summary_
+    """Will get file info by datahugger
 
     Args:
         url (str): url of the dataset repo
@@ -223,30 +255,33 @@ def push_data(username, password, folder, url):
         # upload file by file to OC
         n = 1
         for root, dirs, files in os.walk(folder):
-            if not folder_exists:
-                try:
-                    oc.mkdir(root)
-                except:
-                    message = "failed to create folder"
+            if not get_canceled(username):
+                if not folder_exists:
+                    try:
+                        oc.mkdir(root)
+                    except:
+                        message = "failed to create folder"
+                        update_history(username, folder, url, message)
+                for j in files:
+                    filepath = os.path.join(root, j)
+                    try:
+                        oc.put_file(filepath, filepath)
+                        message = f"uploaded file {n} of {totalfilescount}: {filepath}"
+                    except:
+                        message = f"failed to upload file {filepath}"
                     update_history(username, folder, url, message)
-            for j in files:
-                filepath = os.path.join(root, j)
-                try:
-                    oc.put_file(filepath, filepath)
-                    message = f"uploaded file {n} of {totalfilescount}: {filepath}"
-                except:
-                    message = f"failed to upload file {filepath}"
-                update_history(username, folder, url, message)
-                n += 1
+                    n += 1
         
         # remove the local folder with the data
         try:
             shutil.rmtree(folder)
+            update_history(username,folder, url, "Removing temporary data")
         except Exception as e:
             logger.error(e, exc_info=True)
     except Exception as eee:
         try:
             shutil.rmtree(folder)
+            update_history(username,folder, url, "Removing temporary data")
         except Exception as ee:
             logger.error(ee, exc_info=True)
         logger.error(eee, exc_info=True)
@@ -281,8 +316,7 @@ def check_permission(username, password, folderpath):
         logger.info("folder exists")
         return True
 
-
-@lru_cache(maxsize=1)
+# @lru_cache(maxsize=1)
 def get_folders(username, password, folder):
     """Will get the folders on an owncloud instance.
 
@@ -312,7 +346,7 @@ def get_folders(username, password, folder):
         logger.error(message)
 
 
-@lru_cache(maxsize=1)
+# @lru_cache(maxsize=1)
 def get_folder_content(username, password, folder):
     """Will get a folder content on an owncloud instance.
 
@@ -362,6 +396,12 @@ def make_connection(username=None, password=None, token=None):
         return False
 
 
+def get_status_from_history(username, folder, url):
+    with app.app_context():
+        return History.query.filter_by(username=username).filter_by(
+            url=url).filter_by(folder=folder).order_by(History.id.desc()).all()[0].status
+
+
 def update_history(username, folder, url, status):
     """update the history table in the database
     and update the query status
@@ -373,9 +413,27 @@ def update_history(username, folder, url, status):
         status (str): status of the data import
     """
     logger.info(f"update_history: {status}")
+    if status == 'started':
+        summary[username] = {}
+    if 'failed' in status.lower():
+        if 'failed' not in summary[username]:
+            summary[username]['failed'] = 1
+        else:
+            summary[username]['failed'] += 1
+    if 'uploaded' in status.lower():
+        if 'processed' not in summary[username]:
+            summary[username]['processed'] = 1
+        else:
+            summary[username]['processed'] += 1
+    if 'created' in status.lower():
+        if 'created' not in summary[username]:
+            summary[username]['created'] = 1
+        else:
+            summary[username]['created'] += 1
+
     # status can be up to 128 chars long
     status = status[:128]
-    query_status[(username, folder, url)] = status
+    
     with app.app_context():
         history = History(username=username,
                           folder=folder,
@@ -383,6 +441,33 @@ def update_history(username, folder, url, status):
                           status=status)
         db.session.add(history)
         db.session.commit()
+    
+    if status == 'ready':
+        logger.error(summary)
+        canc = get_canceled(username)
+        if 'failed' not in summary[username] and not canc:
+            final_message = "Success! "
+        else:
+            final_message = "Completed with issues. Check the history. "
+            
+        if 'failed' in summary[username]:
+            final_message += "Failures: {}. ".format(summary[username]['failed'])
+        if 'created' in summary[username]:
+            final_message += "Files created: {}. ".format(summary[username]['created'])
+        if 'processed' in summary[username]:
+            final_message += "Files processed: {}. ".format(summary[username]['processed'])
+        if canc:
+            final_message += "Process was canceled by user."
+        final_message = final_message[:128]
+        with app.app_context():
+            history = History(username=username,
+                            folder=folder,
+                            url=url,
+                            status=final_message)
+            db.session.add(history)
+            db.session.commit() 
+
+    set_query_status(username, folder, url, status)
 
 
 def check_checksums(username, url, folder, files_info=None):
@@ -415,7 +500,7 @@ def check_checksums(username, url, folder, files_info=None):
                 except:
                     hash = None
                 try:
-                    hash_type = df2['hash_type'][0]
+                    hash_type = str(df2['hash_type'][0]).lower().replace("-", "")
                 except:
                     hash_type = None
                 newhash = None
@@ -458,68 +543,132 @@ def run_import(username, password, folder, url):
         url (str): url of the location of the data
     """
     update_history(username, folder, url, 'started')
-    get_data(url=url, folder=folder, username=username)
-    update_history(username, folder, url, 'start checking checksums')
-    check_checksums(username, url, folder)
-    update_history(username, folder, url, 'checking checksums done')
+    if not get_canceled(username):
+        get_data(url=url, folder=folder, username=username)
+    if not get_canceled(username):
+        update_history(username, folder, url, 'start checking checksums')
+        check_checksums(username, url, folder)
+        update_history(username, folder, url, 'created checksums')
 
-    # check if there is just one file and it is a zip, then:
-    # unzip that file
-    for subdir, dirs, files in os.walk(folder):
-        if len(files) == 1 and files[0].endswith(".zip"):
-            # there is one file and it is a zip file
-            update_history(username, folder, url, 'unzipping the zip file')
-            zipfilepath = os.path.join(subdir, files[0])
-            import zipfile
-            with zipfile.ZipFile(zipfilepath, 'r') as zip_ref:
-                zip_ref.extractall(folder)
-            # remove the zipfile
-            update_history(username, folder, url, 'removing the zip file')
-            os.remove(zipfilepath)
+    if not get_canceled(username):
+        # check if there is just one file and it is a zip, then:
+        # unzip that file
+        for subdir, dirs, files in os.walk(folder):
+            if len(files) == 1 and files[0].endswith(".zip"):
+                # there is one file and it is a zip file
+                update_history(username, folder, url, 'unzipping the zip file')
+                zipfilepath = os.path.join(subdir, files[0])
+                import zipfile
+                with zipfile.ZipFile(zipfilepath, 'r') as zip_ref:
+                    zip_ref.extractall(folder)
+                # remove the zipfile
+                update_history(username, folder, url, 'removing the zip file')
+                os.remove(zipfilepath)
 
-    update_history(username, folder, url,
-                   'creating ro-crate-metadata.json file ')
-    create_rocrate(url, folder)
-
-    update_history(username, folder, url, 'start pushing dataset to storage')
-    push_data(username, password, folder, url)
+    if not get_canceled(username):
+        update_history(username, folder, url,
+                    'creating ro-crate-metadata.json file ')
+        create_rocrate(url, folder)
+        update_history(username, folder, url,
+                    'created ro-crate-metadata.json file ')
+    if not get_canceled(username):
+        update_history(username, folder, url, 'start pushing dataset to storage')
+        push_data(username, password, folder, url)
     update_history(username, folder, url, 'ready')
 
 
-def get_quota_text(username, password):
+def get_quota_text(username, password, folder=None):
     """Will generate quota text using the get_quota function or will get it from the settings page
 
     Args:
         username (str): username for logging on to the owncloud instance.
         password (str): application password for logging on to the owncloud instance.
+        folder (str): the folder that the user will be using
 
     Returns:
         str: The quota text from the settings page
     """
     try:
-        quota = get_quota(username, password)
-        percent = round((int(quota[0]) / int(quota[1])) * 100.0)
-        return f"You are using {convert_size(int(quota[0]))} of {convert_size(int(quota[1]))} ({percent}%)"
+        quota = get_quota(username, password, folder)
+        used = int(quota[0])
+        available = int(quota[1])
+        have_permission = quota[2]
+        total = used + available
+        percent = round((used / total) * 100.0)
+        result = f"You are using {convert_size(used)} of {convert_size(total)} ({percent}%). "
+        if have_permission:
+            result += "You have write permission to this folder."
+        else:
+            result += "You do not have write permission to this folder."
+        return result
     except:
         return None
 
 
-def get_quota(username, password):
+def get_quota(username, password, folder=None):
     """Will get the used and available storage quota in bytes
 
     Args:
         username (str): username for logging on to the owncloud instance.
         password (str): application password for logging on to the owncloud instance.
+        folder (str): the folder that the user will be using
 
     Returns:
         tuple: the used and available quota in bytes
     """
-    oc.login(username, password)
-    folder = "/"
-    result = oc.list(folder, depth=2)
-    used = result[0].attributes['{DAV:}quota-used-bytes']
-    available = result[0].attributes['{DAV:}quota-available-bytes']
-    return (used, available)
+    r = oc.login(username, password)
+    
+    root_folder = "/"
+    used = 0
+    available = 0
+
+    ### determine the project folder if there is one
+    folders = folder.split("/")
+    # by default the project folder is the folder on top of root
+    project_folder = "/{}/".format(folders[1])   
+    # Or it can have (Projectfolder) in it's name
+    for item in folders:
+        if item.find(" (Projectfolder)") != -1:
+            project_folder = f"/{item}/"
+
+    have_permission = False
+    test_folder = f"{project_folder}/testingpermissions"
+    try:
+        try:
+            # delete test folder if there is any
+            oc.delete(test_folder)
+        except:
+            # if there is no test folder the delete will throw an exception
+            pass
+        # Now make the test folder. Will return True is we have permission else False
+        have_permission = oc.mkdir(test_folder)
+        oc.delete(test_folder)
+    except:
+        # if the mkdir or delete returns exception then we do not have permission.
+        pass
+
+
+    result = oc.list(root_folder, depth=1)
+    
+    # if project_folder != root_folder:
+    if project_folder.find(" (Projectfolder)") != -1:
+        for r in result:
+            try:
+                if r.path == project_folder:
+                    used += int(r.attributes['{DAV:}quota-used-bytes'])
+                    available += int(r.attributes['{DAV:}quota-available-bytes'])
+            except:
+                pass   
+    else:
+        for r in result:
+            if r.path == project_folder:
+                available = int(r.attributes['{DAV:}quota-available-bytes'])
+            try:
+                used += int(r.attributes['{DAV:}quota-used-bytes'])
+            except:
+                used += int(r.attributes['{DAV:}getcontentlength'])
+
+    return (used, available, have_permission)
 
 
 def convert_to_size(number, size_name):
@@ -593,7 +742,7 @@ def repo_content_fits(repo_content, quota_text):
     return False
 
 
-@lru_cache(maxsize=1)
+# @lru_cache(maxsize=1)
 def get_doi_metadata(url):
     """will pull metadata from the passed in url.
 
@@ -784,7 +933,7 @@ def parse_folder_structure(list_of_paths, folder_path):
     return base
 
 
-@lru_cache(maxsize=1)
+# @lru_cache(maxsize=1)
 def get_raw_folders(username, password, folder):
     list_of_paths = get_folder_content(username, password, folder)
     # logger.error(list_of_paths)
@@ -832,3 +981,4 @@ if __name__ == "__main__":
     folder = ""
     result = get_quota(username, password)
     print(result)
+    # print(oc.get_permissions())

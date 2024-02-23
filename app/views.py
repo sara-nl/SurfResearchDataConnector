@@ -1,12 +1,12 @@
 from app.models import app, db, History
 from app.connections import oauth, registered_services, oauth_services, token_based_services
 from app.utils import run_import, make_connection, get_webdav_token
-from app.utils import get_user_info
-from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, query_status
+from app.utils import get_user_info, set_query_status, set_canceled
+from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, get_query_status, get_status_from_history
 from app.utils import get_folders, get_folder_content, get_files_info, check_checksums, update_history, push_data, get_raw_folders
 from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission
 from app.repos import run_export, check_connection, get_private_metadata, get_repocontent
-from threading import Thread
+from threading import Thread, Event
 from flask import request, session, flash, render_template, url_for, redirect
 from app.globalvars import *
 import logging
@@ -26,8 +26,12 @@ def home():
     Returns:
         str: html for the home page
     """
-    data = session
-    data['srdr_url'] = srdr_url
+    try:
+        data = session
+        data['srdr_url'] = srdr_url
+    except Exception as e:
+        flash("something went wrong (1)")
+        logger.error(e, exc_info=True)
     return render_template('home.html', data=data)
 
 
@@ -38,8 +42,12 @@ def faq():
     Returns:
         str: html for the faq page
     """
-    with open('faq.json') as faq_file:
-        faqitems = json.load(faq_file)
+    try:
+        with open('faq.json') as faq_file:
+            faqitems = json.load(faq_file)
+    except Exception as e:
+        flash("something went wrong (2)")
+        logger.error(e, exc_info=True)
     return render_template('faq.html', data=session, faqitems=faqitems)
 
 
@@ -50,8 +58,12 @@ def messages():
     Returns:
         str: html for the messages page
     """
-    with open('messages.json') as messages_file:
-        messages = json.load(messages_file)
+    try:
+        with open('messages.json') as messages_file:
+            messages = json.load(messages_file)
+    except Exception as e:
+        flash("something went wrong (3)")
+        logger.error(e, exc_info=True)
     return render_template('messages.html', data=session, messages=messages)
 
 
@@ -68,34 +80,36 @@ def history(id=None):
     username = ""
     folder = ""
     url = ""
+    try:
+        if 'username' in session:
+            username = session['username']
+            if id:
+                hist_of_id = History.query.filter_by(id=id).one()
+                folder = hist_of_id.folder
+                url = hist_of_id.url
+                history = History.query.filter(
+                    and_(
+                        History.username == username,
+                        History.folder == folder,
+                        History.url == url
+                        )
+                    ).order_by(History.id.desc()).all()
 
-    if 'username' in session:
-        username = session['username']
-        if id:
-            hist_of_id = History.query.filter_by(id=id).one()
-            folder = hist_of_id.folder
-            url = hist_of_id.url
-            history = History.query.filter(
-                and_(
-                    History.username == username,
-                    History.folder == folder,
-                    History.url == url
-                    )
-                ).order_by(History.id.desc()).all()
-
-        else:
-            history = History.query.filter_by(
-                username=username
-                ).order_by(History.id.desc())
-            tmp_hist = []
-            latest_folder_url = []
-            # only get latest status per retrieval
-            for item in history:
-                if [item.folder, item.url] != latest_folder_url:
-                    tmp_hist.append(item)
-                    latest_folder_url = [item.folder, item.url]
-            history = tmp_hist
-
+            else:
+                history = History.query.filter_by(
+                    username=username
+                    ).order_by(History.id.desc())
+                tmp_hist = []
+                latest_folder_url = []
+                # only get latest status per retrieval
+                for item in history:
+                    if [item.folder, item.url] != latest_folder_url:
+                        tmp_hist.append(item)
+                        latest_folder_url = [item.folder, item.url]
+                history = tmp_hist
+    except Exception as e:
+        flash("something went wrong (4)")
+        logger.error(e, exc_info=True)
     return render_template('history.html', data=session, history=history, drive_url=drive_url)
 
 
@@ -209,8 +223,8 @@ def connect():
                     flash('could not connect to sharekit')
             ### END token based service connections ###
     except Exception as e:
+        flash("something went wrong (5)")
         logger.error(e, exc_info=True)
-
     return render_template('connect.html',
                             data=session,
                             drive_url=drive_url,
@@ -228,84 +242,90 @@ def upload():
     """
     preview = None
     repo = None
+    session['repo'] = None
     metadata = {}
     if 'metadata' not in session:
         session['metadata'] = {}
 
     try:
-        session['query_status'] = query_status[(session['username'], session['complete_folder_path'], session['remote'])]
+        session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
     except Exception as e:
         session['query_status'] = None
         logger.error(f"Failed to get query_status: {e}")
 
-    if request.method == "POST":
-        if session['query_status'] == None or session['query_status'] == 'ready':
-            if 'title' in request.form:
-                session['metadata']['title'] = request.form['title']
-            if 'author' in request.form:
-                session['metadata']['author'] = request.form['author']
-            if 'affiliation' in request.form:
-                session['metadata']['affiliation'] = request.form['affiliation']
-            if 'publisher' in request.form:
-                session['metadata']['publisher'] = request.form['publisher']
-            if 'license' in request.form:
-                session['metadata']['license'] = request.form['license']
-            if 'publication_date' in request.form:
-                session['metadata']['publication_date'] = request.form['publication_date']
-            if 'description' in request.form:
-                session['metadata']['description'] = request.form['description']
-            if 'tags' in request.form:
-                session['metadata']['tags'] = request.form['tags']
-            if 'categories' in request.form:
-                session['metadata']['categories'] = request.form['categories']
-            if 'license' in request.form:
-                session['metadata']['license'] = request.form['license']
-            if 'contact_name' in request.form:
-                session['metadata']['contact_name'] = request.form['contact_name']
-            if 'contact_email' in request.form:
-                session['metadata']['contact_email'] = request.form['contact_email']
-            if 'subject' in request.form:
-                session['metadata']['subject'] = request.form['subject']
+    try:
+        if request.method == "POST":
+            if session['query_status'] == None or session['query_status'] == 'ready':
+                if 'title' in request.form:
+                    session['metadata']['title'] = request.form['title']
+                if 'author' in request.form:
+                    session['metadata']['author'] = request.form['author']
+                if 'affiliation' in request.form:
+                    session['metadata']['affiliation'] = request.form['affiliation']
+                if 'publisher' in request.form:
+                    session['metadata']['publisher'] = request.form['publisher']
+                if 'license' in request.form:
+                    session['metadata']['license'] = request.form['license']
+                if 'publication_date' in request.form:
+                    session['metadata']['publication_date'] = request.form['publication_date']
+                if 'description' in request.form:
+                    session['metadata']['description'] = request.form['description']
+                if 'tags' in request.form:
+                    session['metadata']['tags'] = request.form['tags']
+                if 'categories' in request.form:
+                    session['metadata']['categories'] = request.form['categories']
+                if 'license' in request.form:
+                    session['metadata']['license'] = request.form['license']
+                if 'contact_name' in request.form:
+                    session['metadata']['contact_name'] = request.form['contact_name']
+                if 'contact_email' in request.form:
+                    session['metadata']['contact_email'] = request.form['contact_email']
+                if 'subject' in request.form:
+                    session['metadata']['subject'] = request.form['subject']
 
-            # get the metadata fields
-            metadata = session['metadata']
+                # get the metadata fields
+                metadata = session['metadata']
 
-            if 'preview' in request.form:
-                preview = True
+                if 'preview' in request.form:
+                    preview = True
 
-                if 'selected_repo' in request.form and request.form['selected_repo']!='none':
-                    # get the repo
-                    session['repo'] = request.form['selected_repo']
+                    if 'selected_repo' in request.form and request.form['selected_repo']!='none':
+                        # get the repo
+                        session['repo'] = request.form['selected_repo']
 
-                    # needed for getting the right statusses remote can either be the url or repo
-                    session['remote'] = request.form['selected_repo']
+                        # needed for getting the right statusses remote can either be the url or repo
+                        session['remote'] = request.form['selected_repo']
+                    else:
+                        flash('Please select a repository.')                
+                    # get the folder and set it to session folder
+                    session['folder_path'] = request.form['folder_path']
+                    session['complete_folder_path'] = request.form['folder_path']
+                    # will be loaded async based on session folder
+                    
+                if 'start_upload' in request.form:
+                    
+                    username = session['username']
+                    password = session['password']
+                    complete_folder_path = request.form['folder_path']
+                    repo = request.form['selected_repo']
+                    repo_user = None
+                    if repo == "irods":
+                        repo_user = session['irods_user']
+                    api_key=session[f'{repo}_access_token']
+                    use_zip=False
+                    if 'use_zip' in request.form:
+                        use_zip=True
+                    # setting the canceled status to false for this user
+                    set_canceled(username, False)
+                    t = Thread(target=run_export, args=(
+                        username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip))
+                    t.start()
+                    session['query_status'] = 'started'
                 else:
-                    flash('Please select a repository.')                
-                # get the folder and set it to session folder
-                session['folder_path'] = request.form['folder_path']
-                session['complete_folder_path'] = request.form['folder_path']
-                # will be loaded async based on session folder
-                
-            if 'start_upload' in request.form:
-                
-                username = session['username']
-                password = session['password']
-                complete_folder_path = request.form['folder_path']
-                repo = request.form['selected_repo']
-                repo_user = None
-                if repo == "irods":
-                    repo_user = session['irods_user']
-                api_key=session[f'{repo}_access_token']
-                use_zip=False
-                if 'use_zip' in request.form:
-                    use_zip=True
-                t = Thread(target=run_export, args=(
-                    username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip))
-                t.start()
-                session['query_status'] = 'started'
-            else:
-                preview = True
-
+                    preview = True
+    except Exception as e:
+        flash("something went wrong (6)")
+        logger.error(e, exc_info=True)    
     return render_template('upload.html',
                             data=session,
                             preview=preview,
@@ -323,12 +343,10 @@ def retrieve():
     check_accept_folder_first = None
     preview = False
     
-    # deleting the set repo if any
-    if 'repo' in session:
-        del session['repo']
+    session['repo'] = None
 
     try:
-        session['query_status'] = query_status[(session['username'], session['complete_folder_path'], session['remote'])]
+        session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
     except Exception as e:
         session['query_status'] = None
         logger.error(f"Failed to get query_status: {e}")
@@ -393,6 +411,7 @@ def retrieve():
                     pass
                 else:
                     if 'start_download' in request.form:
+                        set_canceled(username, False)
                         t = Thread(target=run_import, args=(
                             username, password, complete_folder_path, url))
                         t.start()
@@ -400,10 +419,9 @@ def retrieve():
                     else:
                         preview = True
                         flash("Previewing data download.")
-
     except Exception as e:
+        flash("something went wrong (7)")
         logger.error(e, exc_info=True)
-
     return render_template('retrieve.html',
                             data=session,
                             preview=preview,
@@ -422,9 +440,10 @@ def download():
     check_accept_url_in_history_first = None
     check_accept_folder_first = None
     preview = False
+    session['repo'] = None
 
     try:
-        session['query_status'] = query_status[(session['username'], session['complete_folder_path'], session['remote'])]
+        session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
     except Exception as e:
         session['query_status'] = None
         logger.error(f"Failed to get query_status: {e}")
@@ -496,6 +515,7 @@ def download():
                         if f'{repo}_user' in session:
                             repo_user = session[f'{repo}_user']
                         api_key=session[f'{repo}_access_token']
+                        set_canceled(session['username'], False)
                         t = Thread(target=run_private_import, args=(
                                     username, password, complete_folder_path, url, repo, api_key, repo_user))
                         t.start()
@@ -503,16 +523,121 @@ def download():
                     else:
                         preview = True
                         flash("Previewing data download.")
-
     except Exception as e:
+        flash("something went wrong (8)")
         logger.error(e, exc_info=True)
-
     return render_template('download.html',
                             data=session,
                             preview=preview,
                             check_accept_folder_first=check_accept_folder_first,
                             check_accept_url_in_history_first=check_accept_url_in_history_first,
                             drive_url=drive_url)
+
+
+@app.route('/cancel_download', methods=['POST'])
+def cancel_download():
+    try:
+        if request.method == "POST":
+            preview = request.form['preview']
+            check_accept_folder_first = request.form['check_accept_folder_first']
+            check_accept_url_in_history_first = request.form['check_accept_url_in_history_first']
+            if 'cancel' in request.form:
+                status = get_query_status(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
+                if status == 'ready':
+                    flash('Process is ready. Will not cancel.')
+                else:
+                    update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
+                    set_query_status(session['username'], session['complete_folder_path'], session['remote'], 'ready')
+                    session['query_status'] = 'ready'
+                    set_canceled(session['username'], True)
+                    preview = False
+                    check_accept_folder_first=False
+                    check_accept_url_in_history_first=False 
+                    flash("Download was canceled by user.")
+    except Exception as e:
+        preview = False
+        check_accept_folder_first = False
+        check_accept_url_in_history_first = False
+        flash("something went wrong (9)")
+        logger.error(e, exc_info=True)
+    return render_template('download.html',
+                            data=session, 
+                            preview=preview,
+                            check_accept_folder_first=check_accept_folder_first,
+                            check_accept_url_in_history_first=check_accept_url_in_history_first,
+                            drive_url=drive_url)
+
+
+@app.route('/cancel_retrieval', methods=['POST'])
+def cancel_retrieval():
+    try:
+        if request.method == "POST":
+            preview = request.form['preview']
+            check_accept_folder_first = request.form['check_accept_folder_first']
+            check_accept_url_in_history_first = request.form['check_accept_url_in_history_first']
+            if 'cancel' in request.form:
+                status = get_query_status(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
+                if status == 'ready':
+                    flash('Process is ready. Will not cancel.')
+                else:
+                    update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
+                    set_query_status(session['username'], session['complete_folder_path'], session['remote'], 'ready')
+                    session['query_status'] = 'ready'
+                    set_canceled(session['username'], True)
+                    preview = False
+                    check_accept_folder_first=False
+                    check_accept_url_in_history_first=False 
+                    flash("Download was canceled by user.")
+    except Exception as e:
+        preview = None
+        check_accept_folder_first = None
+        check_accept_url_in_history_first = None
+        flash("something went wrong (10)")
+        logger.error(e, exc_info=True)
+    return render_template('retrieve.html',
+                            data=session,
+                            preview=preview,
+                            check_accept_folder_first=check_accept_folder_first,
+                            check_accept_url_in_history_first=check_accept_url_in_history_first,
+                            drive_url=drive_url)
+
+@app.route('/cancel_upload', methods=['POST'])
+def cancel_upload():
+    try:
+        if request.method == "POST":
+            preview = request.form['preview']
+            if 'cancel' in request.form:
+                status = get_query_status(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
+                if status == 'ready':
+                    flash('Process is ready. Will not cancel.')
+                else:
+                    update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
+                    set_query_status(session['username'], session['complete_folder_path'], session['remote'], 'ready')
+                    session['query_status'] = 'ready'
+                    set_canceled(session['username'], True)
+                    preview = False
+                    flash("Upload was canceled by user.")
+    except Exception as e:
+        preview = None
+        flash("something went wrong (11)")
+        logger.error(e, exc_info=True)
+    return render_template('upload.html',
+                            data=session,
+                            preview=True,
+                            drive_url=drive_url)
+
+
+@app.route('/debug', methods=['GET'])
+def debug():
+    try:
+        session['showall'] = False
+        if request.args.get('showall').lower() == 'true':
+            session['showall'] = True
+    except Exception as e:
+        flash("something went wrong (12)")
+        logger.error(e, exc_info=True)
+    return render_template('home.html',
+                            data=session)
 
 
 ### BEGIN FILTERS ###
@@ -660,7 +785,7 @@ def repocontent():
         logger.error(f'failed to get repo content: {e}')
         repo_content = [{'message' : f'failed to get repo content'}]
     try:
-        quota_text = get_quota_text(session['username'], session['password'])
+        quota_text = get_quota_text(session['username'], session['password'], session['complete_folder_path'])
         content_fits = repo_content_fits(repo_content, quota_text)
         # permission = check_permission(session['username'], session['password'], session['complete_folder_path'])
     except:
@@ -728,7 +853,7 @@ def quote_text():
         str: html for the quota-text component
     """
     try:
-        quota_text = get_quota_text(session['username'], session['password'])
+        quota_text = get_quota_text(session['username'], session['password'], session['complete_folder_path'])
     except:
         quota_text = ""
     return render_template('quota_text.html', quota_text = quota_text)

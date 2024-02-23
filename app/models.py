@@ -2,7 +2,11 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy.sql import func
-from app.globalvars import *
+try:
+    from app.globalvars import *
+except:
+    # for testing
+    from globalvars import *
 
 app = Flask(__name__)
 

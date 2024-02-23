@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import configparser
 
 logger = logging.getLogger()
@@ -13,7 +14,7 @@ try:
         config.read('env.ini')
     else:
         # for testing irods_repo
-        config.read('../../env.ini')
+        config.read('../env.ini')
 except Exception as e:
     config = None
     logger.error(str(e))
