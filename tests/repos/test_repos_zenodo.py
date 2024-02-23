@@ -326,6 +326,8 @@ class TestZenodoMethods(unittest.TestCase):
         Create a new deposition, uploads file to it, sets some metadata and remove it.
         """
 
+        import time
+
         z = Zenodo(api_key)
 
         expected_title = "Python Uploader to Zenodo"
