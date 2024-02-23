@@ -50,5 +50,9 @@
     {
         "short": "failed to login to webdav",
         "long": "Failed to login to webdav."
+    },
+    {
+        "short": "something went wrong (number)",
+        "long": "This message is shown when something unexpected happended. Please report the number shown on the message to the appplication developer."
     }
 ]

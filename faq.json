@@ -4,12 +4,12 @@
         "answer": "You can connect the app to the research drive on the <a href='/connect'>connect page</a>. The easiest way is to connect by OAUTH. This will automatically create a application password and find your username and use these to connect. Alternatively you can create an application password yourself in the research drive settings and use it together with your research drive username in the form to login."
     },
     {
-        "question": "How do I retrieve data?",
-        "answer": "Once you have connected the app, you can retrieve data on the <a href='/retrieve'>retrieve page</a>. Simply paste the url of the data source in the data url field and fill out the name of the destination folder in the data folder name field and press retrieve."
+        "question": "How do I download data?",
+        "answer": "Once you have connected the app and your repository, you can download data on the <a href='/download'>download page</a>. Simply select your connected repository, paste the url of the data source in the data url field, and fill out the name of the destination folder in the data folder name field and press preview download. You will first get a preview of all the data dat will be downloaded. If that looks good, then press 'Start Download'."
     },
     {
-        "question": "How can I see the status of the data retrieval?",
-        "answer": "Once the data retrieval has started, you will see a flash message saying '<strong>started</strong>'. Once the retrieval is ready you will see a flash message saying '<strong>ready</strong>'. Click the 'get status' button to refresh the page and see the current status. Alternatively you can check and see the status of the current and historical retrievals on the <a href='/history'>history page</a>."
+        "question": "How can I see the status of the data download?",
+        "answer": "Once the data download has started, you will see a message  in the status table saying '<strong>started</strong>'. Once the download is ready you will see a message saying '<strong>ready</strong>'. You can check and see the status of the current and historical downloads on the <a href='/history'>history page</a>."
     },
     {
         "question": "What do the system messages mean?",
