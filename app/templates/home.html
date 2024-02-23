@@ -36,8 +36,10 @@
     <li>Zenodo</li>
     <li>OSF</li>
     <li>Dataverse</li>
+    {% if data.showall %}
     <li>iRods</li>
     <li>Sharekit</li>
+    {% endif %}
 </ul>
 
 <p>
@@ -56,6 +58,7 @@
 <h4>Download from connected private repositories</h4>
 <p>The extension also allows you to <a href="/download">download</a> data from your private repositories. This enables you to download your own data or data that has been shared with you on these repositories.</p>
 
+{% if data.showall %}
 <h4>Download open data</h4>
 <p>
     In the backend the extension uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>pull open data</b>.
@@ -77,5 +80,6 @@
 
 <p>Search for open Research Data in most Datahugger supported repositories using <a href="https://cse.google.com/cse?cx=762961cffaa1c4546" target="_blank">Google</a>.</p>
 <p>Search for open Research Data in most Datahugger supported dataverse repositories using <a href="https://www.re3data.org" target="_blank">re3data</a>.</p>
+{% endif %}
 
 {% endblock %}

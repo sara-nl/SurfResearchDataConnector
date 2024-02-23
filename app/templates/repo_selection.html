@@ -5,6 +5,7 @@
     <p>Select a repository:</p>
     {% for service in registered_services %}
     {% if service != 'owncloud' %}
+    {% if ('showall' in data and data.showall) or (service != 'irods' and service != 'sharekit')%}
     {% set imgfilepath = '/img/'+service+'.png' %}
     {% set access_token_name = service +'_access_token' %}
     <div class="form-check form-check-inline mt-3 mb-3 col-3">
@@ -22,6 +23,7 @@
         <p><small><a href="/connect">Connect to {{ service }}</a></small></p>
         {% endif %}
     </div>
+    {% endif %}
     {% endif %}
     {% endfor %}
     <div class="form-check form-check-inline mt-3 mb-3 col-3">

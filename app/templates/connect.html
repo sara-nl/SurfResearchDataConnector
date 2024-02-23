@@ -76,6 +76,7 @@
     <h2>Manage your connections to private repositories using Basic Auth</h2>
     <div>
     {% for service in token_based_services %}
+    {% if ('showall' in data and data.showall) or (service != 'irods' and service != 'sharekit')%}
     <div class="form-check-inline col-3 mt-3 mb-3">
     {% set imgfilepath = '/img/'+service+'.png' %}
     <hr>
@@ -126,6 +127,7 @@
         </div>
     {% endif %}
     </div>
+    {% endif %}
     {% endfor %}
     </div>
     <!-- END TOKEN SERVICES -->

@@ -55,7 +55,7 @@
         {% if (vars.url_exists_message==True or data.accept_url_in_history==True) and check_accept_url_in_history_first!=None %}
         <div class="form-check mt-3 mb-3">
             <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {%
-                endif %} id="flexCheckUrl" name="accept_url_in_history">
+                endif %} id="flexCheckUrl" name="accept_url_in_history" required>
             <label class="form-check-label" for="flexCheckUrl">
                 Check this to retrieve even if this url is in your history of downloads.
             </label>
@@ -79,7 +79,7 @@
         %}
         <div class="form-check mt-3 mb-3">
             <input class="form-check-input" type="checkbox" value="" {% if data.accept_folder_exist %} checked {% endif
-                %} id="flexCheckFolder" name="accept_folder_exist">
+                %} id="flexCheckFolder" name="accept_folder_exist" required>
             <label class="form-check-label" for="flexCheckFolder">
                 Check this to retrieve even if this folder already exists on your drive. The data will be added to the
                 folder.
@@ -133,10 +133,25 @@
 
 {% else %}
 
+<form action="/cancel_download" method="post">
+    <input type="text" name="cancel" value="true" hidden>
+    <input type="text" name="preview" value={{preview}} hidden>
+    <input type="text" name="check_accept_folder_first" value={{check_accept_folder_first}} hidden>
+    <input type="text" name="check_accept_url_in_history_first" value={{check_accept_url_in_history_first}} hidden>
+    <button type="submit" class="btn btn-secondary">Cancel Download</button>
+    <div class="form-check mt-3 mb-3">
+        <input class="form-check-input" id="flexCheckCancel" type="checkbox" value="" name="checked" required>
+        <label class="form-check-label" for="flexCheckCancel">
+            Check to confirm cancelation.
+        </label>
+    </div>
+</form>
+
+
 <!-- ### BEGIN STATUS TABLE ### -->
 <div id="status">
     <div class="position-absolute top-50 start-50 translate-middle"
-        style="width: 100%; height: 100%; background-color: lightgray; opacity: 0.1; overflow: hidden;">
+        style="width: 100%; height: 100%; background-color: overflow: hidden;">
         <div class="spinner-border position-absolute top-50 start-50 translate-middle" role="status">
             <span class="visually-hidden">Connecting...</span>
         </div>
