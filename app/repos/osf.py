@@ -1,6 +1,12 @@
+import inspect
 import requests
+import json
 import os
 import logging
+from flask import abort, request
+import functools
+import re
+import time
 from io import BufferedReader
 from osfclient import OSF
 
@@ -23,7 +29,12 @@ class Osf(object):
         self.osf.session.base_url = self.osf_api_address
 
     def check_token(self):
-        return self.osf.can_login
+        try:
+            # if we can get projects we are logged in
+            self.osf.projects()
+            return True
+        except:
+            return False
 
     def create_project(self):
         return self.osf.create_project(title='Untitled')
@@ -154,9 +165,19 @@ class Osf(object):
 
 
 if __name__ == "__main__":
-    api_key = "abc"
+    api_key = ""
     osf = Osf(api_key)
+    # print(dir(osf))
+    # print(dir(osf.check_token()))
     print(osf.check_token())
+    # project_id = '6rgub'
+    # project_id = osf.create_project().id
+    # print(project_id)
+    # path_to_file = "/home/dave/Projects/surfresearchdataretriever/requirements.txt"
+    # print(osf.upload_new_file_to_project(project_id, path_to_file))
+    # response = osf.get_repo_content(project_id='rbafs')
+    # print(dir(response))
+    # print(response.metadata())
     response = osf.download_files(project_id='rbafs', dest_folder='test1234')
     import prettyprinter as pprint
     pprint.pprint(response)

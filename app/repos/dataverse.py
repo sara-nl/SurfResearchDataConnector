@@ -8,8 +8,16 @@ import functools
 import re
 import time
 
+try:
+    from app.globalvars import *
+except:
+    # for testing this file locally
+    from globalvars import *
+    print("testing")
+
 log = logging.getLogger()
 
+# logging.basicConfig(level=logging.DEBUG)
 
 def _rate_limit(func=None, per_second=1):
     """Limit number of requests made per second.
@@ -99,18 +107,20 @@ class Dataverse(object):
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
         log.debug("Check token: Starts")
-        
-        response = cls(api_key, *args, **kwargs).create_new_dataset(return_response=True)
-        
-        persistent_id = response.json()['data']['persistentId']
-
-        r = cls(api_key, *args, **kwargs).get_dataset(persistent_id=persistent_id, return_response=True)
-        log.debug(f"Check Token: Status Code: {r.status_code}")
-
-        # cleanup
-        cls(api_key, *args, **kwargs).remove_dataset(persistent_id)
-
-        return r.status_code == 200
+        try:
+            user_dataverse = cls(api_key, *args, **kwargs).get_user_dataverse()
+            print(user_dataverse)
+            response = cls(api_key, *args, **kwargs).create_new_dataset(return_response=True)
+            print(response.text)
+            persistent_id = response.json()['data']['persistentId']
+            print(persistent_id)
+            r = cls(api_key, *args, **kwargs).get_dataset(persistent_id=persistent_id, return_response=True)
+            log.debug(f"Check Token: Status Code: {r.status_code}")
+            # cleanup
+            cls(api_key, *args, **kwargs).remove_dataset(persistent_id)
+            return r.status_code == 200
+        except:
+            return False
 
     def set_metadata(self, metadata=None):
         """Set the minimum required metadata if metadata is None
@@ -223,50 +233,48 @@ class Dataverse(object):
         Returns:
             _str: name of the dataverse
         """
-        # parent dataverse at demo.dataverse.nl is "root"
-        parent_dataverse = "surf"
+        # parent dataverse at demo.dataverse.nl is "surf"
+        parent_dataverse = dataverse_parent_dataverse
 
-        # get userid
-        try:
-            req = request.get_json(force=True)
-        except:
-            try:
-                req = request.form.to_dict()
-            except:
-                req = None
-        log.debug("got request data: {}".format(req))
-
-        try:
-            user_id = req.get("userId")
-            email = user_id.split(":")[1].split("//")[1]
-            dataverse_user = re.sub('[\W\_]', '', email)
-        except:
-            email = "surf@surf-rds.nl"
-            dataverse_user = re.sub('[\W\_]', '', email)
-
-        # create a dataverse inside the parent dataverse of the installation
-        # If it already exist it will not be created
-        dataverse = {
-            "name": dataverse_user,
-            "alias": dataverse_user,
-            "dataverseContacts": [
-                {
-                "contactEmail": email
-                }
-            ],
-            "affiliation": "Surf Research Drive",
-            "description": "This dataverse has been created as part of the automated transfer of data from Surf Research Drive",
-            "dataverseType": "UNCATEGORIZED"
-            }
+        # get user and email
+        url = f"{self.dataverse_api_address}/users/:me"
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
-        url = f"{self.dataverse_api_address}/dataverses/{parent_dataverse}"
-        payload = json.dumps(dataverse)
-        r = requests.request("POST", url, headers=headers, data=payload)
-        
-        return dataverse_user
+        try:
+            rr = requests.request("GET", url, headers=headers).json()['data']
+
+            dataverse_user = rr['persistentUserId']
+            dataverse_name = ((re.sub(r"[^a-zA-Z0-9]+", '', dataverse_user)))
+            email = rr['email']
+            
+            # create a dataverse inside the parent dataverse of the installation
+            # If it already exist it will not be created
+            dataverse = {
+                "name": dataverse_name,
+                "alias": dataverse_name,
+                "dataverseContacts": [
+                    {
+                    "contactEmail": email
+                    }
+                ],
+                "affiliation": "Surf Research Drive",
+                "description": "This dataverse has been created as part of the automated transfer of data from Surf Research Drive",
+                "dataverseType": "UNCATEGORIZED"
+                }
+            headers = {
+                'X-Dataverse-key': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            url = f"{self.dataverse_api_address}/dataverses/{parent_dataverse}"
+            payload = json.dumps(dataverse)
+            r = requests.request("POST", url, headers=headers, data=payload)
+            return dataverse_name
+        except Exception as e:
+            log.error(e)
+            raise Exception("Cannot retrieve user info")
+            
 
 
     def get_persistent_id_with_id(self, id: int):
@@ -545,14 +553,13 @@ class Dataverse(object):
 
         
         metadata = self.set_metadata(metadata)
-        print(metadata)
         payload = json.dumps(metadata)
 
         log.debug(f"### payload: {payload}")
 
         r = requests.request("PUT", url, headers=headers, data=payload)
-        
-        log.debug(f"### r: {r}") 
+        rtext = r.text
+        log.debug(f"### r: {rtext}") 
 
         return r.status_code == 204 if not return_response else r
 
@@ -636,8 +643,8 @@ class Dataverse(object):
                 tmp['name'] = file['dataFile']['filename']
                 tmp['size'] = file['dataFile']['filesize']
                 tmp['link'] = file['dataFile']['id']
-                tmp['hash'] = file['dataFile']['md5']
-                tmp['hash_type'] = 'md5'
+                tmp['hash'] = file['dataFile']['checksum']['value']
+                tmp['hash_type'] = str(file['dataFile']['checksum']['type']).lower().replace("-", "")
                 file_content.append(tmp)
             except Exception as e:
                 log.error(f"dataset: {e}")
@@ -746,6 +753,7 @@ class Dataverse(object):
 if __name__ == "__main__":
     """Below code will test the code that interfaces the uploads to dataverse
     """
+    import sys
     import configparser
     from prettyprinter import pprint
 
@@ -763,13 +771,13 @@ if __name__ == "__main__":
     except Exception as e:
         log.error(f"Could not get an api_key for testing: {str(e)}")
         log.info("Halting tests")
-        os.exit()
+        sys.exit()
 
     api_address = os.getenv(
         "API_ADDRESS",
         "https://demo.dataverse.org/api"
     )
-    api_key = ''
+    api_key = 'abc'
     api_address = "https://demo.dataverse.nl/api"
     dataverse = Dataverse(api_key=api_key, api_address=api_address)
 
@@ -777,14 +785,14 @@ if __name__ == "__main__":
     print(api_address)
     check = dataverse.check_token(api_key)
     print(check)
-    if check:
+    # if check:
 
-        persistent_id = "doi:10.80227/test-BON2UZ"
-        repo_content = dataverse.get_repo_content(persistent_id)
-        # repo_content = dataverse.get_private_metadata(persistent_id)
-        pprint(repo_content)
-        result = dataverse.download_files(persistent_id=persistent_id, dest_folder='tmptest')
-        print(result)
+    #     persistent_id = "doi:10.80227/test-BON2UZ"
+    #     repo_content = dataverse.get_repo_content(persistent_id)
+    #     # repo_content = dataverse.get_private_metadata(persistent_id)
+    #     pprint(repo_content)
+    #     result = dataverse.download_files(persistent_id=persistent_id, dest_folder='tmptest')
+    #     print(result)
         # print("### Create dataset ###")
         # dataset = dataverse.create_new_dataset(return_response=True)
         # print(dataset.json())

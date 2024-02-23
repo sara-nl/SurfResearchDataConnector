@@ -493,7 +493,17 @@ class Zenodo(object):
 
 
 if __name__ == "__main__":
-    api_key = ""
-    z = Zenodo(api_key=api_key)   
+    # print("Don't run this file directly. Please use `../server.py` for this.")
+    api_key = "" # sandbox
+    # api_key = "" # prod
+    z = Zenodo(api_key=api_key)
+    # response = z.create_new_deposition_internal(metadata={'title': 'test'}, return_response=True)
+    # response = z.get_deposition(id=6785, return_response=True)
+    
     response = z.download_files(deposition_id=6785,dest_folder="tmptest")
+    # print(response.status_code)
     print(response)
+    # files = z.get_files_from_deposition(deposition_id=6785)
+    # print(files)
+
+    # Drafts not showing: https://github.com/zenodo/zenodo/issues/2513

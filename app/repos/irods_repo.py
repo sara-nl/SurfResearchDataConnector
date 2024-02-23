@@ -1,11 +1,15 @@
 import inspect
+from io import BytesIO, StringIO
 import json
 import os
 import logging
 import requests
+from flask import abort
 import functools
 import time
 from irods.session import iRODSSession
+from irods.meta import iRODSMeta
+from RDS import ROParser
 
 try:
     from app.globalvars import irods_zone, irods_base_folder
@@ -145,51 +149,55 @@ class Irods(object):
             f"get collections from irods, path? {path}, metadata? {metadataFilter}"
         )
  
-        if path is None:
-            path = f"/{zone}/home"
+        try:
+            if path is None:
+                path = f"/{zone}/home"
 
-        with iRODSSession(host=self.irods_api_address,
-                          port=1247,
-                          user=self.user,
-                          password=self.api_key,
-                          zone=zone,
-                          authentication_scheme='pam',
-                          **ssl_settings) as irods_session:
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
 
-            coll = irods_session.collections.get(path)
-            if len(coll.subcollections) > 0:
-                available_collections = []
-                for col in coll.subcollections:
-                    available_collection = {'create_time': str(col.create_time),
-                                            'data_objects': [data_object.id for data_object in col.data_objects],
-                                            'id': col.id,
-                                            'inheritance': str(col.inheritance),
-                                            'manager': col.manager.get(col.path).id,
-                                            'metadata': {key: col.metadata.get_all(key)[0].value for key in col.metadata.keys()},
-                                            'modify_time': str(col.modify_time),
-                                            'name': str(col.name),
-                                            'owner_name': str(col.owner_name),
-                                            'owner_zone': str(col.owner_zone),
-                                            'path': str(col.path),
-                                            'subcollections': [col.path for col in col.subcollections]
+                coll = irods_session.collections.get(path)
+                if len(coll.subcollections) > 0:
+                    available_collections = []
+                    for col in coll.subcollections:
+                        available_collection = {'create_time': str(col.create_time),
+                                                'data_objects': [data_object.id for data_object in col.data_objects],
+                                                'id': col.id,
+                                                'inheritance': str(col.inheritance),
+                                                'manager': col.manager.get(col.path).id,
+                                                'metadata': {key: col.metadata.get_all(key)[0].value for key in col.metadata.keys()},
+                                                'modify_time': str(col.modify_time),
+                                                'name': str(col.name),
+                                                'owner_name': str(col.owner_name),
+                                                'owner_zone': str(col.owner_zone),
+                                                'path': str(col.path),
+                                                'subcollections': [col.path for col in col.subcollections]
+                                                }
+                        available_collections.append(available_collection)
+                    return available_collections
+                else:
+                    available_collection = {'create_time': str(coll.create_time),
+                                            'data_objects': [data_object.id for data_object in coll.data_objects],
+                                            'id': coll.id,
+                                            'inheritance': str(coll.inheritance),
+                                            'manager': coll.manager.get(coll.path).id,
+                                            'metadata': {key: coll.metadata.get_all(key)[0].value for key in coll.metadata.keys()},
+                                            'modify_time': str(coll.modify_time),
+                                            'name': str(coll.name),
+                                            'owner_name': str(coll.owner_name),
+                                            'owner_zone': str(coll.owner_zone),
+                                            'path': str(coll.path),
+                                            'subcollections': []
                                             }
-                    available_collections.append(available_collection)
-                return available_collections
-            else:
-                available_collection = {'create_time': str(coll.create_time),
-                                        'data_objects': [data_object.id for data_object in coll.data_objects],
-                                        'id': coll.id,
-                                        'inheritance': str(coll.inheritance),
-                                        'manager': coll.manager.get(coll.path).id,
-                                        'metadata': {key: coll.metadata.get_all(key)[0].value for key in coll.metadata.keys()},
-                                        'modify_time': str(coll.modify_time),
-                                        'name': str(coll.name),
-                                        'owner_name': str(coll.owner_name),
-                                        'owner_zone': str(coll.owner_zone),
-                                        'path': str(coll.path),
-                                        'subcollections': []
-                                        }
-                return available_collection
+                    return available_collection
+        except Exception as e:
+            log.error(f'exception at irods get_collection_internal: {e}')
+
 
     def create_new_collection_internal(self, metadata: dict = None):
         """Creates a new untitled collection.
@@ -205,43 +213,47 @@ class Irods(object):
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         log.debug("Create new collection: Starts")
 
-        if metadata is not None and 'title' in metadata:
-            title = metadata['title']
-            path = f"/{zone}/home/{folder}/{title}-{str(time.time()).replace('.','')}"
-        else:
-            path = f"/{zone}/home/{folder}/SurfRDC-Upload-{str(time.time()).replace('.','')}"
+        try:
+            if metadata is not None and 'title' in metadata:
+                title = metadata['title']
+                path = f"/{zone}/home/{folder}/{title}-{str(time.time()).replace('.','')}"
+            else:
+                path = f"/{zone}/home/{folder}/SurfRDC-Upload-{str(time.time()).replace('.','')}"
 
-        with iRODSSession(host=self.irods_api_address,
-                          port=1247,
-                          user=self.user,
-                          password=self.api_key,
-                          zone=zone,
-                          authentication_scheme='pam',
-                          **ssl_settings) as irods_session:
-            coll = irods_session.collections.create(path)
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
+                coll = irods_session.collections.create(path)
 
-        available_collection = {'create_time': str(coll.create_time),
-                                'data_objects': [data_object.id for data_object in coll.data_objects],
-                                'id': coll.id,
-                                'inheritance': str(coll.inheritance),
-                                'manager': coll.manager.get(coll.path).id,
-                                'metadata': {key: coll.metadata.get_all(key)[0].value for key in coll.metadata.keys()},
-                                'modify_time': str(coll.modify_time),
-                                'name': str(coll.name),
-                                'owner_name': str(coll.owner_name),
-                                'owner_zone': str(coll.owner_zone),
-                                'path': str(coll.path),
-                                'subcollections': [coll.path for col in coll.subcollections]
-                                }
+            available_collection = {'create_time': str(coll.create_time),
+                                    'data_objects': [data_object.id for data_object in coll.data_objects],
+                                    'id': coll.id,
+                                    'inheritance': str(coll.inheritance),
+                                    'manager': coll.manager.get(coll.path).id,
+                                    'metadata': {key: coll.metadata.get_all(key)[0].value for key in coll.metadata.keys()},
+                                    'modify_time': str(coll.modify_time),
+                                    'name': str(coll.name),
+                                    'owner_name': str(coll.owner_name),
+                                    'owner_zone': str(coll.owner_zone),
+                                    'path': str(coll.path),
+                                    'subcollections': [coll.path for col in coll.subcollections]
+                                    }
 
-        log.debug(f"Metadata: {metadata}")
-        if metadata is not None and isinstance(metadata, dict):
-            log.debug(metadata)
-            self.change_metadata_in_collection_internal(
-                coll.path, metadata
-            )
+            log.debug(f"Metadata: {metadata}")
+            if metadata is not None and isinstance(metadata, dict):
+                log.debug(metadata)
+                self.change_metadata_in_collection_internal(
+                    coll.path, metadata
+                )
 
-        return available_collection
+            return available_collection
+        except Exception as e:
+            log.error(f'exception at irods create_new_collection_internal: {e}')
+
 
     def remove_collection_internal(self, path: str):
         """Will remove an collection based on it's path.
@@ -268,6 +280,7 @@ class Irods(object):
         except:
             return False
 
+
     def create_yoda_metadata(self, path, metadata=None):
         """for Yoda: create yoda-metadata.json file and upload it
 
@@ -278,124 +291,126 @@ class Irods(object):
         Returns:
             json: yoda metadata
         """
-
-        yodametadata = {}
-
-        yodametadata["links"] = [
-            {
-                "rel": "describedby",
-                "href": "https://yoda.uu.nl/schemas/default-2/metadata.json"
-            }
-        ]
-
-        url = yodametadata["links"][0]["href"]
-        schema = requests.get(url).json()
-
-        # set default language
-        yodametadata["Language"] = "en - English"
-        # overwrite default if correctly specified in metadata
-        if "Language" in metadata:
-            if metadata['Language'] in schema["definitions"]["optionsISO639-1"]["enum"]:
-                yodametadata["Language"] = metadata['Language']
-
-        # setting some fixe parameters for now
-        yodametadata["Collected"] = {}
-        yodametadata["Covered_Period"] = {}
-        yodametadata["Related_Datapackage"] = [
-            {
-                "Persistent_Identifier": {}
-            }
-        ]
-        yodametadata["Retention_Period"] = 10
-        yodametadata["Data_Type"] = "Dataset"
-
         try:
-            Funder_Name = " ".join(metadata["funder"])
-            yodametadata["Funding_Reference"] = [{"Funder_Name": Funder_Name}]
-        except:
-            pass
+            yodametadata = {}
 
-        yodametadata["Data_Access_Restriction"] = "Closed"
-        yodametadata["Data_Classification"] = "Basic"
-        yodametadata["License"] = "Custom"
-
-        # set discipline only of correctly specified
-        if "Discipline" in metadata:
-            if metadata['Discipline'] in schema["definitions"]["optionsDiscipline"]["enum"]:
-                yodametadata["Discipline"] = [
-                    metadata['Discipline']
-                ]
-
-        # set tag if specified in metadata
-        if "keywords" in metadata:
-            yodametadata["Tag"] = metadata["keywords"].split(", ")
-
-        # set creator
-        try:
-            yodametadata["Creator"] = [
-                {"Person_Identifier": [{}]}
+            yodametadata["links"] = [
+                {
+                    "rel": "describedby",
+                    "href": "https://yoda.uu.nl/schemas/default-2/metadata.json"
+                }
             ]
-            try:
-                Creator_Name = metadata["author"]
-                Given_Name = Creator_Name.split()[0].strip()
-                Family_Name = Creator_Name.split(Given_Name)[1].strip()
-                yodametadata["Creator"][0]["Name"] = {
-                        "Given_Name": Given_Name,
-                        "Family_Name": Family_Name
-                    }
-            except Exception as e:
-                logger.error(e)
-            try:
-                Creator_Affiliation = metadata["publisher"]
-                yodametadata["Creator"][0]["Affiliation"] = [
-                    Creator_Affiliation
-                ]
-            except:
-                pass
-        except:
-            pass
 
+            url = yodametadata["links"][0]["href"]
+            schema = requests.get(url).json()
 
-        # set contributor
-        try:
-            yodametadata["Contributor"] = [
-                {"Person_Identifier": [{}]}
+            # set default language
+            yodametadata["Language"] = "en - English"
+            # overwrite default if correctly specified in metadata
+            if "Language" in metadata:
+                if metadata['Language'] in schema["definitions"]["optionsISO639-1"]["enum"]:
+                    yodametadata["Language"] = metadata['Language']
+
+            # setting some fixe parameters for now
+            yodametadata["Collected"] = {}
+            yodametadata["Covered_Period"] = {}
+            yodametadata["Related_Datapackage"] = [
+                {
+                    "Persistent_Identifier": {}
+                }
             ]
+            yodametadata["Retention_Period"] = 10
+            yodametadata["Data_Type"] = "Dataset"
+
             try:
-                Contributor_Name = metadata["contributor"][0]
-                Given_Name = Contributor_Name.split()[0].strip()
-                Family_Name = Contributor_Name.split(Given_Name)[1].strip()
-                yodametadata["Contributor"][0]["Name"] = {
-                        "Given_Name": Given_Name,
-                        "Family_Name": Family_Name
-                    }
+                Funder_Name = " ".join(metadata["funder"])
+                yodametadata["Funding_Reference"] = [{"Funder_Name": Funder_Name}]
             except:
                 pass
+
+            yodametadata["Data_Access_Restriction"] = "Closed"
+            yodametadata["Data_Classification"] = "Basic"
+            yodametadata["License"] = "Custom"
+
+            # set discipline only of correctly specified
+            if "Discipline" in metadata:
+                if metadata['Discipline'] in schema["definitions"]["optionsDiscipline"]["enum"]:
+                    yodametadata["Discipline"] = [
+                        metadata['Discipline']
+                    ]
+
+            # set tag if specified in metadata
+            if "keywords" in metadata:
+                yodametadata["Tag"] = metadata["keywords"].split(", ")
+
+            # set creator
             try:
-                Contributor_Affiliation = metadata["contributor"][1]
-                yodametadata["Contributor"][0]["Affiliation"] = [
-                    Contributor_Affiliation
+                yodametadata["Creator"] = [
+                    {"Person_Identifier": [{}]}
                 ]
+                try:
+                    Creator_Name = metadata["author"]
+                    Given_Name = Creator_Name.split()[0].strip()
+                    Family_Name = Creator_Name.split(Given_Name)[1].strip()
+                    yodametadata["Creator"][0]["Name"] = {
+                            "Given_Name": Given_Name,
+                            "Family_Name": Family_Name
+                        }
+                except Exception as e:
+                    logger.error(e)
+                try:
+                    Creator_Affiliation = metadata["publisher"]
+                    yodametadata["Creator"][0]["Affiliation"] = [
+                        Creator_Affiliation
+                    ]
+                except:
+                    pass
             except:
                 pass
-        except:
-            pass
 
-        # set title
-        try:
-            yodametadata["Title"] = metadata["title"]
-        except:
-            pass
 
-        # set description
-        try:
-            yodametadata["Description"] = metadata["description"]
-        except:
-            pass
+            # set contributor
+            try:
+                yodametadata["Contributor"] = [
+                    {"Person_Identifier": [{}]}
+                ]
+                try:
+                    Contributor_Name = metadata["contributor"][0]
+                    Given_Name = Contributor_Name.split()[0].strip()
+                    Family_Name = Contributor_Name.split(Given_Name)[1].strip()
+                    yodametadata["Contributor"][0]["Name"] = {
+                            "Given_Name": Given_Name,
+                            "Family_Name": Family_Name
+                        }
+                except:
+                    pass
+                try:
+                    Contributor_Affiliation = metadata["contributor"][1]
+                    yodametadata["Contributor"][0]["Affiliation"] = [
+                        Contributor_Affiliation
+                    ]
+                except:
+                    pass
+            except:
+                pass
 
-        yodametadata = json.dumps(yodametadata)
+            # set title
+            try:
+                yodametadata["Title"] = metadata["title"]
+            except:
+                pass
 
-        return yodametadata
+            # set description
+            try:
+                yodametadata["Description"] = metadata["description"]
+            except:
+                pass
+
+            yodametadata = json.dumps(yodametadata)
+
+            return yodametadata
+        except Exception as e:
+            log.error(f'exception at irods create_yoda_metadata: {e}')
 
 
     def upload_new_file_to_collection_internal(
@@ -441,6 +456,7 @@ class Irods(object):
             log.error(str(e))
             return False
 
+
     def get_files_from_collection(self, path):
         """will get all the files from the collection requested.
 
@@ -452,18 +468,22 @@ class Irods(object):
         """
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
-        with iRODSSession(host=self.irods_api_address,
-                          port=1247,
-                          user=self.user,
-                          password=self.api_key,
-                          zone=zone,
-                          authentication_scheme='pam',
-                          **ssl_settings) as irods_session:
-            coll = irods_session.collections.get(path)
-            result = []
-            for obj in coll.data_objects:
-                result.append(obj.path)
-        return result
+        try:
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
+                coll = irods_session.collections.get(path)
+                result = []
+                for obj in coll.data_objects:
+                    result.append(obj.path)
+            return result
+        except Exception as e:
+            log.error(f'exception at irods get_files_from_collection: {e}')
+
 
     def change_metadata_in_collection_internal(
         self, path, metadata
@@ -490,30 +510,33 @@ class Irods(object):
         """
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
+        try:
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
+                irods_session.connection_timeout = 300
 
-        with iRODSSession(host=self.irods_api_address,
-                          port=1247,
-                          user=self.user,
-                          password=self.api_key,
-                          zone=zone,
-                          authentication_scheme='pam',
-                          **ssl_settings) as irods_session:
-            irods_session.connection_timeout = 300
+                obj = irods_session.collections.get(path)
 
-            obj = irods_session.collections.get(path)
+                # loop through the metadata and add each item
+                for key, value in metadata.items():
+                    try:
+                        obj.metadata.remove(key)
+                    except:
+                        pass
+                    try:
+                        obj.metadata.add(key, value)
+                    except:
+                        pass
 
-            # loop through the metadata and add each item
-            for key, value in metadata.items():
-                try:
-                    obj.metadata.remove(key)
-                except:
-                    pass
-                try:
-                    obj.metadata.add(key, value)
-                except:
-                    pass
+            return self.get_collection_internal(path)
+        except Exception as e:
+            log.error(f'exception at irods change_metadata_in_collection_internal: {e}')
 
-        return self.get_collection_internal(path)
 
     def publish_collection_internal(self, collection_id, return_response=False):
         """Will publish an collection if it is not under embargo
@@ -592,26 +615,29 @@ class Irods(object):
         Args:
             path (str): path to start getting the file info
         """
-        with iRODSSession(host=self.irods_api_address,
-                        port=1247,
-                        user=self.user,
-                        password=self.api_key,
-                        zone=zone,
-                        authentication_scheme='pam',
-                        **ssl_settings) as irods_session:
-            coll = irods_session.collections.get(path)
+        try:
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
+                coll = irods_session.collections.get(path)
 
-            for obj in coll.data_objects:
-                tmp = {}
-                tmp['name'] = obj.name
-                tmp['size'] = obj.size
-                tmp['link'] = obj.path
-                tmp['hash'] = obj.chksum().split(':')[1]
-                tmp['hash_type'] = obj.chksum().split(':')[0]
-                self.file_content.append(tmp)
-                if len(coll.subcollections) > 0:
-                    for col in coll.subcollections:
-                        self.get_file_info(col.path)
+                for obj in coll.data_objects:
+                    tmp = {}
+                    tmp['name'] = obj.name
+                    tmp['size'] = obj.size
+                    tmp['link'] = obj.path
+                    tmp['hash'] = obj.chksum().split(':')[1]
+                    tmp['hash_type'] = obj.chksum().split(':')[0]
+                    self.file_content.append(tmp)
+                    if len(coll.subcollections) > 0:
+                        for col in coll.subcollections:
+                            self.get_file_info(col.path)
+        except Exception as e:
+            log.error(f'exception at irods get_file_info: {e}')
 
 
     def get_repo_content(self, path):
@@ -623,10 +649,13 @@ class Irods(object):
         Returns:
             list: list of all the files information: name, size, link, hash, and hash_type
         """
-        self.file_content = []
-        path = f"/{irods_zone}/home{path}"
-        self.get_file_info(path)
-        return self.file_content
+        try:
+            self.file_content = []
+            path = f"/{irods_zone}/home{path}"
+            self.get_file_info(path)
+            return self.file_content
+        except Exception as e:
+            log.error(f'exception at irods get_repo_content: {e}')
 
 
     def get_private_metadata(self, path):
@@ -638,24 +667,27 @@ class Irods(object):
         Returns:
             dict: flat key value store with keys being the metadata field names and the values the metadata field values.
         """
-        path = f"/{irods_zone}/home{path}"
-        with iRODSSession(host=self.irods_api_address,
-                          port=1247,
-                          user=self.user,
-                          password=self.api_key,
-                          zone=zone,
-                          authentication_scheme='pam',
-                          **ssl_settings) as irods_session:
-            irods_session.connection_timeout = 300
-            coll = irods_session.collections.get(path)
-        result = {}
-        for key in coll.metadata.keys():
-            if key[:4].lower() != 'org_':
-                value = ""
-                for item in coll.metadata.get_all(key):
-                    value += str(item.value) + ", "
-                result[key]=coll.metadata.get_all(key)[0].value
-        return result
+        try:
+            path = f"/{irods_zone}/home{path}"
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
+                irods_session.connection_timeout = 300
+                coll = irods_session.collections.get(path)
+            result = {}
+            for key in coll.metadata.keys():
+                if key[:4].lower() != 'org_':
+                    value = ""
+                    for item in coll.metadata.get_all(key):
+                        value += str(item.value) + ", "
+                    result[key]=coll.metadata.get_all(key)[0].value
+            return result
+        except Exception as e:
+            log.error(f'exception at irods get_private_metadata: {e}')
 
 
     def download_file(self, path, link, filename, dest_folder):
@@ -668,27 +700,29 @@ class Irods(object):
             filename (str): name of the file
             dest_folder (str): the folder path to download to
         """
-        full_coll_path = f"/{irods_zone}/home{path}"
-        full_folder_path = link.split(filename)[0]
-        folder_path = full_folder_path.split('home')[1]
-        #only create subfolder when folder_path is not equal / more then the full_coll_path
-        subfolder = "/"
-        if folder_path.strip("/").lower() != path.strip("/").lower():
-            subfolder = folder_path.split(path)[1]
-        to_create_path = f"{dest_folder}/{subfolder}/"
-        if not os.path.exists(to_create_path):
-            os.makedirs(to_create_path)  # create folder if it does not exist
-        write_to_path = f"{dest_folder}/{subfolder}/{filename}"
-        with iRODSSession(host=self.irods_api_address,
-                          port=1247,
-                          user=self.user,
-                          password=self.api_key,
-                          zone=zone,
-                          authentication_scheme='pam',
-                          **ssl_settings) as irods_session:
-            irods_session.connection_timeout = 300
-            irods_session.data_objects.get(link, write_to_path)
-
+        try:
+            full_coll_path = f"/{irods_zone}/home{path}"
+            full_folder_path = link.split(filename)[0]
+            folder_path = full_folder_path.split('home')[1]
+            #only create subfolder when folder_path is not equal / more then the full_coll_path
+            subfolder = "/"
+            if folder_path.strip("/").lower() != path.strip("/").lower():
+                subfolder = folder_path.split(path)[1]
+            to_create_path = f"{dest_folder}/{subfolder}/"
+            if not os.path.exists(to_create_path):
+                os.makedirs(to_create_path)  # create folder if it does not exist
+            write_to_path = f"{dest_folder}/{subfolder}/{filename}"
+            with iRODSSession(host=self.irods_api_address,
+                            port=1247,
+                            user=self.user,
+                            password=self.api_key,
+                            zone=zone,
+                            authentication_scheme='pam',
+                            **ssl_settings) as irods_session:
+                irods_session.connection_timeout = 300
+                irods_session.data_objects.get(link, write_to_path, )
+        except Exception as e:
+            log.error(f'exception at irods download_file: {e}')
 
     def download_files(self, path, dest_folder):
         """Will download all files for a specific collection to a folder
@@ -700,14 +734,17 @@ class Irods(object):
         Returns:
             bool: returns True if download was succesful
         """
-        if not os.path.exists(dest_folder):
-            os.makedirs(dest_folder)  # create folder if it does not exist
-        file_content = self.get_repo_content(path)
-        for item in file_content:
-            filename = item['name']
-            link = item['link']
-            self.download_file(path=path, link=link, filename=filename, dest_folder=dest_folder)
-        return True
+        try:
+            if not os.path.exists(dest_folder):
+                os.makedirs(dest_folder)  # create folder if it does not exist
+            file_content = self.get_repo_content(path)
+            for item in file_content:
+                filename = item['name']
+                link = item['link']
+                self.download_file(path=path, link=link, filename=filename, dest_folder=dest_folder)
+            return True
+        except Exception as e:
+            log.error(f'exception at irods download_files: {e}')
 
 if __name__ == "__main__":
     pass

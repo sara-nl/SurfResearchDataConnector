@@ -428,3 +428,40 @@ if __name__ == "__main__":
     print(response)
     print(response.status_code)
     print(response.data)
+
+    # first upload the file
+    # file_path = "../sharekit.png"
+    # file_path = "../../coverage.xml"
+    # upload_file_response = sharekit.upload_file(file_path, test=True)
+    # print(upload_file_response.text)
+
+    # then create an item that will contain / reference the uploaded file(s)
+    # fileId = upload_file_response.json()['data']['id']
+    # files = [
+    #     {
+    #         "fileId": fileId,
+    #         "title": file_path,
+    #         "access": "closedAccess"
+    #     }
+    # ]
+    # result = sharekit.create_item(files=files)
+    # print(result.json())
+    format = {'title': {'type': 'text', 'labelNL': 'Titel', 'labelEN': 'Title', 'isRequired': 1, 'regex': None, 'options': []},
+                'type': {'type': 'string', 'labelNL': 'RepoType', 'labelEN': 'RepoType', 'isRequired': 1, 'regex': None, 'options': ['PublicationRecord', 'LearningObject', 'ResearchObject', 'Dataset', 'Project']},
+                'institute': {'type': 'uuid', 'labelNL': 'InstituteID', 'labelEN': 'InstituteID', 'isRequired': 1, 'regex': None, 'options': [{'value': '1cb21e78-6d07-4d21-ba5d-f722dd2ba1bd', 'title': 'SURF edusources test'}]},
+                'subtitle': {'type': 'text', 'labelNL': 'Ondertitel', 'labelEN': 'Subtitle', 'isRequired': 0, 'regex': None, 'options': []},
+                'summary': {'type': 'textarea', 'labelNL': 'Samenvatting', 'labelEN': 'Summary', 'isRequired': 0, 'regex': None, 'options': []},
+                'files': {'type': 'attachment', 'labelNL': 'Bestand', 'labelEN': 'File', 'isRequired': 1, 'regex': None, 'options': []}}
+
+
+    data = {
+            'data': {
+                'attributes': {
+                               'url': 'https://api.acc.surfsharekit.nl/api/v1/files/repoItemFiles/53674d05-71a8-4d6a-a45b-892b4106f6ba',
+                               'title': None,
+                               'permissions': {'canView': True}
+                                },
+                'type': 'repoItemFile',
+                'id': '53674d05-71a8-4d6a-a45b-892b4106f6ba'
+                }
+            }
