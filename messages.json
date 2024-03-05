@@ -1,7 +1,7 @@
 [
     {
         "short": "started",
-        "long": "Retrieval process started."
+        "long": "Download or Upload process started."
     },
     {
         "short": "url in history",
@@ -25,7 +25,7 @@
     },
     {
         "short": "ready",
-        "long": "Retrieval process completed."
+        "long": "Download or Upload process completed."
     },
     {
         "short": "connected",
