@@ -587,11 +587,6 @@ class Figshare(object):
         log.debug(
             f"Entering at lib/figshare.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
-            # in testing we do not have a file object passed in
-            # if not test:
-            #     with open(path_to_file, 'wb') as ff:
-            #         ff.write(file.read())
-
             # we will get the latest created article_id
             article_id = self.get_article_internal(return_response=True).json()[0]['id']
             article_id = int(article_id)
@@ -605,6 +600,7 @@ class Figshare(object):
             log.error(
                 f"Exception at lib/figshare.py {inspect.getframeinfo(inspect.currentframe()).function}")
             log.error(str(e))
+            return str(e)
 
 
     def get_files_from_article(self, article_id, public=False):
@@ -814,42 +810,44 @@ class Figshare(object):
         Returns:
             bool: returns True if download was succesful
         """
-        if not os.path.exists(dest_folder):
-            os.makedirs(dest_folder)  # create folder if it does not exist
-        file_content = self.get_repo_content(article_id)
-        for item in file_content:
-            filename = item['name']
-            
-            # filenames can contain a path as well
-            # we need to create that part of the path as well
-            # so check for '/' in the filename
-            if filename.find("/") != -1:
-                additional_path = filename.split('/')
-                # drop last one as that is the filename
-                filename = additional_path.pop()
-                additional_path = "/".join(additional_path)
-                total_path = os.path.join(dest_folder, additional_path)
-                if not os.path.exists(total_path):
-                    os.makedirs(total_path)  # create folder if it does not exist
-                file_path = os.path.join(total_path, filename)
-            else:
-                file_path = os.path.join(dest_folder, filename)
-            link = item['link']
-            r = requests.get(link,
-                            headers={'Authorization': f"token {self.api_key}"},
-                            stream=True)
-            if r.ok:               
-                with open(file_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 8):
-                        if chunk:
-                            f.write(chunk)
-                            f.flush()
-                            os.fsync(f.fileno())
+        try:
+            if not os.path.exists(dest_folder):
+                os.makedirs(dest_folder)  # create folder if it does not exist
+            file_content = self.get_repo_content(article_id)
+            for item in file_content:
+                filename = item['name']
+                
+                # filenames can contain a path as well
+                # we need to create that part of the path as well
+                # so check for '/' in the filename
+                if filename.find("/") != -1:
+                    additional_path = filename.split('/')
+                    # drop last one as that is the filename
+                    filename = additional_path.pop()
+                    additional_path = "/".join(additional_path)
+                    total_path = os.path.join(dest_folder, additional_path)
+                    if not os.path.exists(total_path):
+                        os.makedirs(total_path)  # create folder if it does not exist
+                    file_path = os.path.join(total_path, filename)
+                else:
+                    file_path = os.path.join(dest_folder, filename)
+                link = item['link']
+                r = requests.get(link,
+                                headers={'Authorization': f"token {self.api_key}"},
+                                stream=True)
+                if r.ok:               
+                    with open(file_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 8):
+                            if chunk:
+                                f.write(chunk)
+                                f.flush()
+                                os.fsync(f.fileno())
 
-            else:  # HTTP status code 4XX/5XX
-                return False
-        return True
-
+                else:  # HTTP status code 4XX/5XX
+                    return 'could not get link to file'
+            return True
+        except Exception as e:
+            return str(e)
 
 if __name__ == "__main__":
     pass

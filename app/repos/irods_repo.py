@@ -253,6 +253,7 @@ class Irods(object):
             return available_collection
         except Exception as e:
             log.error(f'exception at irods create_new_collection_internal: {e}')
+            return {"message": str(e)}
 
 
     def remove_collection_internal(self, path: str):
@@ -454,7 +455,7 @@ class Irods(object):
             log.error(
                 f"Exception at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
             log.error(str(e))
-            return False
+            return str(e)
 
 
     def get_files_from_collection(self, path):
@@ -744,7 +745,7 @@ class Irods(object):
                 self.download_file(path=path, link=link, filename=filename, dest_folder=dest_folder)
             return True
         except Exception as e:
-            log.error(f'exception at irods download_files: {e}')
+            return str(e)
 
 if __name__ == "__main__":
     pass

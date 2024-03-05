@@ -196,10 +196,10 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
     if not get_canceled(username):
         update_history(username, folder, url, 'getting file data')
         result = get_private_files(repo, url, folder, api_key=api_key, user=user)
-        if result:
-            update_history(username, folder, url, 'getting file data done')
+        if result == True:
+            update_history(username, folder, url, f'getting file data done {result}')
         else:
-            update_history(username, folder, url, 'getting file data failed')
+            update_history(username, folder, url, f'getting file data failed: {result}')
 
     if not get_canceled(username):
         update_history(username, folder, url, 'start checking checksums')
@@ -358,16 +358,36 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                     url=repo, status=f'creating a project at {repo}')
         if repo == 'osf':
             try:
-                project_id = osf.create_project().id
-            except:
+                result = osf.create_project()
+                if type(result) == dict:
+                    err = result['error']
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed to create a project at {repo}: {err}')
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'ready')
+                    return
+                else:
+                    project_id = result.id        
+            except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
-                    url=repo, status=f'failed to create a project at {repo}')
+                    url=repo, status=f'failed to create a project at {repo}: {e}')
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
         if repo == 'figshare':
             try:
-                project_id = figshare.create_new_article_internal()['entity_id']
+                result = figshare.create_new_article_internal(return_response=True)
+                project_id = None
+                if result.status_code == 201:
+                    if 'entity_id' in result.json():
+                        project_id = result.json()['entity_id']
+                if project_id == None:
+                    rtext = result.text
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed to create a project at {repo}: {rtext}')
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'ready')
+                    return
             except:
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'failed to create a project at {repo}')
@@ -376,7 +396,20 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 return
         if repo == 'dataverse':
             try:
-                project_id = dataverse.create_new_dataset(return_response=True).json()['data']['persistentId']
+                r = dataverse.create_new_dataset(return_response=True)
+                project_id = None
+                if r.status_code <= 300:
+                    try:
+                        project_id = r.json()['data']['persistentId']
+                    except:
+                        project_id = None
+                if project_id == None:
+                    rtext = r.text
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed to create a project at {repo}: {rtext}')
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'ready')
+                    return                    
             except:
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'failed to create a project at {repo}')
@@ -385,7 +418,23 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 return
         if repo == 'zenodo':
             try:
-                project_id = zenodo.create_new_deposition_internal(metadata=None, return_response=True).json()['id']
+                project_id = None
+                r = zenodo.create_new_deposition_internal(metadata=None, return_response=True)
+                if r.status_code == 201:
+                    if 'id' in r.json():
+                        project_id = r.json()['id']
+                if project_id == None:
+                    try:
+                        rtext = r.json()['message']
+                        if rtext.find('no Referer') != -1:
+                            rtext = 'please reconnect'
+                    except:
+                        rtext = r.text
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed to create a project at {repo}: {rtext}')
+                    update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'ready')                    
+                    return       
             except Exception as e:
                 logger.error(f"Failed to create project for Zenodo: {e}")
                 update_history(username=username, folder=complete_folder_path,
@@ -396,11 +445,19 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
         if repo == 'irods':
             try:
                 project = irods.create_new_collection_internal(metadata=metadata)
+                if type(project) == 'dict':
+                    if  'message' in project:
+                        message = project['message']
+                        update_history(username=username, folder=complete_folder_path,
+                            url=repo, status=f'failed to create a project at {repo}: {message}')
+                        update_history(username=username, folder=complete_folder_path,
+                            url=repo, status=f'ready')
+                        return
                 project_id = project['id']
                 project_path = project['path']
-            except:
+            except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
-                    url=repo, status=f'failed to create a project at {repo}')
+                    url=repo, status=f'failed to create a project at {repo}: {e}')
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
@@ -421,8 +478,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                         repoItemID = response.json()['data']['id']
                         sharekit_files.append(repoItemID)
                         result = True
-                except:
-                    logger.error("failed to upload file")
+                except Exception as e:
+                    message = f"failed to upload file {filepath}: {e}"
+                    logger.error(message)
+                    update_history(username=username, folder=complete_folder_path, url=repo, status=message)
             if repo == 'osf':
                 result = osf.upload_new_file_to_project(project_id=project_id, path_to_file=tmpzip)
             if repo == 'figshare':
@@ -432,14 +491,19 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 result = dataverse.upload_new_file_to_dataset(
                         persistent_id=project_id, path_to_file=tmpzip)
             if repo == 'zenodo':
-                result = zenodo.upload_new_file_to_deposition_internal(deposition_id=project_id, path_to_file=tmpzip)
+                r = zenodo.upload_new_file_to_deposition_internal(
+                    deposition_id=project_id, path_to_file=filepath, return_response=True)
+                if r.status_code == 201:
+                    result = True
+                else:
+                    result = r.text
             if repo == 'irods':
                 result = irods.upload_new_file_to_collection_internal(path=project_path, path_to_file=tmpzip)
             if result == True:
                 message = f"uploaded file: {tmpzip}"
                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
             else:
-                message = f"failed to upload file {filepath}"
+                message = f"failed to upload file {filepath}: {result}"
                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
         # the unzipped folder will be uploaded
         else:
@@ -490,8 +554,12 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                                 result = dataverse.upload_new_file_to_dataset(
                                     persistent_id=project_id, path_to_file=filepath)
                             if repo == 'zenodo':
-                                result = zenodo.upload_new_file_to_deposition_internal(
-                                    deposition_id=project_id, path_to_file=filepath)
+                                r = zenodo.upload_new_file_to_deposition_internal(
+                                    deposition_id=project_id, path_to_file=filepath, return_response=True)
+                                if r.status_code == 201:
+                                    result = True
+                                else:
+                                    result = r.text
                             if repo == 'irods':
                                 result = irods.upload_new_file_to_collection_internal(path=project_path, path_to_file=filepath)
 
@@ -499,7 +567,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                                 message = f"uploaded file {n} of {totalfilescount}: {filepath}"
                                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                             else:
-                                message = f"failed to upload file {filepath}"
+                                message = f"failed to upload file {filepath}: {result}"
                                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                         except Exception as e:
                             logger.error(f"failed to upload file {filepath} - {e}")
@@ -515,7 +583,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                     url=repo, status=f'creating a project at {repo}')
             #  now create a sharekit project AKA repoitem and also add the files by id from sharekit_files list.
             # also add any metadata in the same call.
-            sharekit.create_item(files=sharekit_files, metadata=metadata)
+            r = sharekit.create_item(files=sharekit_files, metadata=metadata)
+            if r is None:
+                update_history(username=username, folder=complete_folder_path,
+                    url=repo, status=f'failed to create a project at {repo}')
     
         ####################################################################
         
@@ -584,7 +655,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 # "publicAccess":true,
                 "tags": tags.split(",")
             }
-            osf.update_metadata(project_id, data)
+            r = osf.update_metadata(project_id, data)
+            if not r:
+                update_history(username=username, folder=complete_folder_path,
+                                url=repo, status='failed to update metadata')                
 
         if repo == 'figshare':
             data = {
@@ -592,8 +666,14 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                             'description': description,
                             'creators': [{'name': author, 'affiliation': affiliation}]
                         }
-            figshare.change_metadata_in_article_internal(
-                    article_id=project_id, metadata=data)
+            r = figshare.change_metadata_in_article_internal(
+                    article_id=project_id, metadata=data, return_response=True)
+            if r.status_code != 205:
+                code = r.status_code
+                text = r.text
+                logger.error(f"Failed to update metadata: {code} - {text}")
+                update_history(username=username, folder=complete_folder_path,
+                                url=repo, status='failed to update metadata')
 
         if repo == 'dataverse':
             subject = "Other"
@@ -678,8 +758,14 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                     }
                 }
 
-            dataverse.change_metadata_in_dataset_internal(
-                persistent_id=project_id, metadata=data)
+            r = dataverse.change_metadata_in_dataset_internal(
+                persistent_id=project_id, metadata=data, return_response=True)
+            if r.status_code > 204:
+                code = r.status_code
+                text = r.text
+                logger.error(f"Failed to update metadata: {code} - {text}")
+                update_history(username=username, folder=complete_folder_path,
+                                url=repo, status='failed to update metadata')
 
         if repo == 'zenodo':
             data = {
@@ -697,8 +783,13 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                         "imprint_publisher": publisher,
                     }
 
-            zenodo.change_metadata_in_deposition_internal(deposition_id=project_id, metadata=data)
-
+            r = zenodo.change_metadata_in_deposition_internal(deposition_id=project_id, metadata=data, return_response=True)
+            if r.status_code != 200:
+                code = r.status_code
+                text = r.text
+                logger.error(f"Failed to update metadata: {code} - {text}")
+                update_history(username=username, folder=complete_folder_path,
+                                url=repo, status='failed to update metadata')
         
         if repo == 'irods':
             Given_Name = author.split()[0]
@@ -729,7 +820,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 # 'Links': 'o2',
                 'Rel': 'describedby',
                 'Version': '1'}
-            irods.change_metadata_in_collection(project_path, data)
+            r = irods.change_metadata_in_collection(project_path, data)
+            if r == None:
+                update_history(username=username, folder=complete_folder_path,
+                                url=repo, status='failed to update metadata')                
         
         if repo == 'irods':
             update_history(username=username, folder=complete_folder_path,

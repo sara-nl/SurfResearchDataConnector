@@ -87,8 +87,11 @@ def get_data(url, folder, username=None,):
         message = "start data retrieval"
         update_history(username=username, folder=folder,
                        url=url, status=message)
-        datahugger.get(url, folder, unzip=False, progress=False)
-        message = "data retrieved"
+        try:
+            datahugger.get(url, folder, unzip=False, progress=False)
+            message = "data retrieved"
+        except Exception as e:
+            message = str(e)
         update_history(username=username, folder=folder,
                        url=url, status=message)
     except Exception as e:
@@ -388,7 +391,7 @@ def make_connection(username=None, password=None, token=None):
     """
     try:
         if token == None:
-            oc.login(username, password)
+            r = oc.login(username, password)
             return True
         else:
             return True
@@ -966,9 +969,13 @@ def get_webdav_token(token, username):
         str: the webdav token that has been set as app password under the name RDC
     """
     url = f"{drive_url}/ocs/v1.php/RDC/token/{username}"
+    logger.debug(url)
     headers = {'Authorization': f'Bearer {token}'}
+    logger.debug(headers)
     response = requests.request("GET", url, headers=headers)
+    logger.debug(response)
     if response.status_code == 200:
+        logger.debug(response.text)
         tree = ET.fromstring(response.text)
         for webdavtoken in tree.iter('token'):
             return webdavtoken.text

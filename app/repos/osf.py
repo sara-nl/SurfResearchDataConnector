@@ -37,22 +37,29 @@ class Osf(object):
             return False
 
     def create_project(self):
-        return self.osf.create_project(title='Untitled')
+        try:
+            return self.osf.create_project(title='Untitled')
+        except Exception as e:
+            return {'error': str(e)}
 
     def get_project(self, project_id):
         return self.osf.project(project_id=project_id)
     
     def upload_new_file_to_project(self, project_id, path_to_file):
-        with open(path_to_file, mode="rb") as data:
-            result = self.osf.project(project_id).storage().create_file(
-                path=path_to_file, fp=BufferedReader(data), force=True
-            )
-        return result
+        try:
+            with open(path_to_file, mode="rb") as data:
+                result = self.osf.project(project_id).storage().create_file(
+                    path=path_to_file, fp=BufferedReader(data), force=True
+                )
+            return result
+        except Exception as e:
+            return str(e)
 
     def update_metadata(self, project_id, metadata):
         metadata = {'data': {'attributes': metadata}}
-        log.error(metadata)
-        return self.osf.project(project_id).update(metadata)
+        r = self.osf.project(project_id).update(metadata)
+        #log.error(f"osfmedatata: {r}")
+        return r
 
 
     ############ For downloads ###################
@@ -125,42 +132,44 @@ class Osf(object):
         Returns:
             bool: returns True if download was succesful
         """
-        if not os.path.exists(dest_folder):
-            os.makedirs(dest_folder)  # create folder if it does not exist
-        file_content = self.get_repo_content(project_id)
-        for item in file_content:
-            filename = item['name']
-            # filenames can contain a path as well
-            # we need to create that part of the path as well
-            # so check for '/' in the filename
-            if filename.find("/") != -1:
-                additional_path = filename.split('/')
-                log.error(additional_path)
-                # drop last one as that is the filename
-                filename = additional_path.pop()
-                additional_path = "/".join(additional_path)
-                total_path = f"{dest_folder}/{additional_path}"
-                if not os.path.exists(total_path):
-                    os.makedirs(total_path)  # create folder if it does not exist
-                file_path = os.path.join(total_path, filename)
-            else:
-                file_path = os.path.join(dest_folder, filename)
-            link = item['link']
-            r = requests.get(link,
-                            headers={'Authorization': f"Bearer {self.api_key}"},
-                            stream=True)
-            if r.ok:               
-                with open(file_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 8):
-                        if chunk:
-                            f.write(chunk)
-                            f.flush()
-                            os.fsync(f.fileno())
+        try:
+            if not os.path.exists(dest_folder):
+                os.makedirs(dest_folder)  # create folder if it does not exist
+            file_content = self.get_repo_content(project_id)
+            for item in file_content:
+                filename = item['name']
+                # filenames can contain a path as well
+                # we need to create that part of the path as well
+                # so check for '/' in the filename
+                if filename.find("/") != -1:
+                    additional_path = filename.split('/')
+                    log.error(additional_path)
+                    # drop last one as that is the filename
+                    filename = additional_path.pop()
+                    additional_path = "/".join(additional_path)
+                    total_path = f"{dest_folder}/{additional_path}"
+                    if not os.path.exists(total_path):
+                        os.makedirs(total_path)  # create folder if it does not exist
+                    file_path = os.path.join(total_path, filename)
+                else:
+                    file_path = os.path.join(dest_folder, filename)
+                link = item['link']
+                r = requests.get(link,
+                                headers={'Authorization': f"Bearer {self.api_key}"},
+                                stream=True)
+                if r.ok:               
+                    with open(file_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 8):
+                            if chunk:
+                                f.write(chunk)
+                                f.flush()
+                                os.fsync(f.fileno())
 
-            else:  # HTTP status code 4XX/5XX
-                return False
-        return True
-
+                else:  # HTTP status code 4XX/5XX
+                    return 'could not get link to file'
+            return True
+        except Exception as e:
+            return str(e)
 
 
 

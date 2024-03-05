@@ -300,21 +300,21 @@ class Sharekit(object):
             response: the unaltered response of the upload endpoint
         """
         url = f"{self.sharekit_api_address}/repoitemupload/v1/upload"
-        log.error(f"### upload url: {url}")
+        log.debug(f"### upload url: {url}")
        
         payload = {}
-        log.error(f"### payload: {payload}")
+        log.debug(f"### payload: {payload}")
 
         files = [('file', open(file_path, 'rb'))]
-        log.error(f"### files: {files}")
+        log.debug(f"### files: {files}")
 
         headers = {'Authorization': f'Bearer {self.api_key}'}
-        log.error(f"### headers: {headers}")
+        log.debug(f"### headers: {headers}")
 
         response = requests.request(
             "POST", url, headers=headers, data=payload, files=files)
         
-        log.error(response.status_code)
+        log.debug(response.status_code)
         if response.status_code < 300:
             rjson = response.json()
             log.error(f"### response: {rjson}")
@@ -356,44 +356,47 @@ class Sharekit(object):
         Returns:
             response: the response of the API call at endpoint create
         """
-        log.error("create_item")
-        log.error(files)
-        log.error(metadata)
-        if files is not None and isinstance(files, list) and len(files)==1:
-            log.debug(f"files: {files}")
-            try:
-                title = "File uploaded by SurfRDC: {}".format(files[0]['title'])
-            except:
-                title = "File uploaded by SurfRDC"
-        else:
-            title = "Item created by SurfRDC"
-        summary = "This item was automatically created by SurfRDC."
-        if metadata is not None and isinstance(metadata, dict):
-            log.debug(f"### Metadata in create item: {metadata}")
-            try:
-                title = metadata["title"]
-            except:
-                pass
-            try:
-                summary = metadata["description"]
-            except:
-                pass
+        try:
+            log.debug("create_item")
+            log.debug(files)
+            log.debug(metadata)
+            if files is not None and isinstance(files, list) and len(files)==1:
+                log.debug(f"files: {files}")
+                try:
+                    title = "File uploaded by SurfRDC: {}".format(files[0]['title'])
+                except:
+                    title = "File uploaded by SurfRDC"
+            else:
+                title = "Item created by SurfRDC"
+            summary = "This item was automatically created by SurfRDC."
+            if metadata is not None and isinstance(metadata, dict):
+                log.debug(f"### Metadata in create item: {metadata}")
+                try:
+                    title = metadata["title"]
+                except:
+                    pass
+                try:
+                    summary = metadata["description"]
+                except:
+                    pass
 
-        url = f"{self.sharekit_api_address}/repoitemupload/v1/create"
-        payload = json.dumps({
-            "type": "ResearchObject",
-            "title": title,
-            "summary": summary,
-            "institute": f"{self.get_institute_id()}",
-            "files": files
-        })
-        log.debug(f"### create_item payload:{payload}")
-        headers = {'Authorization': f'Bearer {self.api_key}'}
-        response = requests.request("POST", url, headers=headers, data=payload)
-        rjson = response.json()
-        log.debug(f"### create_item response:{rjson}")
-        return response
-
+            url = f"{self.sharekit_api_address}/repoitemupload/v1/create"
+            payload = json.dumps({
+                "type": "ResearchObject",
+                "title": title,
+                "summary": summary,
+                "institute": f"{self.get_institute_id()}",
+                "files": files
+            })
+            log.debug(f"### create_item payload:{payload}")
+            headers = {'Authorization': f'Bearer {self.api_key}'}
+            response = requests.request("POST", url, headers=headers, data=payload)
+            rjson = response.json()
+            log.debug(f"### create_item response:{rjson}")
+            return response
+        except Exception as e:
+            log.error(f"Unhandled exception occured at create_item: {e}")
+            
     ### End Implementation based on Surf Sharekit API ###
 
     ############ For downloads ###################
@@ -407,7 +410,7 @@ class Sharekit(object):
 
 
     def download_files(self, article_id, dest_folder):
-        return {'message' : 'downloading files not implemented'}
+        return 'downloading files not implemented'
 
 
 

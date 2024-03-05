@@ -452,44 +452,46 @@ class Zenodo(object):
         Returns:
             bool: returns True if download was succesful
         """
-        if not os.path.exists(dest_folder):
-            os.makedirs(dest_folder)  # create folder if it does not exist
-        file_content = self.get_repo_content(deposition_id)
-        log.error(file_content)
-        for item in file_content:
-            filename = item['name']
-            
-            # filenames can contain a path as well
-            # we need to create that part of the path as well
-            # so check for '/' in the filename
-            if filename.find("/") != -1:
-                additional_path = filename.split('/')
-                # drop last one as that is the filename
-                filename = additional_path.pop()
-                additional_path = "/".join(additional_path)
-                total_path = os.path.join(dest_folder, additional_path)
-                if not os.path.exists(total_path):
-                    os.makedirs(total_path)  # create folder if it does not exist
-                file_path = os.path.join(total_path, filename)
-            else:
-                file_path = os.path.join(dest_folder, filename)
-            link = item['link']
-            r = requests.get(link,
-                            headers={'Authorization': f"Bearer {self.api_key}"},
-                            stream=True)
-            print(r)
-            if r.ok:               
-                with open(file_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 8):
-                        if chunk:
-                            f.write(chunk)
-                            f.flush()
-                            os.fsync(f.fileno())
+        try:
+            if not os.path.exists(dest_folder):
+                os.makedirs(dest_folder)  # create folder if it does not exist
+            file_content = self.get_repo_content(deposition_id)
+            log.error(file_content)
+            for item in file_content:
+                filename = item['name']
+                
+                # filenames can contain a path as well
+                # we need to create that part of the path as well
+                # so check for '/' in the filename
+                if filename.find("/") != -1:
+                    additional_path = filename.split('/')
+                    # drop last one as that is the filename
+                    filename = additional_path.pop()
+                    additional_path = "/".join(additional_path)
+                    total_path = os.path.join(dest_folder, additional_path)
+                    if not os.path.exists(total_path):
+                        os.makedirs(total_path)  # create folder if it does not exist
+                    file_path = os.path.join(total_path, filename)
+                else:
+                    file_path = os.path.join(dest_folder, filename)
+                link = item['link']
+                r = requests.get(link,
+                                headers={'Authorization': f"Bearer {self.api_key}"},
+                                stream=True)
+                print(r)
+                if r.ok:               
+                    with open(file_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 8):
+                            if chunk:
+                                f.write(chunk)
+                                f.flush()
+                                os.fsync(f.fileno())
 
-            else:  # HTTP status code 4XX/5XX
-                return False
-        return True
-        # return {'message' : 'downloading files not implemented'}
+                else:  # HTTP status code 4XX/5XX
+                    return 'could not get link to file'
+            return True
+        except Exception as e:
+            return str(e)
 
 
 if __name__ == "__main__":

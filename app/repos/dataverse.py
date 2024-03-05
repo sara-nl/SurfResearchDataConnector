@@ -447,10 +447,6 @@ class Dataverse(object):
             f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
                
         try:
-            # if not test:
-            #     with open(path_to_file, 'wb') as ff:
-            #         ff.write(file.read())
-
             file_content = open(path_to_file, 'rb')
 
             files = {'file': (path_to_file.split("/")[-1], file_content)}
@@ -471,14 +467,19 @@ class Dataverse(object):
             
             if return_response:
                 return response           
-               
-            return True
 
+            # check response. if all ok then true else return string of the response for user to see what went wrong
+            if response.status_code == 200:
+                if 'status' in response.json():
+                    if response.json()['status'] == 'OK':
+                        return True
+            return response.text
+            
         except Exception as e:
             log.error(
                 f"Exception at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
             log.error(str(e))
-            return False
+            return str(e)
 
     def get_files_from_dataset(self, persistent_id):
         """will get all the files metadata from the dataset requested.
@@ -561,7 +562,7 @@ class Dataverse(object):
         rtext = r.text
         log.debug(f"### r: {rtext}") 
 
-        return r.status_code == 204 if not return_response else r
+        return r.status_code == 204 if not return_response else r 
 
     def publish_dataset_internal(self, persistent_id, return_response=False):
         """Will publish an dataset if it is not under embargo
@@ -708,47 +709,49 @@ class Dataverse(object):
         Returns:
             bool: returns True if download was succesful
         """
-        if not os.path.exists(dest_folder):
-            os.makedirs(dest_folder)  # create folder if it does not exist
-        file_content = self.get_repo_content(persistent_id)
-        for item in file_content:
-            filename = item['name']
-            # filenames can contain a path as well
-            # we need to create that part of the path as well
-            # so check for '/' in the filename
-            if filename.find("/") != -1:
-                additional_path = filename.split('/')
-                log.error(additional_path)
-                # drop last one as that is the filename
-                filename = additional_path.pop()
-                additional_path = "/".join(additional_path)
-                total_path = f"{dest_folder}/{additional_path}"
-                if not os.path.exists(total_path):
-                    os.makedirs(total_path)  # create folder if it does not exist
-                file_path = os.path.join(total_path, filename)
-            else:
-                file_path = os.path.join(dest_folder, filename)
-            file_id = item['link']
-            url = f'{self.dataverse_api_address}/access/datafile/{file_id}?persistentId={persistent_id}'
-            headers = {
-                'X-Dataverse-key': self.api_key,
-                'Content-Type': 'application/json'
-            }
-            r = requests.get(url,
-                            headers=headers,
-                            stream=True)
-            if r.ok:               
-                with open(file_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 8):
-                        if chunk:
-                            f.write(chunk)
-                            f.flush()
-                            os.fsync(f.fileno())
+        try:
+            if not os.path.exists(dest_folder):
+                os.makedirs(dest_folder)  # create folder if it does not exist
+            file_content = self.get_repo_content(persistent_id)
+            for item in file_content:
+                filename = item['name']
+                # filenames can contain a path as well
+                # we need to create that part of the path as well
+                # so check for '/' in the filename
+                if filename.find("/") != -1:
+                    additional_path = filename.split('/')
+                    log.error(additional_path)
+                    # drop last one as that is the filename
+                    filename = additional_path.pop()
+                    additional_path = "/".join(additional_path)
+                    total_path = f"{dest_folder}/{additional_path}"
+                    if not os.path.exists(total_path):
+                        os.makedirs(total_path)  # create folder if it does not exist
+                    file_path = os.path.join(total_path, filename)
+                else:
+                    file_path = os.path.join(dest_folder, filename)
+                file_id = item['link']
+                url = f'{self.dataverse_api_address}/access/datafile/{file_id}?persistentId={persistent_id}'
+                headers = {
+                    'X-Dataverse-key': self.api_key,
+                    'Content-Type': 'application/json'
+                }
+                r = requests.get(url,
+                                headers=headers,
+                                stream=True)
+                if r.ok:               
+                    with open(file_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024 * 8):
+                            if chunk:
+                                f.write(chunk)
+                                f.flush()
+                                os.fsync(f.fileno())
 
-            else:  # HTTP status code 4XX/5XX
-                return False
-        return True
-
+                else:  # HTTP status code 4XX/5XX
+                    return 'could not get link to file'
+            return True
+        except Exception as e:
+            return str(e)
 
 if __name__ == "__main__":
     """Below code will test the code that interfaces the uploads to dataverse
