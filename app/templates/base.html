@@ -41,11 +41,13 @@
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/">HOME</a></button></li>
                     {% if data.connected==true %}
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/upload">UPLOAD</a></button></li>
-                    {% if data.showall %}
-                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/retrieve">DOWNLOAD</a></button></li>
-                    {% else %}
+
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/download">DOWNLOAD</a></button></li>
+
+                    {% if data.showall %}
+                    <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/retrieve">OPEN DATA</a></button></li>
                     {% endif %}
+
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/history">HISTORY</a></button></li>
                     {% endif %}
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/faq">FAQ</a></button></li>

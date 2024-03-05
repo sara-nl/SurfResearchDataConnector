@@ -29,8 +29,9 @@
 <!-- END BEGIN HELPER LOGIC ### -->
 
 {% if not preview %}
-    <h1>Download</h1>
-    <p>Download data to your Research Drive.</p>
+    <h1>Download Open Data</h1>
+    <p>Download open data to your Research Drive using <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a>.</p>
+    <p>Datahugger is used in the background to try and retrieve metadata and to download the data. If you encounter any issues with retrieving metadata or the data itself, then please consider providing feedback about this to the Datahugger project.</p>
 {% endif %}
 
 {% if data.connected==True %}
@@ -88,7 +89,7 @@
             {% else %}
 
                 <!-- ### BEGIN PREVIEW ### -->
-                <h1>Download - Preview</h1>
+                <h1>Download Open Data - Preview</h1>
                 
                 <h2>Drive Storage</h2>
                 <!-- async loading quote_text -->
