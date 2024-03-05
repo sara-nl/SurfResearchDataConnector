@@ -924,20 +924,28 @@ def authorize(service=None):
             username = user_info['sub']
             password = get_webdav_token(access_token, username)
             session.clear()
-            if make_connection(username, password):
-                session['username'] = username
-                session['password'] = password
-                session['access_token'] = access_token
-                session['refresh_token'] = refresh_token
-                session['connected'] = True
-                session['failed'] = False
-                session.pop('_flashes', None)
-                flash('research drive connected')
+            if username is None:
+                flash('failed to get username')
+            if password is None:
+                flash('failed to get webdav token')
+            if username is not None and password is not None:
+                if make_connection(username, password):
+                    session['username'] = username
+                    session['password'] = password
+                    session['access_token'] = access_token
+                    session['refresh_token'] = refresh_token
+                    session['connected'] = True
+                    session['failed'] = False
+                    session.pop('_flashes', None)
+                    flash('research drive connected')
+                else:
+                    flash('failed to connect (1)')
+                    session['failed'] = True
             else:
-                flash('failed to connect')
+                flash('failed to connect (2)')
                 session['failed'] = True
         except:
-            flash(f'failed to connect')
+            flash(f'failed to connect (3)')
             session['failed'] = True
     elif service in registered_services:
         try:
