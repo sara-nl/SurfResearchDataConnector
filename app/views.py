@@ -16,6 +16,7 @@ import requests
 import json
 from sqlalchemy import and_
 from app.repos import run_private_import
+import whois
 
 logger = logging.getLogger()
 
@@ -120,6 +121,7 @@ def connect():
     Returns:
         str: html for the connect page
     """
+    session['hidden_services'] = hidden_services
     if 'username' in session and 'password' in session and make_connection(session['username'], session['password']):
         session['connected'] = True
     else:
@@ -279,12 +281,24 @@ def upload():
                 if 'contact_name' in request.form:
                     session['metadata']['contact_name'] = request.form['contact_name']
                 if 'contact_email' in request.form:
-                    session['metadata']['contact_email'] = request.form['contact_email']
+                    email = request.form['contact_email']
+                    session['metadata']['contact_email'] = email
                 if 'subject' in request.form:
                     session['metadata']['subject'] = request.form['subject']
 
                 # get the metadata fields
                 metadata = session['metadata']
+
+                # validate the email domain here
+                if email:
+                    domain = email.split("@")[-1]
+                    w = whois.whois(domain)
+                    if w['domain_name'] == None:
+                        flash(f"email domain {domain} name does not exist")
+                        return render_template('upload.html',
+                                                data=session,
+                                                preview=preview,
+                                                drive_url=drive_url)
 
                 if 'preview' in request.form:
                     preview = True
@@ -301,7 +315,7 @@ def upload():
                     session['folder_path'] = request.form['folder_path']
                     session['complete_folder_path'] = request.form['folder_path']
                     # will be loaded async based on session folder
-                    
+
                 if 'start_upload' in request.form:
                     
                     username = session['username']
@@ -697,6 +711,7 @@ def repo_selection():
     Returns:
         str: html for the repo_selection component
     """   
+    session['hidden_services'] = hidden_services
     return render_template('repo_selection.html',
                             data=session,
                             registered_services = registered_services,
