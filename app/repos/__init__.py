@@ -671,9 +671,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
             if r.status_code != 205:
                 code = r.status_code
                 text = r.text
-                logger.error(f"Failed to update metadata: {code} - {text}")
+                message = f"Failed to update metadata: {code} - {text}"
+                logger.error(message)
                 update_history(username=username, folder=complete_folder_path,
-                                url=repo, status='failed to update metadata')
+                                url=repo, status=message)
 
         if repo == 'dataverse':
             subject = "Other"
@@ -763,9 +764,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
             if r.status_code > 204:
                 code = r.status_code
                 text = r.text
-                logger.error(f"Failed to update metadata: {code} - {text}")
+                message = f"Failed to update metadata: {code} - {text}"
+                logger.error(message)
                 update_history(username=username, folder=complete_folder_path,
-                                url=repo, status='failed to update metadata')
+                                url=repo, status=message)
 
         if repo == 'zenodo':
             data = {
@@ -787,9 +789,10 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
             if r.status_code != 200:
                 code = r.status_code
                 text = r.text
-                logger.error(f"Failed to update metadata: {code} - {text}")
+                message = f"Failed to update metadata: {code} - {text}"
+                logger.error(message)
                 update_history(username=username, folder=complete_folder_path,
-                                url=repo, status='failed to update metadata')
+                                url=repo, status=message)
         
         if repo == 'irods':
             Given_Name = author.split()[0]
@@ -821,9 +824,9 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 'Rel': 'describedby',
                 'Version': '1'}
             r = irods.change_metadata_in_collection(project_path, data)
-            if r == None:
+            if type(r) == 'str':
                 update_history(username=username, folder=complete_folder_path,
-                                url=repo, status='failed to update metadata')                
+                                url=repo, status=f'failed to update metadata: {r}')                
         
         if repo == 'irods':
             update_history(username=username, folder=complete_folder_path,
@@ -836,9 +839,9 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                     ff.write(yodametadata)
                 # upload the yoda-metadata.json file
                 irods.upload_new_file_to_collection_internal(path=project_path, path_to_file=json_file_path)
-            except:
+            except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
-                        url=repo, status='failed to update metadata for yoda')
+                        url=repo, status=f'failed to update metadata for yoda: {e}')
 
     ###############################################################
 

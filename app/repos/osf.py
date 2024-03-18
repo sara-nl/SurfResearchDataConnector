@@ -56,9 +56,17 @@ class Osf(object):
             return str(e)
 
     def update_metadata(self, project_id, metadata):
+        """_summary_
+
+        Args:
+            project_id (str): id of the project
+            metadata (dict): metadata
+
+        Returns:
+            bool: True if update was succesful, else False
+        """
         metadata = {'data': {'attributes': metadata}}
         r = self.osf.project(project_id).update(metadata)
-        #log.error(f"osfmedatata: {r}")
         return r
 
 

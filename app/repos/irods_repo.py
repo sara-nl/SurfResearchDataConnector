@@ -537,6 +537,7 @@ class Irods(object):
             return self.get_collection_internal(path)
         except Exception as e:
             log.error(f'exception at irods change_metadata_in_collection_internal: {e}')
+            return str(e)
 
 
     def publish_collection_internal(self, collection_id, return_response=False):
