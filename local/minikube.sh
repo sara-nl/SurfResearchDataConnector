@@ -37,6 +37,7 @@ minikube addons enable ingress
 echo "#######################################"
 echo "create namespace surf-rdr in the cluster"
 kubectl create ns surf-rdr
+kubectl create ns surf-rdr-demo
 
 echo "#######################################"
 echo "Set docker environment to that of minikube, so we can build images directly available in minikube"
@@ -57,13 +58,18 @@ cd cert
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=local-srdr-rd-app-acc.data.surfsara.nl"
 kubectl create secret -n surf-rdr tls localdomain-reversed-tls --key="tls.key" --cert="tls.crt"
 kubectl get secret -n surf-rdr localdomain-reversed-tls -o yaml
+
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout demo-tls.key -out demo-tls.crt -subj "/CN=demo-srdr-rd-app-acc.data.surfsara.nl"
+kubectl create secret -n surf-rdr-demo tls demodomain-reversed-tls --key="demo-tls.key" --cert="demo-tls.crt"
+kubectl get secret -n surf-rdr-demo demodomain-reversed-tls -o yaml
+
 cd ..
 rm -Rf cert
 
 echo "#######################################"
 echo "run helm install"
-helm install -n surf-rdr surfresearchdataretriever local-surf-rdr-chart/ --values local-surf-rdr-chart/values.yaml
-
+helm install -n surf-rdr surfresearchdataretriever local-surf-rdr-chart/ --values local-surf-rdr-chart/values-aperture.yaml
+helm install -n surf-rdr-demo surfresearchdataretriever local-surf-rdr-chart/ --values local-surf-rdr-chart/values-demo.yaml
 
 echo "#######################################"
 echo "See cluster status"
