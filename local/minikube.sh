@@ -50,16 +50,16 @@ docker build -f dockerfile -t local/surfresearchdataretriever:latest .
 cd local
 
 echo "#######################################"
-echo "create ssl cert for local-srdr-rd-app-acc.data.surfsara.nl"
+echo "create ssl cert for local-srdc-rd-app-acc.data.surfsara.nl"
 echo "Change the script to set your domain."
 rm -Rf cert
 mkdir cert
 cd cert
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=local-srdr-rd-app-acc.data.surfsara.nl"
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=local-srdc-rd-app-acc.data.surfsara.nl"
 kubectl create secret -n surf-rdr tls localdomain-reversed-tls --key="tls.key" --cert="tls.crt"
 kubectl get secret -n surf-rdr localdomain-reversed-tls -o yaml
 
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout demo-tls.key -out demo-tls.crt -subj "/CN=demo-srdr-rd-app-acc.data.surfsara.nl"
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout demo-tls.key -out demo-tls.crt -subj "/CN=demo-srdc-rd-app-acc.data.surfsara.nl"
 kubectl create secret -n surf-rdr-demo tls demodomain-reversed-tls --key="demo-tls.key" --cert="demo-tls.crt"
 kubectl get secret -n surf-rdr-demo demodomain-reversed-tls -o yaml
 

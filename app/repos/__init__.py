@@ -250,13 +250,21 @@ def check_connection(repo, api_key, user=None):
     return connection_ok
 
 
-def run_export(username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip=False):
+def run_export(username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip=False):
 
     ### NOTE ###
     # let's first implement an on disk solution, as we have seen that the buffered solution is not working with ScieboRDS
     # This is probably gonna be slower, but less error prone.
     # Let's first build something that works reliably and only then optimize for speed and prettyness
     # This will also allow reuse of code written for the retrieval of repos
+
+    # set the temporary storage path. This path will also show up in the repo
+    # so it is best to set it to root or to something descriptive like ./SRDC.
+    # setting it to root has the possibility that if the folder name is the same as
+    # a folder in root, that this already existing content will also be uploaded. 
+    tmp_storage = "./"
+    if not os.path.exists(tmp_storage):
+        os.mkdir(tmp_storage)
 
     update_history(username=username, folder=complete_folder_path,
                    url=repo, status='started')
@@ -275,7 +283,8 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
         # Download the data from OC
         update_history(username=username, folder=complete_folder_path,
                     url=repo, status='start downloading project as zipfile')
-        tmpzip = complete_folder_path.split("/")[-1] + ".zip"
+        
+        tmpzip = tmp_folder_path_name + ".zip"
         downloaded = oc.get_directory_as_zip(
             remote_path=complete_folder_path, local_file=tmpzip)
         update_history(username=username, folder=complete_folder_path,
@@ -285,9 +294,11 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
         # unzip the file to folder with name of last part of complete folder path.
         update_history(username=username, folder=complete_folder_path,
                     url=repo, status='unzipping the zipfile')
-        unzipped_folder = "./" + complete_folder_path.split("/")[-1]
+        
+        # set the unzipped_folder to a specific temp storage folder
+        unzipped_folder = tmp_storage + tmp_folder_path_name
         with zipfile.ZipFile(tmpzip, 'r') as zip_ref:
-            zip_ref.extractall('./')
+            zip_ref.extractall(tmp_storage)
 
     if not get_canceled(username):
         # remove the zip
@@ -326,7 +337,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
             # zip the unzipped_folder to tmpzip
             update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f"creating zipfile {tmpzip} for upload")
-            shutil.make_archive(complete_folder_path.split("/")[-1], 'zip', unzipped_folder)
+            shutil.make_archive(tmp_folder_path_name, 'zip', unzipped_folder)
 
     ### NOTE: Alternative implementation ###
     # instead of downloading all files at once, we can get the filepaths at oc as a list
@@ -466,7 +477,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
         ### upload files ###
         # if user selected upload as zip to perserve folder structure there will be a zipfile
         sharekit_files = []
-        tmpzip = complete_folder_path.split("/")[-1] + ".zip"
+        tmpzip = tmp_folder_path_name + ".zip"
         if os.path.isfile(tmpzip):
             update_history(username=username, folder=complete_folder_path, url=repo, status="uploading the zipfile")
             result = False
@@ -507,7 +518,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
         # the unzipped folder will be uploaded
         else:
-            uploads = "./" + complete_folder_path.split("/")[-1]
+            uploads = tmp_storage + tmp_folder_path_name
 
             # upload the unzipped folder to the project
             s = ''
@@ -834,7 +845,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
             try:
                 yodametadata = irods.create_yoda_metadata(path=project_path, metadata=metadata)
                 # write this data to yoda-metadata.json file
-                json_file_path = "./" + complete_folder_path.split("/")[-1] + "/yoda-metadata.json"
+                json_file_path = tmp_storage + tmp_folder_path_name + "/yoda-metadata.json"
                 with open(json_file_path, 'w') as ff:
                     ff.write(yodametadata)
                 # upload the yoda-metadata.json file

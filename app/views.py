@@ -29,7 +29,8 @@ def home():
     """
     try:
         data = session
-        data['srdr_url'] = srdr_url
+        data['srdc_url'] = srdc_url
+        data['hidden_services'] = hidden_services
     except Exception as e:
         flash("something went wrong (1)")
         logger.error(e, exc_info=True)
@@ -283,6 +284,8 @@ def upload():
                 if 'contact_email' in request.form:
                     email = request.form['contact_email']
                     session['metadata']['contact_email'] = email
+                else:
+                    email = None
                 if 'subject' in request.form:
                     session['metadata']['subject'] = request.form['subject']
 
@@ -331,8 +334,14 @@ def upload():
                         use_zip=True
                     # setting the canceled status to false for this user
                     set_canceled(username, False)
+
+                    # setting a tmp folder path name that does not interfere with other projects or the SRDC code itself.
+                    tmp_folder_path_name = complete_folder_path.split("/")[-1]
+                    if tmp_folder_path_name in ['', 'app', 'local', 'instance', 'migrations', 'surf-rdr-chart', 'tests']:
+                        tmp_folder_path_name = tmp_folder_path_name + "_" + metadata['title'].replace(" ", "_")
+                    
                     t = Thread(target=run_export, args=(
-                        username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip))
+                        username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip))
                     t.start()
                     session['query_status'] = 'started'
                 else:
@@ -637,7 +646,7 @@ def cancel_upload():
         logger.error(e, exc_info=True)
     return render_template('upload.html',
                             data=session,
-                            preview=True,
+                            preview=preview,
                             drive_url=drive_url)
 
 
@@ -693,13 +702,17 @@ def checkconnection():
 
     Returns:
         str: html for the check_connection component
-    """    
-    repo = session['repo']
-    repo_user = None
-    if repo == 'irods':
-        repo_user = session[f'{repo}_user']
-    api_key = session[f'{repo}_access_token']
-    connection_ok = check_connection(repo=repo, api_key=api_key, user=repo_user)
+    """  
+    try:
+        repo = session['repo']
+        repo_user = None
+        if repo == 'irods':
+            repo_user = session[f'{repo}_user']
+        api_key = session[f'{repo}_access_token']
+        connection_ok = check_connection(repo=repo, api_key=api_key, user=repo_user)
+    except:
+        session['repo'] = 'None'
+        connection_ok = None
     return render_template('check_connection.html',
                             data=session,
                             connection_ok=connection_ok)
@@ -910,10 +923,10 @@ def login(service=None):
         obj: Oauth object
     """
     if service == None:
-        redirect_uri = f'{srdr_url}/authorize'
+        redirect_uri = f'{srdc_url}/authorize'
         return oauth.owncloud.authorize_redirect(redirect_uri)
     elif service in registered_services:
-        redirect_uri = f'{srdr_url}/authorize/{service}'
+        redirect_uri = f'{srdc_url}/authorize/{service}'
         logger.error(redirect_uri)
         return eval(f"oauth.{service}.authorize_redirect(redirect_uri)")
 
