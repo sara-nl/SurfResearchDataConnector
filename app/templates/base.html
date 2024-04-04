@@ -43,8 +43,8 @@
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/upload">UPLOAD</a></button></li>
 
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/download">DOWNLOAD</a></button></li>
-
-                    {% if data.showall %}
+                    
+                    {% if 'datahugger' not in data.hidden_services or data.showall%}
                     <li class="nav-item"><button class="btn btn-light"><a class="nav-link" href="/retrieve">OPEN DATA</a></button></li>
                     {% endif %}
 

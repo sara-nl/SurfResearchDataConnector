@@ -10,7 +10,7 @@
 {% if not data.connected and not data.failed %}
 <script>
     var a = document.createElement('a');
-    a.href= '{{ data.srdr_url }}/login';
+    a.href= '{{ data.srdc_url }}/login';
     a.target = '_top';
     document.body.appendChild(a);
     a.click();
@@ -58,7 +58,7 @@
 <h4>Download from connected private repositories</h4>
 <p>The extension also allows you to <a href="/download">download</a> data from your private repositories. This enables you to download your own data or data that has been shared with you on these repositories.</p>
 
-{% if data.showall %}
+{% if 'datahugger' not in data.hidden_services or data.showall %}
 <h4>Download open data</h4>
 <p>
     In the backend the extension uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>pull open data</b>.
