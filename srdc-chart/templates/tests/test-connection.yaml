@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "surfresearchdataretriever.fullname" . }}-test-connection"
+  name: "{{ include "surfresearchdataconnector.fullname" . }}-test-connection"
   labels:
-    {{- include "surfresearchdataretriever.labels" . | nindent 4 }}
+    {{- include "surfresearchdataconnector.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": test
 spec:
@@ -11,5 +11,5 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "surfresearchdataretriever.fullname" . }}:{{ .Values.service.port }}']
+      args: ['{{ include "surfresearchdataconnector.fullname" . }}:{{ .Values.service.port }}']
   restartPolicy: Never

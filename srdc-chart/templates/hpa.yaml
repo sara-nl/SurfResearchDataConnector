@@ -2,14 +2,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "surfresearchdataretriever.fullname" . }}
+  name: {{ include "surfresearchdataconnector.fullname" . }}
   labels:
-    {{- include "surfresearchdataretriever.labels" . | nindent 4 }}
+    {{- include "surfresearchdataconnector.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "surfresearchdataretriever.fullname" . }}
+    name: {{ include "surfresearchdataconnector.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:
