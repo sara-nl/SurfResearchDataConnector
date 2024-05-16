@@ -1,51 +1,58 @@
-# import logging
+import logging
 import os
-# import sys
-# import configparser
+import sys
+import configparser
 
-# logger = logging.getLogger()
+logger = logging.getLogger()
 
-# EXCLUDE_APP_TYPE = 'LOCAL'
-# EXCLUDE_APP_TEST = 'TEST'
+# Set default global values in an env.ini file
+# This can be used for local development without k8 / helm charts
+# It can also be used to run tests locally.
 
-# try:
-#     config = configparser.ConfigParser()
-#     if os.path.isfile('env.ini'):
-#         config.read('env.ini')
-#     else:
-#         # for testing irods_repo
-#         config.read('../../env.ini')
-# except Exception as e:
-#     config = None
-#     logger.error(str(e))
+EXCLUDE_APP_TYPE = 'RDR'
+EXCLUDE_APP_TEST = 'TESTS'
 
-# for section in config.sections():
-#     if section.upper().find(EXCLUDE_APP_TYPE)==-1 and section.upper().find(EXCLUDE_APP_TEST)==-1:
-#         for k,v in config[section].items():
-#             expr = f"{k.lower()} = os.getenv('{k.upper()}', config.get('{section.upper()}', '{k.upper()}'))"
-#             exec(expr)
-
-
-# all_vars = {'EXCLUDE_APP_TYPE': EXCLUDE_APP_TYPE}
-# for section in config.sections():
-#     if section.upper().find(EXCLUDE_APP_TYPE)==-1 and section.upper().find(EXCLUDE_APP_TEST)==-1:
-#         for k,v in config[section].items():
-#             expr = f"all_vars['{k.lower()}']={k.lower()}"
-#             exec(expr)
-
-# get all env vars
-all_vars = {}
-for key in os.environ:
-    value = os.getenv(key)
-    if key.upper() == 'HIDDEN_SERVICES':
-        value = value.split(",")
-        value = [v.strip() for v in value]
-        expr = f"{key.lower()}={value}"
+try:
+    config = configparser.ConfigParser()
+    if os.path.isfile('env.ini'):
+        config.read('env.ini')
     else:
-        expr = f"{key.lower()}='{value}'"
-    all_vars[key.lower()]=value
-    exec(expr)
+        # for testing irods_repo
+        config.read('../../env.ini')
+except Exception as e:
+    config = None
+    logger.error(str(e))
 
+for section in config.sections():
+    if section.upper().find(EXCLUDE_APP_TYPE)==-1 and section.upper().find(EXCLUDE_APP_TEST)==-1:
+        for k,v in config[section].items():
+            expr = f"{k.lower()} = os.getenv('{k.upper()}', config.get('{section.upper()}', '{k.upper()}'))"
+            exec(expr)
+
+
+all_vars = {'EXCLUDE_APP_TYPE': EXCLUDE_APP_TYPE}
+for section in config.sections():
+    if section.upper().find(EXCLUDE_APP_TYPE)==-1 and section.upper().find(EXCLUDE_APP_TEST)==-1:
+        for k,v in config[section].items():
+            expr = f"all_vars['{k.lower()}']={k.lower()}"
+            exec(expr)
+
+# get all env vars from the environment in the pod, which are set in the helm charts
+# This will overwrite any default values set in the env.ini file
+# all_vars = {}
+for key in os.environ:
+    try:
+        value = os.getenv(key)
+        if key.upper() == 'HIDDEN_SERVICES':
+            value = value.split(",")
+            value = [v.strip() for v in value]
+            expr = f"{key.lower()}={value}"
+        else:
+            expr = f"{key.lower()}='{value}'"
+        all_vars[key.lower()]=value
+        exec(expr)
+    except:
+        pass
 
 # if __name__ == "__main__":
 #     all_vars = {'EXCLUDE_APP_TYPE': EXCLUDE_APP_TYPE}
