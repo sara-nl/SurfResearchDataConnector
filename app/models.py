@@ -11,7 +11,7 @@ except:
 app = Flask(__name__)
 
 try:
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{db_user}:{db_pass}@{db_host}/{db_database}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{db_user}:{db_pass}@{db_host}{db_port}/{db_database}'
 except:
     # local db for development only
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
