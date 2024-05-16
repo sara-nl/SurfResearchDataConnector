@@ -70,6 +70,7 @@ pyarrow==13.0.0
 pycparser==2.21
 Pygments==2.16.1
 PyMySQL==1.1.0
+pyncclient==0.7
 pyocclient==0.6
 pyparsing==3.1.1
 pytest==7.4.0
