@@ -12,11 +12,21 @@
 <p>Manage all your connections.</p>
 {% else %}
 <h1>Connect</h1>
-<p>Connect to your Research Drive first.</p>
+    {% if data.cloud_service == 'owncloud' %}
+        <p>Connect to your Research Drive first.</p>
+    {% endif %}
+    {% if data.cloud_service == 'nextcloud' %}
+        <p>Connect to your Nextcloud first.</p>
+    {% endif %}
 {% endif %}
 
+{% if data.cloud_service == 'owncloud' %}
 <h2>Surf Research Drive</h2>
 <img src="{{ url_for('static', filename = '/img/surf.png' ) }}" alt="surf">
+{% endif %}
+{% if data.cloud_service == 'nextcloud' %}
+<h2>Nextcloud</h2>
+{% endif %}
 {% if data.connected==true %}
     <div class="row mt-3 mb-3">
         <p>

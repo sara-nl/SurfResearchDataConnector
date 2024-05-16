@@ -8,6 +8,7 @@ from app.utils import update_history, create_generated_folder, total_files_count
 from app.utils import create_rocrate, check_checksums, push_data, get_query_status, get_status_from_history
 import logging
 import owncloud
+import nextcloud_client
 import zipfile
 import shutil
 import os
@@ -24,7 +25,14 @@ except:
 
 logger = logging.getLogger()
 
-oc = owncloud.Client(drive_url)
+if cloud_service == "owncloud":
+    cloud = owncloud.Client(drive_url)
+elif cloud_service == "nextcloud":
+    cloud = nextcloud_client.Client(drive_url)
+else:
+    # defaulting to the owncloud lib in case cloud_service is not configured
+    cloud = owncloud.Client(drive_url)
+
 
 def get_repocontent(repo, url, api_key, user=None):
     repo_content = [{'message' : f'failed to get repo content from {repo}'}]

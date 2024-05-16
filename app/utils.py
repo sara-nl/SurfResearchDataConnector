@@ -4,6 +4,7 @@ import shutil
 from flask import session
 import datahugger
 import owncloud
+import nextcloud_client
 import logging
 import requests
 import pandas as pd
@@ -34,7 +35,13 @@ from pprint import pprint
 
 logger = logging.getLogger()
 
-oc = owncloud.Client(drive_url)
+if cloud_service == "owncloud":
+    cloud = owncloud.Client(drive_url)
+elif cloud_service == "nextcloud":
+    cloud = nextcloud_client.Client(drive_url)
+else:
+    # defaulting to the owncloud lib in case cloud_service is not configured
+    cloud = owncloud.Client(drive_url)
 
 global query_status
 query_status = {}
@@ -132,14 +139,14 @@ def check_if_folder_exists(username, password, folder, url=None):
     """
     # first login
     try:
-        oc.login(username, password)
+        cloud.login(username, password)
     except:
         message = "failed to login to webdav"
         if url != None:
             update_history(username, folder, url, message)
-    # we can use oc.list to list content of a folder. If we get an error, we know it does not exist.
+    # we can use cloud.list to list content of a folder. If we get an error, we know it does not exist.
     try:
-        oc.list(folder)
+        cloud.list(folder)
         return True
     except:
         return False
@@ -241,13 +248,13 @@ def push_data(username, password, folder, url):
             update_history(username, folder, url, message)
 
         # This does not seem to work
-        # oc.put_directory("/", folder)
+        # cloud.put_directory("/", folder)
         # So let's upload file by file
         # And create sub directories as well
 
         # first login
         try:
-            oc.login(username, password)
+            cloud.login(username, password)
         except:
             message = "failed to login to webdav"
             update_history(username, folder, url, message)
@@ -261,14 +268,14 @@ def push_data(username, password, folder, url):
             if not get_canceled(username):
                 if not folder_exists:
                     try:
-                        oc.mkdir(root)
+                        cloud.mkdir(root)
                     except:
                         message = "failed to create folder"
                         update_history(username, folder, url, message)
                 for j in files:
                     filepath = os.path.join(root, j)
                     try:
-                        oc.put_file(filepath, filepath)
+                        cloud.put_file(filepath, filepath)
                         message = f"uploaded file {n} of {totalfilescount}: {filepath}"
                     except:
                         message = f"failed to upload file {filepath}"
@@ -306,12 +313,12 @@ def check_permission(username, password, folderpath):
     folder_exists = check_if_folder_exists(username, password, folderpath)
     if not folder_exists:
         try:
-            oc.login(username, password)
+            cloud.login(username, password)
         except:
             logger.error("failed to login to webdav")
         try:
-            oc.mkdir(folderpath)
-            oc.delete(folderpath)
+            cloud.mkdir(folderpath)
+            cloud.delete(folderpath)
             return True
         except:
             return False
@@ -332,12 +339,12 @@ def get_folders(username, password, folder):
         list: list of available folder paths
     """
     try:
-        oc.login(username, password)
+        cloud.login(username, password)
     except:
         message = "failed to login to webdav"
         logger.error(message)
     try:
-        result = oc.list(folder, depth=100)
+        result = cloud.list(folder, depth=100)
         paths = ["/"]
         for item in result:
             folder_path = item.get_path()
@@ -362,11 +369,11 @@ def get_folder_content(username, password, folder):
         list: list of available files and folder paths in the specified folder
     """
     try:
-        oc.login(username, password)
+        cloud.login(username, password)
     except:
         message = "failed to login to webdav"
     try:
-        result = oc.list(folder, depth=100)
+        result = cloud.list(folder, depth=100)
         paths = []
         for item in result:
             folder_path = item.path
@@ -391,7 +398,7 @@ def make_connection(username=None, password=None, token=None):
     """
     try:
         if token == None:
-            r = oc.login(username, password)
+            r = cloud.login(username, password)
             return True
         else:
             return True
@@ -619,7 +626,7 @@ def get_quota(username, password, folder=None):
     Returns:
         tuple: the used and available quota in bytes
     """
-    r = oc.login(username, password)
+    r = cloud.login(username, password)
     
     root_folder = "/"
     used = 0
@@ -639,19 +646,19 @@ def get_quota(username, password, folder=None):
     try:
         try:
             # delete test folder if there is any
-            oc.delete(test_folder)
+            cloud.delete(test_folder)
         except:
             # if there is no test folder the delete will throw an exception
             pass
         # Now make the test folder. Will return True is we have permission else False
-        have_permission = oc.mkdir(test_folder)
-        oc.delete(test_folder)
+        have_permission = cloud.mkdir(test_folder)
+        cloud.delete(test_folder)
     except:
         # if the mkdir or delete returns exception then we do not have permission.
         pass
 
 
-    result = oc.list(root_folder, depth=1)
+    result = cloud.list(root_folder, depth=1)
     
     # if project_folder != root_folder:
     if project_folder.find(" (Projectfolder)") != -1:
@@ -988,4 +995,4 @@ if __name__ == "__main__":
     folder = ""
     result = get_quota(username, password)
     print(result)
-    # print(oc.get_permissions())
+    # print(cloud.get_permissions())

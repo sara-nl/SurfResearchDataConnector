@@ -31,6 +31,7 @@ def home():
         data = session
         data['srdc_url'] = srdc_url
         data['hidden_services'] = hidden_services
+        data['cloud_service'] = cloud_service
     except Exception as e:
         flash("something went wrong (1)")
         logger.error(e, exc_info=True)
@@ -337,7 +338,7 @@ def upload():
 
                     # setting a tmp folder path name that does not interfere with other projects or the SRDC code itself.
                     tmp_folder_path_name = complete_folder_path.split("/")[-1]
-                    if tmp_folder_path_name in ['', 'app', 'local', 'instance', 'migrations', 'surf-rdr-chart', 'tests']:
+                    if tmp_folder_path_name in ['', 'app', 'local', 'instance', 'migrations', 'surf-rdc-chart', 'tests']:
                         tmp_folder_path_name = tmp_folder_path_name + "_" + metadata['title'].replace(" ", "_")
                     
                     t = Thread(target=run_export, args=(
@@ -948,8 +949,15 @@ def authorize(service=None):
             oauth_token = oauth.owncloud.token
             access_token = oauth_token['access_token']
             refresh_token = oauth_token['refresh_token']
-            user_info = get_user_info(access_token)
-            username = user_info['sub']
+            # user_info = get_user_info(access_token)
+            # username = user_info['sub']
+            if cloud_service.lower() == "owncloud":
+                username = oauth_token['user_id']
+            elif cloud_service.lower() == "nextcloud":
+                # nextcloud has user_id i.o. username
+                username = oauth_token['user_id']
+            else:
+                username = None
             password = get_webdav_token(access_token, username)
             session.clear()
             if username is None:
@@ -972,8 +980,9 @@ def authorize(service=None):
             else:
                 flash('failed to connect (2)')
                 session['failed'] = True
-        except:
+        except Exception as e:
             flash(f'failed to connect (3)')
+            flash(str(e))
             session['failed'] = True
     elif service in registered_services:
         try:

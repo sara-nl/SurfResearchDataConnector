@@ -15,8 +15,8 @@ oauth = OAuth(app)
 try:
     oauth.register(
         name='owncloud',
-        client_id=owncloud_client_id,
-        client_secret=owncloud_client_secret,
+        client_id=cloud_client_id,
+        client_secret=cloud_client_secret,
         access_token_url=f'{drive_url}/index.php/apps/oauth2/api/v1/token',
         access_token_params=None,
         authorize_url=f'{drive_url}/index.php/apps/oauth2/authorize',

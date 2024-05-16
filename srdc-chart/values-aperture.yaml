@@ -109,6 +109,8 @@ env:
   # All services: figshare,osf,zenodo, dataverse,irods,sharekit,datahugger
   - name: HIDDEN_SERVICES
     value: sharekit
+  - name: CLOUD_SERVICE
+    value: owncloud
 
   # Database connection
   - name: DB_USER
