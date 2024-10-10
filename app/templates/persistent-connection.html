@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% from "macros.html" import load_async with context %}
+
+{% block title %}Persistent connection{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<div class="m-1">Persistent connection: 
+    {% if data.persistent_connection %}
+    <b>OK</b>
+    {% else %}
+    <b>NO</b>
+    <p>Please, go to the newly opened window, log in, and grant access.</p>
+    <p>Once you have done that: <a href="/persistent-connection">Click here</a>.</p>
+    <script>
+        var a = document.createElement('a');
+        a.href= '{{ data.poll_info.poll_login }}';
+        a.target = 'popup';
+        document.body.appendChild(a);
+        a.click();
+    </script>
+    {% endif %}
+    </b>
+</div>
+
+{% endblock %}

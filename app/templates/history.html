@@ -24,7 +24,7 @@
             {% for item in history %}
             <tr>
                 <th scope="row">{{ item.time_created }}</th>
-                <td><a href="{{drive_url}}/index.php/apps/files?dir=//{{ item.folder }}" target="_top" rel="noopener noreferrer">{{ item.folder }}</a></td>
+                <td><a href="{{drive_url}}/index.php/apps/files?dir={{ item.folder }}" target="_top" rel="noopener noreferrer">{{ item.folder }}</a></td>
                 {% if 'http' in item.url %}
                 <td><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.url | truncate(80,true,'') }}</a></td>
                 {% else %}

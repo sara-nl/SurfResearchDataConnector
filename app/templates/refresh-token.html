@@ -1,0 +1,6 @@
+{% if old_token != new_token %}
+<small id="msg">token automatically refreshed</small>
+<script>
+$("#msg").show().delay(5000).fadeOut();
+</script>
+{% endif %}

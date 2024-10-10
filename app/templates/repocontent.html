@@ -36,38 +36,40 @@
 {% endif %}
 
 <!-- ### BEGIN RETRIEVAL BUTTON -->
-{% if repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits %}
-        <p>It looks like there is enough storage space to host the dataset.</p>
+{% if repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
+        <p>It looks like there is enough storage space to host and resources to process the dataset.</p>
         {% if not data.permission %}
         <p>Your account does not have permission to create this folder: <b>{{ data.complete_folder_path }}</b>.</p>
         <a href="/retrieve"><div class="btn btn-secondary">Go back</div></a>
-    {% endif %}
+        {% endif %}
 
 {% else %}
     
     {% if not repo_content_fits%}
     <p>
         We could not determin if there is enough storage space.
+        
         {% if quota_text == None %}
         Please make sure you are connected, <a href="/connect">reconnect</a> and try again.
         {% else %}
         <p>This can be because you:</p>
         <ul>
-            <li>cannnot preview the files to be downloaded.</li>
+            <li>cannot preview the files to be downloaded.</li>
             <li>do not have write permission to the folder.</li>
             <li>fully used up the available storage.</li>
         </ul>
         {% endif %}
+
     </p>
     {% else %}
-    <p>There is enough storage space to host the dataset at your chosen location.</p>
+    <p>There is enough storage space to host and resources to process the dataset.</p>
     {% endif %}
 
 <a href="/retrieve"><div class="btn btn-secondary">Go back</div></a>
 
 {% endif %}
 
-{% if data.permission and repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits %}
+{% if data.permission and repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
 <button type="submit" class="btn btn-secondary" id="start_download">Start Download</button>
 <div class="form-check mt-3 mb-3">
     <input class="form-check-input" type="checkbox" id="flexCheckRetrieval" value="" name="start_download" required>

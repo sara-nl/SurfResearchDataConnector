@@ -6,6 +6,9 @@ import logging
 import functools
 import time
 
+
+from app.globalvars import *
+
 log = logging.getLogger()
 
 
@@ -41,7 +44,7 @@ class Sharekit(object):
         self.sharekit_api_address = api_address
         if api_address is None:
             self.sharekit_api_address = os.getenv(
-                "API_ADDRESS", "https://api.acc.surfsharekit.nl/api"
+                "SHAREKIT_API_URL", "https://api.acc.surfsharekit.nl/api"
             )
 
         self.api_key = api_key
@@ -57,50 +60,18 @@ class Sharekit(object):
             self.delete_all_files_from_item_internal
         )
 
-    @classmethod
-    def get_item(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).get_item(*args, **kwargs)
-
-    @classmethod
-    def create_new_item(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).create_new_item_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def remove_item(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).remove_item(*args, **kwargs)
-
-    @classmethod
-    def upload_new_file_to_item(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).upload_new_file_to_item(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def change_metadata_in_item(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).change_metadata_in_item_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def publish_item(cls, api_key, *args, **kwargs):
-        return cls(api_key).publish_item(*args, **kwargs)
-
-    @classmethod
-    def delete_all_files_from_item(cls, api_key, *args, **kwargs):
-        return cls(api_key).delete_all_files_from_item_internal(*args, **kwargs)
-
-    @classmethod
-    def check_token(cls, api_key, *args, **kwargs):
+    def check_token(self):
         """Check the API-Token `api_key`.
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
         log.debug("Check token: Starts")
-        r = cls(api_key, *args, **kwargs).get_format()
+        r = self.get_persons()
         log.debug(f"Check Token: Status Code: {r.status_code}")
-
+        if r.status_code != 200:
+            pass
+            # get token and try again
         return r.status_code == 200
+
 
     @_rate_limit(per_second=5)
     def get_item_internal(
@@ -289,7 +260,28 @@ class Sharekit(object):
             f"Entering at lib/upload_sharekit.py {inspect.getframeinfo(inspect.currentframe()).function}")
         raise NotImplementedError
 
-    ### Start Implementation based on Surf Sharekit API ###
+    ### Start Implementation based on Surf Sharekit API Version as of September 2024###
+
+    def get_persons(self, email=None, name=None):
+
+        """Calls the persons endpoint and returns a list of persons
+
+        Args:
+            filter (dict, optional): dict with values for filtering the persons data. Defaults to None
+
+        Returns:
+            json: data structure with info on persosns
+        """
+        if email:
+            url = f"{self.sharekit_api_address}/upload/v1/persons?filter[email][LIKE]=%{email}%&pageNumber=1&pageSize=1"
+        elif name:
+            url = f"{self.sharekit_api_address}/upload/v1/persons?filter[name][LIKE]=%{name}%&pageNumber=1&pageSize=1"
+        else:
+            url = f"{self.sharekit_api_address}/upload/v1/persons?pageNumber=1&pageSize=1"
+        payload = {}
+        headers = {'Authorization': f'Bearer {self.api_key}'}
+        response = requests.request("GET", url, headers=headers, data=payload)
+        return response
 
     def upload_file(self, file_path):
         """Uploads a file using the sharekit upload endpoint
@@ -299,7 +291,7 @@ class Sharekit(object):
         Returns:
             response: the unaltered response of the upload endpoint
         """
-        url = f"{self.sharekit_api_address}/repoitemupload/v1/upload"
+        url = f"{self.sharekit_api_address}/upload/v1/files"
         log.debug(f"### upload url: {url}")
        
         payload = {}
@@ -317,7 +309,7 @@ class Sharekit(object):
         log.debug(response.status_code)
         if response.status_code < 300:
             rjson = response.json()
-            log.error(f"### response: {rjson}")
+            log.debug(f"### response: {rjson}")
             
         return response
 
@@ -343,8 +335,12 @@ class Sharekit(object):
         # As the api-key is application specific and not user specific, many institutes can be returned
         # what we need is the institute id of that matches with the institute of the user.
 
-        response = self.get_format()
-        return response.json()['institute']['options'][0]['value']
+        url = f"{self.sharekit_api_address}/upload/v1/discover/institutes"
+        payload = {}
+        headers = {'Authorization': f'Bearer {self.api_key}'}
+        response = requests.request("GET", url, headers=headers, data=payload)
+
+        return response.json()['data']['institutes'][0]['id']
 
     def create_item(self, files=[], metadata=None):
         """Creates a new sharekit item.
@@ -368,7 +364,9 @@ class Sharekit(object):
                     title = "File uploaded by SurfRDC"
             else:
                 title = "Item created by SurfRDC"
+            
             summary = "This item was automatically created by SurfRDC."
+            
             if metadata is not None and isinstance(metadata, dict):
                 log.debug(f"### Metadata in create item: {metadata}")
                 try:
@@ -380,19 +378,56 @@ class Sharekit(object):
                 except:
                     pass
 
-            url = f"{self.sharekit_api_address}/repoitemupload/v1/create"
-            payload = json.dumps({
-                "type": "ResearchObject",
-                "title": title,
-                "summary": summary,
-                "institute": f"{self.get_institute_id()}",
-                "files": files
-            })
-            log.debug(f"### create_item payload:{payload}")
+            url = f"{self.sharekit_api_address}/upload/v1/repoitems"
+
+            owner = sharekit_owner
+
+            if 'owner' in metadata:
+                owner = metadata['owner']
+
+            if 'rd_user' in metadata:
+                rd_user = metadata['rd_user']
+                summary += f"\n\nUploaded by:\nResearch Drive User: {rd_user}."
+
+            if 'matched_person' in metadata:
+                matched_person = metadata['matched_person']
+                summary += f"\nSharekit User: {matched_person}."
+
+            data = {
+                "owner": owner,
+                "repoItemType": "ResearchObject",
+                "institute": sharekit_institute,
+                "metadata" : {
+                    "title": title,
+                    "summary": summary,
+                    "files": files
+                }
+            }
+
+            payload = json.dumps(data)
+            log.error(f"### create_item payload:{payload}")
+            
             headers = {'Authorization': f'Bearer {self.api_key}'}
             response = requests.request("POST", url, headers=headers, data=payload)
             rjson = response.json()
-            log.debug(f"### create_item response:{rjson}")
+            log.error(f"### create_item response:{rjson}")
+            
+            # set the status to Submitted
+            UUID = rjson['id']
+            status_url = f"{self.sharekit_api_address}/upload/v1/repoitems/{UUID}/status"
+            data = {'status': 'Submitted'}
+            status_payload = json.dumps(data)
+            headers = {'Authorization': f'Bearer {self.api_key}'}
+            response = requests.request("POST", url=status_url, headers=headers, data=status_payload)
+
+            if response.status_code >= 300:
+                # submit a fillrequest if status cannot be changed to submitted
+                UUID = rjson['id']
+                fill_url = f"{self.sharekit_api_address}/upload/v1/repoitems/{UUID}/fill-request"
+                data = {}
+                fill_payload = json.dumps(data)
+                headers = {'Authorization': f'Bearer {self.api_key}'}
+                response = requests.request("POST", url=fill_url, headers=headers, data=fill_payload)
             return response
         except Exception as e:
             log.error(f"Unhandled exception occured at create_item: {e}")
@@ -417,20 +452,20 @@ class Sharekit(object):
 if __name__ == "__main__":
     """Below code will test the code that interfaces the uploads to Sharekit
     """
-    api_key = ""
-    api_address = "https://api.acc.surfsharekit.nl/api"
-    sharekit = Sharekit(api_key=api_key, api_address=api_address)
-    print(sharekit.get_format().json())
+    # api_key = ""
+    # api_address = "https://api.acc.surfsharekit.nl/api"
+    # sharekit = Sharekit(api_key=api_key, api_address=api_address)
+    # print(sharekit.get_format().json())
 
-    path_to_file = "./app/static/img/sharekit.png"
-    path_to_file = "./app/repos/ro-crate-metadata.json"
+    # path_to_file = "./app/static/img/sharekit.png"
+    # path_to_file = "./app/repos/ro-crate-metadata.json"
 
     # act
-    response = sharekit.upload_file(file_path=path_to_file)
+    # response = sharekit.upload_file(file_path=path_to_file)
 
-    print(response)
-    print(response.status_code)
-    print(response.data)
+    # print(response)
+    # print(response.status_code)
+    # print(response.data)
 
     # first upload the file
     # file_path = "../sharekit.png"
@@ -449,22 +484,39 @@ if __name__ == "__main__":
     # ]
     # result = sharekit.create_item(files=files)
     # print(result.json())
-    format = {'title': {'type': 'text', 'labelNL': 'Titel', 'labelEN': 'Title', 'isRequired': 1, 'regex': None, 'options': []},
-                'type': {'type': 'string', 'labelNL': 'RepoType', 'labelEN': 'RepoType', 'isRequired': 1, 'regex': None, 'options': ['PublicationRecord', 'LearningObject', 'ResearchObject', 'Dataset', 'Project']},
-                'institute': {'type': 'uuid', 'labelNL': 'InstituteID', 'labelEN': 'InstituteID', 'isRequired': 1, 'regex': None, 'options': [{'value': '1cb21e78-6d07-4d21-ba5d-f722dd2ba1bd', 'title': 'SURF edusources test'}]},
-                'subtitle': {'type': 'text', 'labelNL': 'Ondertitel', 'labelEN': 'Subtitle', 'isRequired': 0, 'regex': None, 'options': []},
-                'summary': {'type': 'textarea', 'labelNL': 'Samenvatting', 'labelEN': 'Summary', 'isRequired': 0, 'regex': None, 'options': []},
-                'files': {'type': 'attachment', 'labelNL': 'Bestand', 'labelEN': 'File', 'isRequired': 1, 'regex': None, 'options': []}}
+
+    # format = {'title': {'type': 'text', 'labelNL': 'Titel', 'labelEN': 'Title', 'isRequired': 1, 'regex': None, 'options': []},
+    #             'type': {'type': 'string', 'labelNL': 'RepoType', 'labelEN': 'RepoType', 'isRequired': 1, 'regex': None, 'options': ['PublicationRecord', 'LearningObject', 'ResearchObject', 'Dataset', 'Project']},
+    #             'institute': {'type': 'uuid', 'labelNL': 'InstituteID', 'labelEN': 'InstituteID', 'isRequired': 1, 'regex': None, 'options': [{'value': '1cb21e78-6d07-4d21-ba5d-f722dd2ba1bd', 'title': 'SURF edusources test'}]},
+    #             'subtitle': {'type': 'text', 'labelNL': 'Ondertitel', 'labelEN': 'Subtitle', 'isRequired': 0, 'regex': None, 'options': []},
+    #             'summary': {'type': 'textarea', 'labelNL': 'Samenvatting', 'labelEN': 'Summary', 'isRequired': 0, 'regex': None, 'options': []},
+    #             'files': {'type': 'attachment', 'labelNL': 'Bestand', 'labelEN': 'File', 'isRequired': 1, 'regex': None, 'options': []}}
 
 
-    data = {
-            'data': {
-                'attributes': {
-                               'url': 'https://api.acc.surfsharekit.nl/api/v1/files/repoItemFiles/53674d05-71a8-4d6a-a45b-892b4106f6ba',
-                               'title': None,
-                               'permissions': {'canView': True}
-                                },
-                'type': 'repoItemFile',
-                'id': '53674d05-71a8-4d6a-a45b-892b4106f6ba'
-                }
-            }
+    # data = {
+    #         'data': {
+    #             'attributes': {
+    #                            'url': 'https://api.acc.surfsharekit.nl/api/v1/files/repoItemFiles/53674d05-71a8-4d6a-a45b-892b4106f6ba',
+    #                            'title': None,
+    #                            'permissions': {'canView': True}
+    #                             },
+    #             'type': 'repoItemFile',
+    #             'id': '53674d05-71a8-4d6a-a45b-892b4106f6ba'
+    #             }
+    #         }
+
+    api_key = 'abc'
+    username = 'abc'
+    password = 'abc'
+    institute = 'abc'
+    api_address = "https://api.acc.surfsharekit.nl/api"
+    sharekit = Sharekit(api_key=api_key, api_address=api_address)
+    print("#####")
+    print(sharekit.api_key)
+    print(sharekit.check_token())
+    print("#####")
+    sharekit.api_key =  sharekit.get_token()
+    print(sharekit.api_key)
+    print(sharekit.check_token())
+    
+    

@@ -1,3 +1,16 @@
 {% set imgfilepath = '/img/' + data.repo + '.png' %}
 <img src="{{ url_for('static', filename = imgfilepath) }}" alt="{{data.repo}}"/>
-<p>{{data.repo | upper}}: connection {% if connection_ok %}OK{% else %} NOT OK {% endif %}</p>
+
+{% if connection_ok %}
+<p>{{data.repo | upper}}: connection OK</p>
+
+{% else %}
+
+<p style='color: red;'>{{data.repo | upper}}: connection NOT OK</p>
+
+<script>
+    // disable all secondary buttons, so user will not be able to proceed
+    $( ".btn-secondary" ).prop('disabled', true);
+</script>
+
+{% endif %}

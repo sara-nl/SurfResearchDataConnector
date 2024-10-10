@@ -38,13 +38,13 @@ def _rate_limit(func=None, per_second=1):
 
 class Zenodo(object):
 
-    def __init__(self, api_key, address=None, *args, **kwargs):
-        self.zenodo_address = address
-        if address is None:
+    def __init__(self, api_key, api_address=None, *args, **kwargs):
+        if api_address is None:
             self.zenodo_address = os.getenv(
-                "ADDRESS", "https://sandbox.zenodo.org"
-            )
-
+                "ZENODO_API_URL", "https://sandbox.zenodo.org"
+            ).split("/api")[0]
+        else:
+            self.zenodo_address = api_address.split("/api")[0]
         self.api_key = api_key
 
         # monkeypatching all functions with internals
@@ -58,47 +58,12 @@ class Zenodo(object):
             self.delete_all_files_from_deposition_internal
         )
 
-    @classmethod
-    def get_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).get_deposition(*args, **kwargs)
-
-    @classmethod
-    def create_new_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).create_new_deposition_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def remove_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).remove_deposition(*args, **kwargs)
-
-    @classmethod
-    def upload_new_file_to_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).upload_new_file_to_deposition(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def change_metadata_in_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).change_metadata_in_deposition(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def publish_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key).publish_deposition(*args, **kwargs)
-
-    @classmethod
-    def delete_all_files_from_deposition(cls, api_key, *args, **kwargs):
-        return cls(api_key).delete_all_files_from_deposition_internal(*args, **kwargs)
-
-    @classmethod
-    def check_token(cls, api_key, *args, **kwargs):
+    def check_token(self):
         """Check the API-Token `api_key`.
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
         log.debug("Check token: Starts")
-        r = cls(api_key, *args, **kwargs).get_deposition(return_response=True)
+        r = self.get_deposition_internal(return_response=True)
         log.debug("Check Token: Status Code: {}".format(r.status_code))
 
         return r.status_code == 200
@@ -206,7 +171,7 @@ class Zenodo(object):
         log.debug(
             "Create new deposition: Status Code: {}".format(r.status_code))
 
-        if r.status_code != 201:
+        if r.status_code != 200:
             return {} if not return_response else r
 
         if metadata is not None and isinstance(metadata, dict):
@@ -379,7 +344,6 @@ class Zenodo(object):
             list: list of all the files information: name, size, link, hash, and hash_type
         """
         files = self.get_files_from_deposition(deposition_id=deposition_id)
-        log.error(f"files: {files}")
 
         # if files cannot be retrieved then try to get as public article
         # if 'message' in files and files['message'] == 'Insufficient permissions':
@@ -407,40 +371,8 @@ class Zenodo(object):
             dict: flat key value store with keys being the metadata field names and the values the metadata field values.
         """
         result = self.get_deposition(return_response=True, id=deposition_id)
-        # if result is no permission (403 or something) then try to get as public article
-        # if result.status_code > 300:
-        #     result = self.get_article_internal(return_response=True, id=article_id, public=True)
         result = result.json()
-        return result
-
-        # final = {}
-        # exclude = ['URL_PRIVATE_API', 'URL_PUBLIC_API', 'URL_PRIVATE_HTML', 'URL_PUBLIC_HTML','FILES']
-        # # here we can improve on the metadata presentation
-        # for key in result.keys():
-        #     if key.upper() not in exclude:
-        #         if result[key] != None and result[key] != [] and result[key] != "":
-        #             if type(result[key]) == "dict":
-        #                 for sub_key in result[key]:
-        #                     final[key + "_" + sub_key] = result[key][sub_key]
-        #             elif key == 'authors':
-        #                 authors = ""
-        #                 for author in result[key]:
-        #                     authors += f"{author['full_name']}, "
-        #                 final[key] = authors
-        #             elif key == 'categories':
-        #                 categories = ""
-        #                 for category in result[key]:
-        #                     categories += f"{category['title']}, "
-        #                 final[key] = categories
-        #             elif key == 'tags':
-        #                 final[key] = ", ".join(result[key])
-        #             elif key == 'timeline' or key == 'license':
-        #                 for sub_key in result[key]:
-        #                     final[key + "_" + sub_key] = result[key][sub_key]
-        #             else:
-        #                 final[key] = result[key]
-        # return final
-        
+        return result        
 
     def download_files(self, deposition_id, dest_folder):
         """Will download all files for a specific article to a folder
@@ -456,7 +388,6 @@ class Zenodo(object):
             if not os.path.exists(dest_folder):
                 os.makedirs(dest_folder)  # create folder if it does not exist
             file_content = self.get_repo_content(deposition_id)
-            log.error(file_content)
             for item in file_content:
                 filename = item['name']
                 
@@ -495,17 +426,4 @@ class Zenodo(object):
 
 
 if __name__ == "__main__":
-    # print("Don't run this file directly. Please use `../server.py` for this.")
-    api_key = "" # sandbox
-    # api_key = "" # prod
-    z = Zenodo(api_key=api_key)
-    # response = z.create_new_deposition_internal(metadata={'title': 'test'}, return_response=True)
-    # response = z.get_deposition(id=6785, return_response=True)
-    
-    response = z.download_files(deposition_id=6785,dest_folder="tmptest")
-    # print(response.status_code)
-    print(response)
-    # files = z.get_files_from_deposition(deposition_id=6785)
-    # print(files)
-
-    # Drafts not showing: https://github.com/zenodo/zenodo/issues/2513
+    pass

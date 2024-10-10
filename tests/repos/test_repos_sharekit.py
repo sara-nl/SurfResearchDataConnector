@@ -153,7 +153,7 @@ class TestSharekitMethodsNew(unittest.TestCase):
         sharekit = Sharekit(api_key=api_key, api_address=api_address)
 
         # act
-        response = sharekit.check_token(api_key)
+        response = sharekit.check_token()
 
         # assert
         self.assertTrue(response)

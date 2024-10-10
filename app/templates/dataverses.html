@@ -1,0 +1,10 @@
+Select the dataverse to upload to:
+<select name="dataverse" class="form-select" required>
+    <option></option>
+    {% for dataverse in dataverses %}
+        <option value="{{dataverse}}" selected='selected' >{{dataverse.title}}</option>
+    {% endfor %}
+</select>
+<div class="invalid-feedback">
+    Please select a dataverse!
+</div>

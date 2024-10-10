@@ -329,7 +329,7 @@ class TestFigshareMethodsNew(unittest.TestCase):
         figshare = Figshare(api_key=api_key, api_address=api_address)
 
         # act
-        response = figshare.check_token(api_key)
+        response = figshare.check_token()
 
         # assert
         self.assertTrue(response)

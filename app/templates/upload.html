@@ -2,7 +2,7 @@
 
 {% from "macros.html" import load_async with context %}
 
-{% block title %}Connect{% endblock %}
+{% block title %}Upload{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -23,10 +23,11 @@
                 {{ load_async("repo_selection", "/repo-selection") }}
                 <!-- end async -->
                 {% if not preview %}
+                <div id="show_dataverses"></div>
                 <div class="form-group mt-3 mb-3">
                     <label for="Folder">Select the folder to upload:</label>
                     <!-- async loading folder paths -->
-                    {{ load_async("folderpaths", "/folder-paths") }}
+                    {{ load_async("folderpaths", "/folder-paths", 55000) }}
                     <!-- end async -->
                 </div>
                 {% else %}
@@ -35,6 +36,7 @@
                         <option value="{{data.folder_path}}" selected='selected' >{{ data.folder_path }}</option>
                 </select>
                 {% endif %}
+                
                 <h2>Metadata</h2>
                 <div id="show_meta">Please select a repository. The repository specific metadata fields will show here.</div>
             </div>
@@ -49,15 +51,21 @@
 
                 <!-- ### BEGIN PREVIEW ### -->
                 <h1>Upload - Preview</h1>
-            
+                
                 <h2>Repo</h2>
                 <!-- async loading check connection -->
-                {{ load_async("check_connection", "/check-connection") }}
+                {% set checkconnectionurl = '/check-connection/' + data.repo %}
+                {{ load_async("check_connection", checkconnectionurl) }}
                 <!-- end async -->
 
+                {% if data.repo == 'dataverse' %}
+                <div>Uploading to dataverse: {{data.dataverse.title}}</div>
+                {% endif %}
+                
+                
                 <h2>Data Folder to upload</h2>
                 <!-- async loading folder content -->
-                {{ load_async("foldercontent", "/folder-content") }}
+                {{ load_async("foldercontent", "/folder-content/up", 55000) }}
                 <!-- end async -->
 
                 <h2>Metadata</h2>
@@ -109,7 +117,7 @@
         <form action="/cancel_upload" method="post">
             <input type="text" name="cancel" value="true" hidden>
             <input type="text" name="preview" value={{preview}} hidden>
-            <button type="submit" class="btn btn-secondary">Cancel Upload</button>
+            <button type="submit" class="btn btn-secondary">Cancel Process</button>
             <div class="form-check mt-3 mb-3">
                 <input class="form-check-input" id="flexCheckCancel" type="checkbox" value="" name="checked" required>
                 <label class="form-check-label" for="flexCheckCancel">

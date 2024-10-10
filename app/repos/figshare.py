@@ -230,48 +230,13 @@ class Figshare(object):
 
     # end helper functions
 
-    @classmethod
-    def get_article(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).get_article(*args, **kwargs)
-
-    @classmethod
-    def create_new_article(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).create_new_article_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def remove_article(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).remove_article(*args, **kwargs)
-
-    @classmethod
-    def upload_new_file_to_article(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).upload_new_file_to_article(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def change_metadata_in_article(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).change_metadata_in_article_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def publish_article(cls, api_key, *args, **kwargs):
-        return cls(api_key).publish_article(*args, **kwargs)
-
-    @classmethod
-    def delete_all_files_from_article(cls, api_key, *args, **kwargs):
-        return cls(api_key).delete_all_files_from_article_internal(*args, **kwargs)
-
-    @classmethod
-    def check_token(cls, api_key, *args, **kwargs):
+    def check_token(self):
         """Check the API-Token `api_key`.
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
-        log.debug("Check token: Starts")
-        r = cls(api_key, *args, **kwargs).get_article(return_response=True)
-        log.debug(f"Check Token: Status Code: {r.status_code}")
+        log.error("Check token: Starts")
+        r = self.get_article(return_response=True)
+        log.error(f"Check Token: Status Code: {r.status_code}")
 
         return r.status_code == 200
 

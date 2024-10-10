@@ -2,7 +2,7 @@
 
 {% from "macros.html" import load_async with context %}
 
-{% block title %}Connect{% endblock %}
+{% block title %}Download{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -65,14 +65,16 @@
             <label for="Folder">Data Folder Path: </label>
 
             <!-- async loading folder paths -->
-            {{ load_async("folderpaths", "/folder-paths") }}
+            {{ load_async("folderpaths", "/folder-paths", 55000) }}
             <!-- end async -->
 
-            <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder"
-                required>
+            <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder (optional)"
+            pattern="[\--_-A-Za-z0-9]+" >
+
             <div class="invalid-feedback">
                 Please fill out the folder name where you want store the data.
             </div>
+
         </div>
 
         {% if (vars.folder_exists_message==True or data.accept_folder_exist==True) and check_accept_folder_first!=None
@@ -99,6 +101,11 @@
 
     <!-- ### BEGIN PREVIEW ### -->
     <h1>Download - Preview</h1>
+
+    <!-- async loading check connection -->
+    {% set checkconnectionurl = '/check-connection/' + data.repo %}
+    {{ load_async("check_connection", checkconnectionurl) }}
+    <!-- end async -->
     
     <h2>Drive Storage</h2>
     <!-- async loading quote_text -->
@@ -107,14 +114,10 @@
 
     <h2>Data Folder</h2>
     <!-- async loading folder content -->
-    {{ load_async("foldercontent", "/folder-content") }}
+    {{ load_async("foldercontent", "/folder-content/down", 55000) }}
     <!-- end async -->
 
     <h2>Data Set</h2>
-
-    <!-- async loading check connection -->
-    {{ load_async("check_connection", "/check-connection") }}
-    <!-- end async -->
 
     <!-- Needs specific implementation for the private repo choosen-->
 
@@ -138,7 +141,7 @@
     <input type="text" name="preview" value={{preview}} hidden>
     <input type="text" name="check_accept_folder_first" value={{check_accept_folder_first}} hidden>
     <input type="text" name="check_accept_url_in_history_first" value={{check_accept_url_in_history_first}} hidden>
-    <button type="submit" class="btn btn-secondary">Cancel Download</button>
+    <button type="submit" class="btn btn-secondary">Cancel Process</button>
     <div class="form-check mt-3 mb-3">
         <input class="form-check-input" id="flexCheckCancel" type="checkbox" value="" name="checked" required>
         <label class="form-check-label" for="flexCheckCancel">

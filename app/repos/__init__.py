@@ -2,9 +2,9 @@ from app.repos.osf import Osf
 from app.repos.figshare import Figshare
 from app.repos.zenodo import Zenodo
 from app.repos.dataverse import Dataverse
-from app.repos.irods_repo import Irods
+from app.repos.irods import Irods
 from app.repos.sharekit import Sharekit
-from app.utils import update_history, create_generated_folder, total_files_count, get_canceled
+from app.utils import update_history, create_generated_folder, total_files_count, get_canceled, cloud, make_connection
 from app.utils import create_rocrate, check_checksums, push_data, get_query_status, get_status_from_history
 import logging
 import owncloud
@@ -14,6 +14,7 @@ import shutil
 import os
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
+import requests
 
 try:
     from app.globalvars import *
@@ -25,13 +26,17 @@ except:
 
 logger = logging.getLogger()
 
-if cloud_service == "owncloud":
-    cloud = owncloud.Client(drive_url)
-elif cloud_service == "nextcloud":
-    cloud = nextcloud_client.Client(drive_url)
-else:
-    # defaulting to the owncloud lib in case cloud_service is not configured
-    cloud = owncloud.Client(drive_url)
+
+def get_sharekit_token():
+    # will get temp token / api_key based on client id en secret
+    url = f"{sharekit_api_url}/upload/v1/auth/token"
+    payload = f'client_id={sharekit_client_id}&client_secret={sharekit_client_secret}&grant_type=client_credentials&institute={sharekit_institute}'
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    response = requests.request("POST", url, headers=headers, data=payload)
+    if response.status_code < 300:
+        return response.json()['access_token']
 
 
 def get_repocontent(repo, url, api_key, user=None):
@@ -51,16 +56,13 @@ def get_repocontent(repo, url, api_key, user=None):
             deposition_id = int(url.split('/')[-2])
         repo_content = zenodo.get_repo_content(deposition_id=deposition_id)
     if repo == 'osf':
-        # logger.error(url)
         osf = Osf(api_key=api_key, api_address=osf_api_url)
         split_url = url.split('/')
-        # logger.error(split_url)
         if split_url[-1] != '':
             project_id = str(split_url[-1])
         else:
             project_id = str(split_url[-2])
         repo_content = osf.get_repo_content(project_id=project_id)
-        # logger.error(repo_content)
     if repo == 'dataverse':
         try:
             dataverse = Dataverse(api_key=api_key, api_address=dataverse_api_url)
@@ -79,7 +81,6 @@ def get_repocontent(repo, url, api_key, user=None):
         irods = Irods(api_key=api_key, api_address=irods_api_url, user=user)
         parsed = urlparse(url)
         path = parse_qs(parsed.query)['dir'][0]
-        logger.error(f"path: {path}")
         repo_content = irods.get_repo_content(path=path)
     if repo == 'sharekit':
         sharekit = Sharekit(api_key=api_key, api_address=sharekit_api_url)
@@ -222,9 +223,9 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
             create_rocrate(url, folder)
             update_history(username, folder, url,
                     'created ro-crate-metadata.json file')
-        except:
+        except Exception as e:
             update_history(username, folder, url,
-                    'failed to create ro-crate-metadata.json file')
+                    f'failed to create ro-crate-metadata.json file: {e}')
 
     if not get_canceled(username):
         update_history(username, folder, url, 'start pushing dataset to storage')
@@ -242,23 +243,23 @@ def check_connection(repo, api_key, user=None):
         connection_ok = osf.check_token()
     if repo == "figshare":
         figshare = Figshare(api_key=api_key, api_address=figshare_api_url)
-        connection_ok = figshare.check_token(api_key=api_key)
+        connection_ok = figshare.check_token()
     if repo == "zenodo":
         zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
-        connection_ok = zenodo.check_token(api_key=api_key)
+        connection_ok = zenodo.check_token()
     if repo == "dataverse":
         dataverse = Dataverse(api_key=api_key, api_address=dataverse_api_url)
-        connection_ok = dataverse.check_token(api_key=api_key)   
+        connection_ok = dataverse.check_token()   
     if repo == "irods":
         irods = Irods(api_key=api_key, api_address=irods_api_url, user=user)
-        connection_ok = irods.check_token(api_key=api_key, user=user)
+        connection_ok = irods.check_token()
     if repo == "sharekit":
         sharekit = Sharekit(api_key=api_key, api_address=sharekit_api_url)
-        connection_ok = sharekit.check_token(api_key=api_key)
+        connection_ok = sharekit.check_token()
     return connection_ok
 
 
-def run_export(username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip=False):
+def run_export(username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip=False, dataverse_alias=None):
 
     ### NOTE ###
     # let's first implement an on disk solution, as we have seen that the buffered solution is not working with ScieboRDS
@@ -279,13 +280,16 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
 
     # connect to OC
     try:
-        oc.login(username, password)
-    except:
-        message = "failed to connect to RD"
+        make_connection(username, password)
+    except Exception as e:
+        message = f"failed to connect to RD: {e}"
         logger.error(message)
         update_history(username=username,
                        folder=complete_folder_path, url=repo, status=message)
+        update_history(username=username, folder=complete_folder_path,
+            url=repo, status=f'ready')
         return
+
 
     if not get_canceled(username):
         # Download the data from OC
@@ -293,11 +297,17 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                     url=repo, status='start downloading project as zipfile')
         
         tmpzip = tmp_folder_path_name + ".zip"
-        downloaded = oc.get_directory_as_zip(
-            remote_path=complete_folder_path, local_file=tmpzip)
-        update_history(username=username, folder=complete_folder_path,
-                    url=repo, status='done downloading project as zipfile')
-
+        try:
+            cloud.get_directory_as_zip(
+                remote_path=complete_folder_path, local_file=tmpzip)
+            update_history(username=username, folder=complete_folder_path,
+                        url=repo, status='done downloading project as zipfile')
+        except Exception as e:
+            update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed downloading project as zipfile: {e}')
+            update_history(username=username, folder=complete_folder_path,
+                url=repo, status=f'ready')
+            return
     if not get_canceled(username):
         # unzip the file to folder with name of last part of complete folder path.
         update_history(username=username, folder=complete_folder_path,
@@ -323,9 +333,9 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             create_rocrate(url=repo, folder=unzipped_folder, metadata=metadata)
             update_history(username=username, folder=complete_folder_path,
                     url=repo, status="created ro-crate file in 'generated' folder")
-        except:
+        except Exception as e:
             update_history(username=username, folder=complete_folder_path,
-                    url=repo, status="failed at creating ro-crate file in 'generated' folder")
+                    url=repo, status=f"failed at creating ro-crate file in 'generated' folder: {e}")
 
     # if not get_canceled(username):
     #     # write the metadata in generated folder back to OC
@@ -334,7 +344,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
     #     update_history(username=username, folder=complete_folder_path,
     #                 url=repo, status="backing up ro-crate file to RD")
     #     try:
-    #         oc.put_directory(target_path=complete_folder_path, local_directory=f'{unzipped_folder}/generated')
+    #         cloud.put_directory(target_path=complete_folder_path, local_directory=f'{unzipped_folder}/generated')
     #     except:
     #         update_history(username=username, folder=complete_folder_path,
     #                 url=repo, status="failed at backing up ro-crate file to RD")
@@ -362,7 +372,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
         if repo == 'figshare':
             figshare = Figshare(api_key=api_key, api_address=figshare_api_url)
         if repo == 'dataverse':
-            dataverse = Dataverse(api_key=api_key, api_address=dataverse_api_url)
+            dataverse = Dataverse(api_key=api_key, api_address=dataverse_api_url, dataverse_alias=dataverse_alias)
         if repo == 'zenodo':
             zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
         if repo == 'irods':
@@ -407,9 +417,9 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                     update_history(username=username, folder=complete_folder_path,
                         url=repo, status=f'ready')
                     return
-            except:
+            except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
-                    url=repo, status=f'failed to create a project at {repo}')
+                    url=repo, status=f'failed to create a project at {repo}: {e}')
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
@@ -429,9 +439,9 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                     update_history(username=username, folder=complete_folder_path,
                         url=repo, status=f'ready')
                     return                    
-            except:
+            except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
-                    url=repo, status=f'failed to create a project at {repo}')
+                    url=repo, status=f'failed to create a project at {repo}: {e}')
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
@@ -447,7 +457,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                         rtext = r.json()['message']
                         if rtext.find('no Referer') != -1:
                             rtext = 'please reconnect'
-                    except:
+                    except Exception as e:
                         rtext = r.text
                     update_history(username=username, folder=complete_folder_path,
                         url=repo, status=f'failed to create a project at {repo}: {rtext}')
@@ -457,7 +467,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             except Exception as e:
                 logger.error(f"Failed to create project for Zenodo: {e}")
                 update_history(username=username, folder=complete_folder_path,
-                    url=repo, status=f'failed to create a project at {repo}')
+                    url=repo, status=f'failed to create a project at {repo}: {e}')
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
@@ -540,11 +550,9 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             # upload file by file to repo
             n = 1
             for root, dirs, files in os.walk(uploads):
-                logger.error((root, dirs, files))
                 for j in files:
                     if not get_canceled(username):
                         filepath = os.path.join(root, j)
-                        # logger.error(filepath)
                         try:
                             result = False
                             if repo == 'sharekit':
@@ -552,18 +560,21 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                                 try:
                                     response = sharekit.upload_file(file_path=filepath)
                                     if response.status_code < 300:
-                                        repoItemID = response.json()['data']['id']
-                                        sharekit_files.append(repoItemID)
+                                        logger.error("##################")
+                                        logger.error(response.json())
+                                        fileId = response.json()['id']
+                                        sharekit_files.append({'fileId' : fileId,  'fileName' : j})
                                         result = True
                                     else:
                                         statuscode = response.status_code
                                         logger.error(f"failed to upload file. got {statuscode}")
+                                        logger.error(response.text)
                                         try:
-                                            logger.error(r.text)
+                                            logger.error(response.text)
                                         except:
                                             pass
-                                except:
-                                    logger.error("failed to upload file")
+                                except Exception as e:
+                                    logger.error(f"failed to upload file: {e}")
                             if repo == 'osf':
                                 result = osf.upload_new_file_to_project(project_id=project_id, path_to_file=filepath)
                             if repo == 'figshare':
@@ -589,8 +600,8 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                                 message = f"failed to upload file {filepath}: {result}"
                                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                         except Exception as e:
-                            logger.error(f"failed to upload file {filepath} - {e}")
                             message = f"failed to upload file {filepath} - {e}"
+                            logger.error(message)
                             update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                         n += 1
         update_history(username=username, folder=complete_folder_path,

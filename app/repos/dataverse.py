@@ -12,6 +12,10 @@ try:
     from app.globalvars import *
 except:
     # for testing this file locally
+    import sys
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    print(SCRIPT_DIR)
+    sys.path.append(os.path.dirname(SCRIPT_DIR))
     from globalvars import *
     print("testing")
 
@@ -47,7 +51,7 @@ def _rate_limit(func=None, per_second=1):
 
 class Dataverse(object):
 
-    def __init__(self, api_key, api_address=None, *args, **kwargs):
+    def __init__(self, api_key, api_address=None, dataverse_alias=None, *args, **kwargs):
         self.dataverse_api_address = api_address
         if api_address is None:
             self.dataverse_api_address = os.getenv(
@@ -55,6 +59,7 @@ class Dataverse(object):
             )
 
         self.api_key = api_key
+        self.dataverse_alias = dataverse_alias
 
         # monkeypatching all functions with internals
         self.get_dataset = self.get_dataset_internal
@@ -67,59 +72,23 @@ class Dataverse(object):
             self.delete_all_files_from_dataset_internal
         )
 
-    @classmethod
-    def get_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).get_dataset(*args, **kwargs)
-
-    @classmethod
-    def create_new_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).create_new_dataset_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def remove_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).remove_dataset(*args, **kwargs)
-
-    @classmethod
-    def upload_new_file_to_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).upload_new_file_to_dataset(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def change_metadata_in_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key, *args, **kwargs).change_metadata_in_dataset_internal(
-            *args, **kwargs
-        )
-
-    @classmethod
-    def publish_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key).publish_dataset(*args, **kwargs)
-
-    @classmethod
-    def delete_all_files_from_dataset(cls, api_key, *args, **kwargs):
-        return cls(api_key).delete_all_files_from_dataset_internal(*args, **kwargs)
-
-    @classmethod
-    def check_token(cls, api_key, *args, **kwargs):
+    def check_token(self):
         """Check the API-Token `api_key`.
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
         log.debug("Check token: Starts")
         try:
-            user_dataverse = cls(api_key, *args, **kwargs).get_user_dataverse()
-            print(user_dataverse)
-            response = cls(api_key, *args, **kwargs).create_new_dataset(return_response=True)
-            print(response.text)
+            if dataverse_create_user_dataverse.lower() == "ok":
+                user_dataverse = self.get_user_dataverse()
+            response = self.create_new_dataset(return_response=True)
             persistent_id = response.json()['data']['persistentId']
-            print(persistent_id)
-            r = cls(api_key, *args, **kwargs).get_dataset(persistent_id=persistent_id, return_response=True)
+            r = self.get_dataset(persistent_id=persistent_id, return_response=True)
             log.debug(f"Check Token: Status Code: {r.status_code}")
             # cleanup
-            cls(api_key, *args, **kwargs).remove_dataset(persistent_id)
+            self.remove_dataset(persistent_id)
             return r.status_code == 200
-        except:
+        except Exception as e:
+            logger.error(e)
             return False
 
     def set_metadata(self, metadata=None):
@@ -221,6 +190,47 @@ class Dataverse(object):
         return metadata
 
 
+    def get_dataverse_info(self, dataverse):
+        dataverse_info = {'type': 'dataverse'}
+        url = f"{self.dataverse_api_address}/dataverses/{dataverse}"
+        headers = {
+            'X-Dataverse-key': self.api_key,
+            'Content-Type': 'application/json'
+        }
+        req = requests.request("GET", url, headers=headers)
+        if req.status_code == 200:
+            if req.json()['status'] == 'OK':
+                dataverse_info['id'] = req.json()['data']['id']
+                dataverse_info['title'] = req.json()['data']['name']
+                dataverse_info['alias'] = req.json()['data']['alias']
+        return dataverse_info
+
+
+    def get_sub_dataverses(self, root_dataverse=dataverse_parent_dataverse):
+        subdataverses = []
+        url = f"{self.dataverse_api_address}/dataverses/{root_dataverse}/contents"
+        headers = {
+            'X-Dataverse-key': self.api_key,
+            'Content-Type': 'application/json'
+        }
+        rr = requests.request("GET", url, headers=headers)
+        if rr.status_code == 200:
+            if rr.json()['status'] == 'OK':
+                if 'data' in rr.json():
+                    for item in rr.json()['data']:
+                        if item['type'] == 'dataverse':
+                            ID = item['id']
+                            url = f"{self.dataverse_api_address}/dataverses/{ID}"
+                            headers = {
+                                'X-Dataverse-key': self.api_key,
+                                'Content-Type': 'application/json'
+                            }
+                            req = requests.request("GET", url, headers=headers)
+                            item['alias'] = req.json()['data']['alias']
+                            subdataverses.append(item)
+        return subdataverses
+
+
     def get_user_dataverse(self):
         """This method will return a dataverse name based on the userId.
         Each time it is called it will try to create a dataverse with the name
@@ -233,6 +243,10 @@ class Dataverse(object):
         Returns:
             _str: name of the dataverse
         """
+        
+        if dataverse_create_user_dataverse.lower() != "ok":
+            return #dataverse_parent_dataverse
+
         # parent dataverse at demo.dataverse.nl is "surf"
         parent_dataverse = dataverse_parent_dataverse
 
@@ -244,7 +258,7 @@ class Dataverse(object):
         }
         try:
             rr = requests.request("GET", url, headers=headers).json()['data']
-
+            
             dataverse_user = rr['persistentUserId']
             dataverse_name = ((re.sub(r"[^a-zA-Z0-9]+", '', dataverse_user)))
             email = rr['email']
@@ -312,10 +326,14 @@ class Dataverse(object):
             'Content-Type': 'application/json'
         }
         
-        user_dataverse = self.get_user_dataverse()
-        
-        url = f"{self.dataverse_api_address}/dataverses/{user_dataverse}/contents"
-        
+        if dataverse_create_user_dataverse.lower() == "ok":
+            dataverse_alias = self.get_user_dataverse()
+        elif self.dataverse_alias:
+            dataverse_alias = self.dataverse_alias
+        else:
+            dataverse_alias = dataverse_parent_dataverse
+
+        url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/contents"
         r = requests.request("GET", url, headers=headers)
         
         last_dataset_id = r.json()["data"][-1]['id']
@@ -342,8 +360,6 @@ class Dataverse(object):
         log.debug(
             f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
 
-        user_dataverse = self.get_user_dataverse()
-
         try:
             headers = {
                 'X-Dataverse-key': self.api_key,
@@ -353,7 +369,16 @@ class Dataverse(object):
             if persistent_id is not None:
                 url = f"{self.dataverse_api_address}/datasets/:persistentId/?persistentId={persistent_id}"
             else:
-                url = f"{self.dataverse_api_address}/dataverses/{user_dataverse}/contents"
+
+                if dataverse_create_user_dataverse.lower() == "ok":
+                    dataverse_alias = self.get_user_dataverse()
+                elif self.dataverse_alias:
+                    dataverse_alias = self.dataverse_alias
+                else:
+                    dataverse_alias = dataverse_parent_dataverse
+                    
+                url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/contents"
+
             r = requests.request("GET", url, headers=headers)
             if return_response:
                 return r
@@ -385,16 +410,21 @@ class Dataverse(object):
         log.debug("Create new dataset: Starts")
         log.debug(f"### metadata: {metadata}")
 
-        user_dataverse = self.get_user_dataverse()
-
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
 
         # Create a dataset as part of the parent dataverse
-        url = f"{self.dataverse_api_address}/dataverses/{user_dataverse}/datasets"
+        if dataverse_create_user_dataverse.lower() == "ok":
+            dataverse_alias = self.get_user_dataverse()
+        elif self.dataverse_alias:
+            dataverse_alias = self.dataverse_alias
+        else:
+            dataverse_alias = dataverse_parent_dataverse
 
+        url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/datasets"
+        
         # use metadata here to set values of below variables els:
         
         metadata = self.set_metadata(metadata)
@@ -720,7 +750,7 @@ class Dataverse(object):
                 # so check for '/' in the filename
                 if filename.find("/") != -1:
                     additional_path = filename.split('/')
-                    log.error(additional_path)
+                    # log.error(additional_path)
                     # drop last one as that is the filename
                     filename = additional_path.pop()
                     additional_path = "/".join(additional_path)
@@ -784,12 +814,12 @@ if __name__ == "__main__":
     api_address = "https://demo.dataverse.nl/api"
     dataverse = Dataverse(api_key=api_key, api_address=api_address)
 
-    print("### check token ###")
-    print(api_address)
-    check = dataverse.check_token(api_key)
-    print(check)
-    # if check:
-
+    # print("### check token ###")
+    # print(api_address)
+    check = dataverse.check_token()
+    # print(check)
+    if check:
+        pprint(dataverse.get_dataverse_info("surf"))
     #     persistent_id = "doi:10.80227/test-BON2UZ"
     #     repo_content = dataverse.get_repo_content(persistent_id)
     #     # repo_content = dataverse.get_private_metadata(persistent_id)

@@ -1,24 +1,29 @@
 from app.models import app, db, History
 from app.connections import oauth, registered_services, oauth_services, token_based_services
-from app.utils import run_import, make_connection, get_webdav_token
-from app.utils import get_user_info, set_query_status, set_canceled
+from app.utils import run_import, make_connection, get_webdav_token, get_webdav_poll_info_nc, get_webdav_token_nc
+from app.utils import get_user_info, set_query_status, set_canceled, get_cached_folders, repo_content_can_be_processed, folder_content_can_be_processed
 from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, get_query_status, get_status_from_history
 from app.utils import get_folders, get_folder_content, get_files_info, check_checksums, update_history, push_data, get_raw_folders
 from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission
-from app.repos import run_export, check_connection, get_private_metadata, get_repocontent
+from app.utils import refresh_cloud_token, get_user_info
+from app.repos import run_export, check_connection, get_private_metadata, get_repocontent, get_sharekit_token
+from app.repos.dataverse import Dataverse
+from app.repos.sharekit import Sharekit
 from threading import Thread, Event
-from flask import request, session, flash, render_template, url_for, redirect
+from flask import request, session, flash, render_template, url_for, redirect, render_template_string
 from app.globalvars import *
+import json
 import logging
 import math
 import os
-import requests
-import json
+import shutil
 from sqlalchemy import and_
 from app.repos import run_private_import
 import whois
+from time import time
 
 logger = logging.getLogger()
+
 
 @app.route('/')
 def home():
@@ -28,15 +33,45 @@ def home():
         str: html for the home page
     """
     try:
-        data = session
-        data['srdc_url'] = srdc_url
-        data['hidden_services'] = hidden_services
-        data['cloud_service'] = cloud_service
+        session['persist'] = False
+        session['srdc_url'] = srdc_url
+        session['hidden_services'] = hidden_services
+        session['cloud_service'] = cloud_service
     except Exception as e:
-        flash("something went wrong (1)")
+        flash("something went wrong (1b)")
         logger.error(e, exc_info=True)
-    return render_template('home.html', data=data)
+    return render_template('home.html', data=session)
 
+
+@app.route('/refresh-folderpaths')
+def refresh_folder_paths():
+    """Will refresh the cached folders and then redirect to home.
+
+    Returns:
+        redirect
+    """
+    try:
+        data = session
+        if data['connected']:
+            get_cached_folders.cache_clear()
+            get_cached_folders(username = session['username'], password = session['password'], folder = '/')
+            flash('Data Folder Paths refreshed')
+            # if cloud_service.lower() == 'nextcloud' and 'persist' in session and session['persist'] == True:
+            #     flash('Please login and grant access in the window that just opened to make your connection persistent.')
+    except Exception as e:
+        flash("something went wrong (22)")
+        logger.error(e, exc_info=True)
+    return render_template('refresh-folderpaths.html', data=session, embed_app_url=embed_app_url)
+
+
+@app.route('/refresh')
+def refresh():
+    """Will render the refresh page
+
+    Returns:
+        str: html for the refresh page
+    """
+    return render_template('refresh.html', data=session)
 
 @app.route('/faq')
 def faq():
@@ -78,11 +113,29 @@ def history(id=None):
     Returns:
         str: html for the history page
     """
-
-    history = []
-    username = ""
-    folder = ""
-    url = ""
+    try:
+        username = None
+        password = None
+        session['cloud_service'] = cloud_service
+        if 'username' in session:
+            username = session['username']
+        if cloud_service == 'owncloud':
+            if 'password' in session:
+                password = session['password']
+        else:
+            if 'access_token' in session:
+                password = session['access_token']
+        if not make_connection(username=session['username'], password=session['password']):
+            flash('Not connected')
+            return redirect('/connect')
+            
+        history = []
+        username = ""
+        folder = ""
+        url = ""
+    except Exception as e:
+        flash("something went wrong (15)")
+        logger.error(e, exc_info=True)
     try:
         if 'username' in session:
             username = session['username']
@@ -123,11 +176,15 @@ def connect():
     Returns:
         str: html for the connect page
     """
-    session['hidden_services'] = hidden_services
-    if 'username' in session and 'password' in session and make_connection(session['username'], session['password']):
-        session['connected'] = True
-    else:
-        session['connected'] = False
+    try:
+        session['hidden_services'] = hidden_services
+        if 'username' in session and 'password' in session and make_connection(session['username'], session['password']):
+            session['connected'] = True
+        else:
+            session['connected'] = False
+    except Exception as e:
+        flash("something went wrong (14)")
+        logger.error(e, exc_info=True)
     try:
         if request.method == "POST":
             if 'disconnect' in request.form:
@@ -151,14 +208,20 @@ def connect():
             if 'figshare_disconnect' in request.form:
                 if 'figshare_access_token' in session:
                     del session['figshare_access_token']
+                    if 'repo' in session and session['repo'] == 'figshare':
+                        session['repo'] = None
                     flash('figshare disconnected')
             if 'zenodo_disconnect' in request.form:
                 if 'zenodo_access_token' in session:
                     del session['zenodo_access_token']
+                    if 'repo' in session and session['repo'] == 'zenodo':
+                        session['repo'] = None
                     flash('zenodo disconnected')
             if 'osf_disconnect' in request.form:
                 if 'osf_access_token' in session:
                     del session['osf_access_token']
+                    if 'repo' in session and session['repo'] == 'osf':
+                        session['repo'] = None
                     flash('osf disconnected')
             ### END Oauth based service connections ###
 
@@ -166,6 +229,8 @@ def connect():
             if 'figshare_disconnect' in request.form:
                 if 'figshare_access_token' in session:
                     del session['figshare_access_token']
+                    if 'repo' in session and session['repo'] == 'figshare':
+                        session['repo'] = None
                     flash('figshare disconnected')
             elif 'figshare_access_token' in request.form:
                 if check_connection(repo='figshare', api_key=request.form['figshare_access_token']):
@@ -176,6 +241,8 @@ def connect():
             if 'zenodo_disconnect' in request.form:
                 if 'zenodo_access_token' in session:
                     del session['zenodo_access_token']
+                    if 'repo' in session and session['repo'] == 'zenodo':
+                        session['repo'] = None
                     flash('zenodo disconnected')
             elif 'zenodo_access_token' in request.form:
                 if check_connection(repo='zenodo', api_key=request.form['zenodo_access_token']):
@@ -186,6 +253,8 @@ def connect():
             if 'osf_disconnect' in request.form:
                 if 'osf_access_token' in session:
                     del session['osf_access_token']
+                    if 'repo' in session and session['repo'] == 'osf':
+                        session['repo'] = None
                     flash('osf disconnected')
             elif 'osf_access_token' in request.form:
                 if check_connection(repo='osf', api_key=request.form['osf_access_token']):
@@ -196,6 +265,8 @@ def connect():
             if 'dataverse_disconnect' in request.form:
                 if 'dataverse_access_token' in session:
                     del session['dataverse_access_token']
+                    if 'repo' in session and session['repo'] == 'dataverse':
+                        session['repo'] = None
                     flash('dataverse disconnected')
             elif 'dataverse_access_token' in request.form:
                 if check_connection(repo='dataverse', api_key=request.form['dataverse_access_token']):
@@ -207,6 +278,8 @@ def connect():
                 if 'irods_access_token' in session:
                     del session['irods_access_token']
                     del session['irods_user']
+                    if 'repo' in session and session['repo'] == 'irods':
+                        session['repo'] = None
                     flash('irods disconnected')
             elif 'irods_access_token' in request.form and 'irods_user' in request.form:
                 if check_connection(repo='irods', api_key=request.form['irods_access_token'], user=request.form['irods_user']):
@@ -218,10 +291,14 @@ def connect():
             if 'sharekit_disconnect' in request.form:
                 if 'sharekit_access_token' in session:
                     del session['sharekit_access_token']
+                    if 'repo' in session and session['repo'] == 'sharekit':
+                        session['repo'] = None
                     flash('sharekit disconnected')
-            elif 'sharekit_access_token' in request.form:
-                if check_connection(repo='sharekit', api_key=request.form['sharekit_access_token']):
-                    session['sharekit_access_token'] = request.form['sharekit_access_token']
+            elif 'sharekit_connect' in request.form:
+                # get access token
+                sharekit_api_key = get_sharekit_token()
+                if check_connection(repo='sharekit', api_key = sharekit_api_key):
+                    session['sharekit_access_token'] = sharekit_api_key
                     flash('sharekit connected')
                 else:
                     flash('could not connect to sharekit')
@@ -229,6 +306,7 @@ def connect():
     except Exception as e:
         flash("something went wrong (5)")
         logger.error(e, exc_info=True)
+    session['cloud_service'] = cloud_service
     return render_template('connect.html',
                             data=session,
                             drive_url=drive_url,
@@ -244,18 +322,37 @@ def upload():
     Returns:
         str: html for the upload page
     """
-    preview = None
-    repo = None
-    session['repo'] = None
-    metadata = {}
-    if 'metadata' not in session:
-        session['metadata'] = {}
+    session['temp_hidden_services'] = []
+    try:
+        username = None
+        password = None
+        if 'username' in session:
+            username = session['username']
+        if cloud_service == 'owncloud':
+            if 'password' in session:
+                password = session['password']
+        else:
+            if 'access_token' in session:
+                password = session['access_token']
+        if not make_connection(username=session['username'], password=session['password']):
+            flash('Not connected')
+            return redirect('/connect')
+        
+        preview = None
+        repo = None
+        metadata = {}
+        if 'metadata' not in session:
+            session['metadata'] = {}
+    except Exception as e:
+        flash("something went wrong (16)")
+        logger.error(e, exc_info=True)
 
     try:
         session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
     except Exception as e:
         session['query_status'] = None
-        logger.error(f"Failed to get query_status: {e}")
+        logger.info(f"Failed to get query_status:")
+        logger.info(e, exc_info=True)
 
     try:
         if request.method == "POST":
@@ -320,16 +417,31 @@ def upload():
                     session['complete_folder_path'] = request.form['folder_path']
                     # will be loaded async based on session folder
 
+                    if 'dataverse' in request.form:
+                        dataverse = request.form['dataverse']
+                        dataverse = dataverse.replace("'", '"')
+                        dataverse = json.loads(dataverse)
+                        session['dataverse'] = dataverse
+
                 if 'start_upload' in request.form:
                     
                     username = session['username']
                     password = session['password']
                     complete_folder_path = request.form['folder_path']
                     repo = request.form['selected_repo']
+                    
+                    dataverse_alias = None
+                    if repo == 'dataverse':
+                        if 'dataverse' in session:
+                            if 'alias' in session['dataverse']:
+                                dataverse_alias = session['dataverse']['alias']
+                    
                     repo_user = None
                     if repo == "irods":
                         repo_user = session['irods_user']
+                    
                     api_key=session[f'{repo}_access_token']
+                    
                     use_zip=False
                     if 'use_zip' in request.form:
                         use_zip=True
@@ -341,8 +453,26 @@ def upload():
                     if tmp_folder_path_name in ['', 'app', 'local', 'instance', 'migrations', 'surf-rdc-chart', 'tests']:
                         tmp_folder_path_name = tmp_folder_path_name + "_" + metadata['title'].replace(" ", "_")
                     
+                    if repo == "sharekit":
+                        email = None
+                        displayname = None
+                        user_info = get_user_info(session['username'], session['password'])
+                        if 'email' in user_info and user_info['email']!= None:
+                            email = user_info['email']
+                        if 'displayname' in user_info and user_info['displayname']!= None:
+                            displayname = user_info['displayname']
+                        
+                        sharekit = Sharekit(api_key=api_key, api_address=sharekit_api_url)
+                        response = sharekit.get_persons(email=email, name=displayname)
+                        if response.status_code == 200:
+                            person = response.json()['data'][0]
+                        
+                        metadata['owner'] = person['id']
+                        metadata['rd_user'] = f"{displayname} ({username})"
+                        metadata['matched_person'] = person['name'] + " (" + person['id'] + ")"
+                        
                     t = Thread(target=run_export, args=(
-                        username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip))
+                        username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip, dataverse_alias))
                     t.start()
                     session['query_status'] = 'started'
                 else:
@@ -363,17 +493,35 @@ def retrieve():
     Returns:
         str: html for the retrieve page
     """
-    check_accept_url_in_history_first = None
-    check_accept_folder_first = None
-    preview = False
-    
-    session['repo'] = None
+    session['temp_hidden_services'] = ['sharekit']
+    try:
+        username = None
+        password = None
+        if 'username' in session:
+            username = session['username']
+        if cloud_service == 'owncloud':
+            if 'password' in session:
+                password = session['password']
+        else:
+            if 'access_token' in session:
+                password = session['access_token']
+        if not make_connection(username=session['username'], password=session['password']):
+            flash('Not connected')
+            return redirect('/connect')
 
+        check_accept_url_in_history_first = None
+        check_accept_folder_first = None
+        preview = False
+        
+        session['repo'] = None
+    except Exception as e:
+        flash("something went wrong (17)")
+        logger.error(e, exc_info=True)
     try:
         session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
     except Exception as e:
         session['query_status'] = None
-        logger.error(f"Failed to get query_status: {e}")
+        logger.info(f"Failed to get query_status: {e}")
 
     try:
         if request.method == "POST":
@@ -394,16 +542,16 @@ def retrieve():
             folder_path = request.form['folder_path']
             session['folder_path'] = folder_path
             folder = request.form['folder']
-            session['folder'] = folder
+
             if folder_path == "" or folder_path == None:
                 complete_folder_path = "/" + folder
             elif folder_path == "/":
-                complete_folder_path = folder
+                complete_folder_path = "/" + folder
             else:
-                complete_folder_path = folder_path + "/" + folder
+                complete_folder_path =  folder_path + "/" + folder
             
+            session['folder'] = folder
             session['complete_folder_path'] = complete_folder_path
-
             session['permission'] = check_permission(session['username'], session['password'], session['complete_folder_path'])
 
             url = request.form['url']
@@ -461,17 +609,35 @@ def download():
     Returns:
         str: html for the download page
     """
-    check_accept_url_in_history_first = None
-    check_accept_folder_first = None
-    preview = False
-    session['repo'] = None
+    session['temp_hidden_services'] = ['sharekit']
+    try:
+        username = None
+        password = None
+        if 'username' in session:
+            username = session['username']
+        if cloud_service == 'owncloud':
+            if 'password' in session:
+                password = session['password']
+        else:
+            if 'access_token' in session:
+                password = session['access_token']
+        if not make_connection(username=session['username'], password=session['password']):
+            flash('Not connected')
+            return redirect('/connect')
 
+        check_accept_url_in_history_first = None
+        check_accept_folder_first = None
+        preview = False
+        # session['repo'] = None
+    except Exception as e:
+        flash("something went wrong (18)")
+        logger.error(e, exc_info=True)
     try:
         session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
     except Exception as e:
         session['query_status'] = None
-        logger.error(f"Failed to get query_status: {e}")
-
+        logger.info(f"Failed to get query_status:")
+        logger.info(e, exc_info=True)
     try:
         if request.method == "POST":
 
@@ -490,12 +656,16 @@ def download():
                 accept_url_in_history = True
             folder_path = request.form['folder_path']
             folder = request.form['folder']
-            if folder_path == "" or folder_path == None:
-                complete_folder_path = "/" + folder
-            elif folder_path == "/":
-                complete_folder_path = folder
+            if folder_path == "" or folder_path == None or folder_path == "/":
+                if folder != "" and folder != None and folder != "/":
+                    complete_folder_path = "/" + folder
+                else:
+                    complete_folder_path = "/"
             else:
-                complete_folder_path = folder_path + "/" + folder
+                if folder != "" and folder != None and folder != "/":
+                    complete_folder_path = folder_path + "/" + folder
+                else:
+                    complete_folder_path = folder_path
             repo = request.form['selected_repo']
 
             # storing all variables back into session
@@ -509,7 +679,6 @@ def download():
             session['folder_path'] = folder_path
             session['folder'] = folder
             session['permission'] = check_permission(username, password, complete_folder_path)
-            
 
             if status == None or status == 'ready':
                 # check if folder already exists on owncloud
@@ -578,18 +747,28 @@ def cancel_download():
                     check_accept_folder_first=False
                     check_accept_url_in_history_first=False 
                     flash("Download was canceled by user.")
+                    # do some clean up
+                    tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
+                    try:
+                        if os.path.isfile(tmp_zip_file):
+                            os.remove(tmp_zip_file)
+                    except Exception as ee:
+                        flash(f"Failed to remove temporary file: {tmp_zip_file} - {ee}")
+                    
+                    # remove the temp folder
+                    tmp_unzipped_path = "/" + session['complete_folder_path'].split("/")[-1]
+                    try:
+                        if os.path.isdir(tmp_unzipped_path):
+                            shutil.rmtree(tmp_unzipped_path)
+                    except Exception as e:
+                        flash(f"Failed to remove temporary folder: {tmp_unzipped_path} - {e}")
     except Exception as e:
         preview = False
         check_accept_folder_first = False
         check_accept_url_in_history_first = False
         flash("something went wrong (9)")
         logger.error(e, exc_info=True)
-    return render_template('download.html',
-                            data=session, 
-                            preview=preview,
-                            check_accept_folder_first=check_accept_folder_first,
-                            check_accept_url_in_history_first=check_accept_url_in_history_first,
-                            drive_url=drive_url)
+    return redirect("/download")
 
 
 @app.route('/cancel_retrieval', methods=['POST'])
@@ -612,18 +791,29 @@ def cancel_retrieval():
                     check_accept_folder_first=False
                     check_accept_url_in_history_first=False 
                     flash("Download was canceled by user.")
+                    # do some clean up
+                    tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
+                    try:
+                        if os.path.isfile(tmp_zip_file):
+                            os.remove(tmp_zip_file)
+                    except Exception as ee:
+                        flash(f"Failed to remove temporary file: {tmp_zip_file} - {ee}")
+                    
+                    # remove the temp folder
+                    tmp_unzipped_path = "/" + session['complete_folder_path'].split("/")[-1]
+                    try:
+                        if os.path.isdir(tmp_unzipped_path):
+                            shutil.rmtree(tmp_unzipped_path)
+                    except Exception as e:
+                        flash(f"Failed to remove temporary folder: {tmp_unzipped_path} - {e}")
     except Exception as e:
         preview = None
         check_accept_folder_first = None
         check_accept_url_in_history_first = None
         flash("something went wrong (10)")
         logger.error(e, exc_info=True)
-    return render_template('retrieve.html',
-                            data=session,
-                            preview=preview,
-                            check_accept_folder_first=check_accept_folder_first,
-                            check_accept_url_in_history_first=check_accept_url_in_history_first,
-                            drive_url=drive_url)
+    return redirect("/retrieve")
+
 
 @app.route('/cancel_upload', methods=['POST'])
 def cancel_upload():
@@ -641,26 +831,55 @@ def cancel_upload():
                     set_canceled(session['username'], True)
                     preview = False
                     flash("Upload was canceled by user.")
+                    # do some clean up
+                    tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
+                    try:
+                        if os.path.isfile(tmp_zip_file):
+                            os.remove(tmp_zip_file)
+                    except Exception as ee:
+                        flash(f"Failed to remove temporary file: {tmp_zip_file} - {ee}")
+                    
+                    # remove the temp folder
+                    tmp_unzipped_path = "/" + session['complete_folder_path'].split("/")[-1]
+                    try:
+                        if os.path.isdir(tmp_unzipped_path):
+                            shutil.rmtree(tmp_unzipped_path)
+                    except Exception as e:
+                        flash(f"Failed to remove temporary folder: {tmp_unzipped_path} - {e}")
     except Exception as e:
         preview = None
         flash("something went wrong (11)")
         logger.error(e, exc_info=True)
-    return render_template('upload.html',
-                            data=session,
-                            preview=preview,
-                            drive_url=drive_url)
+    return redirect("/upload")
 
 
 @app.route('/debug', methods=['GET'])
 def debug():
     try:
         session['showall'] = False
-        if request.args.get('showall').lower() == 'true':
+        if 'showall' in request.args and request.args.get('showall').lower() == 'true':
             session['showall'] = True
     except Exception as e:
         flash("something went wrong (12)")
         logger.error(e, exc_info=True)
-    return render_template('home.html',
+    try:
+        session['showversion'] = False
+        if 'showversion' in request.args and request.args.get('showversion').lower() == 'true':
+            flash("Release 20241001")
+    except Exception as e:
+        flash("something went wrong (13)")
+        logger.error(e, exc_info=True)
+    try:
+        session['showallvars'] = False
+        if 'showallvars' in request.args and request.args.get('showallvars').lower() == 'true':
+            try:
+                flash(all_vars['redis_host'])
+            except:
+                flash("not showing all_vars")
+    except Exception as e:
+        flash("something went wrong (13)")
+        logger.error(e, exc_info=True)
+    return render_template('connect.html',
                             data=session)
 
 
@@ -676,11 +895,37 @@ def convertsize(size_bytes):
     Returns:
         str: human readable size
     """
-    return convert_size(size_bytes)
+    try:
+        return convert_size(size_bytes)
+    except Exception as e:
+        flash("something went wrong (19)")
+        logger.error(e, exc_info=True)
 
 ### END FILTERS ###
 
 ### BEGIN COMPONENTS ###
+
+@app.route('/dataverses', methods=['GET'])
+def dataverses():
+    """Will render the dataverses component
+
+    Returns:
+        str: html for the dataverses component
+    """
+    try:
+        dataverse = Dataverse(api_key=session['dataverse_access_token'], api_address=dataverse_api_url)
+        dataverses = dataverse.get_sub_dataverses()
+        parent_dataverse_info = dataverse.get_dataverse_info(dataverse_parent_dataverse)
+        dataverses.append(parent_dataverse_info)
+    except Exception as e:
+        logger.error(f"Failed at dataverses component view:")
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                   name="dataverses")
+    return render_template('dataverses.html',
+                            data=session,
+                            dataverses = dataverses)
+
 
 @app.route('/metadata', methods=['GET'])
 def metadata():
@@ -689,48 +934,67 @@ def metadata():
     Returns:
         str: html for the metadata component
     """
-    disabled = request.args.get('disabled')
-    repo = request.args.get('repo')
-    session['repo'] = repo
-    return render_template('metadata.html',
-                            data=session,
-                            disabled=disabled,
-                            repo=repo)
+    try:
+        disabled = request.args.get('disabled')
+        repo = request.args.get('repo')
+        session['repo'] = repo
+        return render_template('metadata.html',
+                                data=session,
+                                disabled=disabled,
+                                repo=repo)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="metadata")
 
-@app.route('/check-connection', methods=['GET'])
-def checkconnection():
+@app.route('/check-connection/<repo>', methods=['GET'])
+def checkconnection(repo=None):
     """Will render the check_connection component
 
     Returns:
         str: html for the check_connection component
-    """  
+    """
     try:
-        repo = session['repo']
-        repo_user = None
-        if repo == 'irods':
-            repo_user = session[f'{repo}_user']
-        api_key = session[f'{repo}_access_token']
-        connection_ok = check_connection(repo=repo, api_key=api_key, user=repo_user)
-    except:
-        session['repo'] = 'None'
-        connection_ok = None
-    return render_template('check_connection.html',
-                            data=session,
-                            connection_ok=connection_ok)
-
+        # always get a fresh sharekit token that will last again for 1 hr
+        if repo == 'sharekit':
+            session['sharekit_access_token'] = get_sharekit_token()
+        try:
+            repo_user = None
+            if repo == 'irods':
+                repo_user = session[f'{repo}_user']
+            api_key = session[f'{repo}_access_token']
+            connection_ok = check_connection(repo=repo, api_key=api_key, user=repo_user)
+        except Exception as e:
+            logger.info(e, exc_info=True)
+            connection_ok = None
+        return render_template('check_connection.html',
+                                data=session,
+                                connection_ok=connection_ok)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="check connection")
+                                    
 @app.route('/repo-selection', methods=['GET'])
 def repo_selection():
     """Will render the repo_selection component
 
     Returns:
         str: html for the repo_selection component
-    """   
-    session['hidden_services'] = hidden_services
-    return render_template('repo_selection.html',
-                            data=session,
-                            registered_services = registered_services,
-                            all_vars = all_vars)
-
+    """
+    try:
+        session['hidden_services'] = hidden_services
+        if registered_services == []:
+            return render_template('component_load_failure.html',
+                                    name="repo selection")
+        return render_template('repo_selection.html',
+                                data=session,
+                                registered_services = registered_services,
+                                all_vars = all_vars)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="repo selection")
 
 @app.route('/folder-paths', methods=['GET'])
 def folder_paths():
@@ -739,47 +1003,50 @@ def folder_paths():
     Returns:
         str: html for the select_folder_path component
     """
-    if 'username' in session and 'password' in session:
-        folder_paths = get_folders(username = session['username'], password = session['password'], folder = '/')
-    else:
-        folder_paths = []
-    return render_template('select_folder_path.html',
-                            data=session,
-                            folder_paths = folder_paths)
+    try:
+        if 'username' in session and 'password' in session:
+            folder_paths = get_cached_folders(username = session['username'], password = session['password'], folder = '/')
+            if folder_paths == None or folder_paths == []:
+                return render_template('component_load_failure.html',
+                                        name="folder paths")
+        else:
+            return render_template('component_load_failure.html',
+                                    name="folder paths")
+        return render_template('select_folder_path.html',
+                                data=session,
+                                folder_paths = folder_paths)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="folder paths")
 
-
-@app.route('/folder-content', methods=['GET'])
-def folder_content():
+@app.route('/folder-content/<direction>', methods=['GET'])
+def folder_content(direction=None):
     """Will render the folder_content component
 
     Returns:
         str: html for the folder_content component
     """
-    if 'username' in session and 'password' in session and 'complete_folder_path' in session:
-        folder_content = get_folder_content(session['username'], session['password'], session['complete_folder_path'])
-    else:
-        folder_content = []
-    return render_template('folder_content.html',
-                            data=session,
-                            folder_content = folder_content)
-
-
-@app.route('/folder-content-new', methods=['GET'])
-def folder_content_new():
-    """Will render the folder_content component
-
-    Returns:
-        str: html for the folder_content component
-    """
-    if 'username' in session and 'password' in session and 'complete_folder_path' in session:
-        logger.error(session['complete_folder_path'])
-        folder_content = get_raw_folders(session['username'], session['password'], session['complete_folder_path'])
-    else:
-        folder_content = []
-    return render_template('folder_content_new.html',
-                            data=session,
-                            folder_content = folder_content)
-
+    try:
+        if 'username' in session and 'password' in session and 'complete_folder_path' in session:
+            folder_content = get_folder_content(session['username'], session['password'], session['complete_folder_path'])
+            if direction == 'up':
+                content_can_be_processed = folder_content_can_be_processed(session['username'], session['password'], session['complete_folder_path'])
+            else:
+                content_can_be_processed = {'can_be_processed': None, 'total_size': None, 'free_bytes': None}
+        else:
+            return render_template('component_load_failure.html',
+                                        name="folder content")
+        
+        return render_template('folder_content.html',
+                                data=session,
+                                folder_content = folder_content,
+                                folder_content_can_be_processed = content_can_be_processed,
+                                direction = direction)
+    except Exception as e:
+        logger.error(e)
+        return render_template('component_load_failure.html',
+                                    name="folder content")
 
 @app.route('/repocontent', methods=['GET'])
 def repocontent():
@@ -788,13 +1055,82 @@ def repocontent():
     Returns:
         str: html for the repocontent component
     """
-    # currently just getting info from data hugger
     try:
-        url = session['url']
-        if 'repo' not in session or session['repo'] == None:
-            repo_content = get_files_info(url)
-        else:
+        # currently just getting info from data hugger
+        try:
+            url = session['url']
+            if 'repo' not in session or session['repo'] == None:
+                repo_content = get_files_info(url)
+            else:
+                repo = session['repo']
+                user = None
+                if repo == 'figshare':
+                    api_key = session['figshare_access_token']
+                if repo == 'zenodo':
+                    api_key = session['zenodo_access_token']
+                if repo == 'osf':
+                    api_key = session['osf_access_token']
+                if repo == 'dataverse':
+                    api_key = session['dataverse_access_token']
+                if repo == 'irods':
+                    api_key = session['irods_access_token']
+                    user = session['irods_user']
+                if repo == 'sharekit':
+                    api_key = session['sharekit_access_token']
+                repo_content = get_repocontent(repo=repo, url=url, api_key=api_key, user=user)
+        except Exception as e:
+            logger.error(f'failed to get repo content (1): {e}')
+            repo_content = [{'message' : f'failed to get repo content'}]
+        try:
+            content_fits = repo_content_fits(repo_content, session['username'], session['password'], session['complete_folder_path'])
+            content_can_be_processed = repo_content_can_be_processed(repo_content)
+            permission = check_permission(session['username'], session['password'], session['complete_folder_path'])
+        except Exception as e:
+            logger.error("Exception at repocontent")
+            logger.error(e)
+            content_fits = None
+        return render_template('repocontent.html',
+                                data=session,
+                                repo_content = repo_content,
+                                repo_content_fits = content_fits,
+                                repo_content_can_be_processed = content_can_be_processed)
+    except Exception as e:
+        logger.error(f'failed to get repo content (2): {e}')
+        return render_template('component_load_failure.html',
+                                    name="repo content")
+
+@app.route('/doi-metadata', methods=['GET'])
+def doi_metadata():
+    """Will render the doi-metadata component
+
+    Returns:
+        str: html for the doi-metadata component
+    """
+    try:
+        try:
+            doi_metadata = get_doi_metadata(session['url'])
+            doi_metadata = parse_doi_metadata(doi_metadata)
+        except:
+            doi_metadata = {}
+        return render_template('doi_metadata.html',
+                                data=session,
+                                doi_metadata = doi_metadata)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="doi metadata")
+
+@app.route('/private-metadata', methods=['GET'])
+def private_metadata():
+    """Will render the private-metadata component
+
+    Returns:
+        str: html for the private-metadata component
+    """
+    try:
+        try:
             repo = session['repo']
+            url = session['url']
             user = None
             if repo == 'figshare':
                 api_key = session['figshare_access_token']
@@ -809,70 +1145,17 @@ def repocontent():
                 user = session['irods_user']
             if repo == 'sharekit':
                 api_key = session['sharekit_access_token']
-            repo_content = get_repocontent(repo=repo, url=url, api_key=api_key, user=user)
+            private_metadata = get_private_metadata(repo=repo, url=url, api_key=api_key, user=user)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            private_metadata = {}
+        return render_template('private_metadata.html',
+                                data=session,
+                                private_metadata = private_metadata)
     except Exception as e:
-        logger.error(f'failed to get repo content: {e}')
-        repo_content = [{'message' : f'failed to get repo content'}]
-    try:
-        quota_text = get_quota_text(session['username'], session['password'], session['complete_folder_path'])
-        content_fits = repo_content_fits(repo_content, quota_text)
-        # permission = check_permission(session['username'], session['password'], session['complete_folder_path'])
-    except:
-        content_fits = None
-    return render_template('repocontent.html',
-                            data=session,
-                            repo_content = repo_content,
-                            repo_content_fits = content_fits)
-                            # permisssion = permission)
-
-
-@app.route('/doi-metadata', methods=['GET'])
-def doi_metadata():
-    """Will render the doi-metadata component
-
-    Returns:
-        str: html for the doi-metadata component
-    """
-    try:
-        doi_metadata = get_doi_metadata(session['url'])
-        doi_metadata = parse_doi_metadata(doi_metadata)
-    except:
-        doi_metadata = {}
-    return render_template('doi_metadata.html',
-                            data=session,
-                            doi_metadata = doi_metadata)
-
-@app.route('/private-metadata', methods=['GET'])
-def private_metadata():
-    """Will render the private-metadata component
-
-    Returns:
-        str: html for the private-metadata component
-    """
-    try:
-        repo = session['repo']
-        url = session['url']
-        user = None
-        if repo == 'figshare':
-            api_key = session['figshare_access_token']
-        if repo == 'zenodo':
-            api_key = session['zenodo_access_token']
-        if repo == 'osf':
-            api_key = session['osf_access_token']
-        if repo == 'dataverse':
-            api_key = session['dataverse_access_token']
-        if repo == 'irods':
-            api_key = session['irods_access_token']
-            user = session['irods_user']
-        if repo == 'sharekit':
-            api_key = session['sharekit_access_token']
-        private_metadata = get_private_metadata(repo=repo, url=url, api_key=api_key, user=user)
-    except:
-        private_metadata = {}
-    return render_template('private_metadata.html',
-                            data=session,
-                            private_metadata = private_metadata)
-
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="private metadata")
 
 @app.route('/quota-text', methods=['GET'])
 def quote_text():
@@ -882,11 +1165,16 @@ def quote_text():
         str: html for the quota-text component
     """
     try:
-        quota_text = get_quota_text(session['username'], session['password'], session['complete_folder_path'])
-    except:
-        quota_text = ""
-    return render_template('quota_text.html', quota_text = quota_text)
-
+        try:
+            quota_text = get_quota_text(session['username'], session['password'], session['complete_folder_path'])
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            quota_text = ""
+        return render_template('quota_text.html', quota_text = quota_text)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="quote text")
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -896,21 +1184,51 @@ def status():
         str: html for the status component
     """
     try:
-        username = session['username']
-        complete_folder_path = session['complete_folder_path']
-        remote = session['remote']
-        query_status_history = get_query_status_history(username, complete_folder_path, remote)
-    except:
-        query_status_history = {}
-    return render_template('status.html',
-                            data=session,
-                            drive_url=drive_url,
-                            query_status_history = query_status_history)
+        try:
+            username = session['username']
+            complete_folder_path = session['complete_folder_path']
+            remote = session['remote']
+            query_status_history = get_query_status_history(username, complete_folder_path, remote)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            query_status_history = {}
+        return render_template('status.html',
+                                data=session,
+                                drive_url=drive_url,
+                                query_status_history = query_status_history)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                    name="status")
 
 ### END COMPONENTS ###
 
 
 ### BEGIN SERVICE CONNECTIONS ###
+
+@app.route('/persistent-connection', methods=['GET'])
+def persistent_connection(persist=None):
+    session['persist'] = True
+    session['persistent_connection'] = False
+    try:
+        if cloud_service.lower() == 'nextcloud':
+            if 'poll_info' in session:
+                result = get_webdav_token_nc(session['poll_info']['poll_endpoint'])
+                if result:
+                    password = result['appPassword']
+                    if make_connection(session['username'], password):
+                        session['password'] = password
+                        session['persistent_connection'] = True
+                        session['persist'] = False
+                        # return render_template('connect.html', data=session)
+                    else:
+                        flash('Failed to make connection to research drive persistent.')
+            else:
+                session['poll_info'] = get_webdav_poll_info_nc(session['access_token'])
+    except Exception as e:
+        logger.error(e)
+    return render_template('persistent-connection.html',
+                            data=session)
 
 @app.route('/login/<service>', methods=['GET'])
 @app.route('/login', methods=['GET'])
@@ -923,14 +1241,15 @@ def login(service=None):
     Returns:
         obj: Oauth object
     """
-    if service == None:
-        redirect_uri = f'{srdc_url}/authorize'
-        return oauth.owncloud.authorize_redirect(redirect_uri)
-    elif service in registered_services:
-        redirect_uri = f'{srdc_url}/authorize/{service}'
-        logger.error(redirect_uri)
-        return eval(f"oauth.{service}.authorize_redirect(redirect_uri)")
-
+    try:
+        if service == None:
+            redirect_uri = f'{srdc_url}/authorize'
+            return oauth.rdrive.authorize_redirect(redirect_uri)
+        elif service in registered_services:
+            redirect_uri = f'{srdc_url}/authorize/{service}'
+            return eval(f"oauth.{service}.authorize_redirect(redirect_uri)")
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 @app.route('/authorize/<service>', methods=['GET'])
 @app.route('/authorize', methods=['GET'])
@@ -943,58 +1262,89 @@ def authorize(service=None):
     Returns:
         redirect: will redirect to the embed url
     """
-    if service == None:
-        try:
-            oauth.owncloud.authorize_access_token()
-            oauth_token = oauth.owncloud.token
-            access_token = oauth_token['access_token']
-            refresh_token = oauth_token['refresh_token']
-            # user_info = get_user_info(access_token)
-            # username = user_info['sub']
-            if cloud_service.lower() == "owncloud":
-                username = oauth_token['user_id']
-            elif cloud_service.lower() == "nextcloud":
-                # nextcloud has user_id i.o. username
-                username = oauth_token['user_id']
-            else:
-                username = None
-            password = get_webdav_token(access_token, username)
-            session.clear()
-            if username is None:
-                flash('failed to get username')
-            if password is None:
-                flash('failed to get webdav token')
-            if username is not None and password is not None:
-                if make_connection(username, password):
-                    session['username'] = username
-                    session['password'] = password
-                    session['access_token'] = access_token
-                    session['refresh_token'] = refresh_token
-                    session['connected'] = True
-                    session['failed'] = False
-                    session.pop('_flashes', None)
-                    flash('research drive connected')
+    try:
+        if service == None:
+            try:
+                oauth.rdrive.authorize_access_token()
+                oauth_token = oauth.rdrive.token
+                access_token = oauth_token['access_token']
+                refresh_token = oauth_token['refresh_token']
+                if cloud_service.lower() == "owncloud":
+                    username = oauth_token['user_id']
+                    password = get_webdav_token(access_token, username)
+                elif cloud_service.lower() == "nextcloud":
+                    username = oauth_token['user_id']
+                    password = access_token
                 else:
-                    flash('failed to connect (1)')
+                    username = None
+                    password = access_token
+                if username is None:
+                    flash('failed to get user_id')
+                if password is None:
+                    flash('failed to get access_token')
+                if username is not None and password is not None:
+                    if make_connection(username, password):
+                        session['cloud_token'] = oauth_token
+                        session['username'] = username
+                        session['password'] = password
+                        session['access_token'] = access_token
+                        session['refresh_token'] = refresh_token
+                        session['connected'] = True
+                        session['failed'] = False
+                        session.pop('_flashes', None)
+                        flash('research drive connected')
+                    else:
+                        flash('failed to connect (1)')
+                        session['failed'] = True
+                else:
+                    flash('failed to connect (2)')
                     session['failed'] = True
-            else:
-                flash('failed to connect (2)')
+            except Exception as e:
+                flash(f'failed to connect (3)')
+                flash(str(e))
                 session['failed'] = True
-        except Exception as e:
-            flash(f'failed to connect (3)')
-            flash(str(e))
-            session['failed'] = True
-    elif service in registered_services:
-        try:
-            eval(f"oauth.{service}.authorize_access_token()")
-            oauth_token = eval(f"oauth.{service}.token")
+            return redirect("/refresh")
+        elif service in registered_services:
+            try:
+                eval(f"oauth.{service}.authorize_access_token()")
+                oauth_token = eval(f"oauth.{service}.token")
 
-            access_token = oauth_token['access_token']
-            session[f'{service}_access_token'] = access_token
-            flash(f'{service} connected')
-        except Exception as e:
-            logger.error(f"failed at connecting {service}: {e}")
-            flash('failed to connect')
+                access_token = oauth_token['access_token']
+                session[f'{service}_access_token'] = access_token
+                flash(f'{service} connected')
+            except Exception as e:
+                logger.error(f"failed at connecting {service}: {e}")
+                flash('failed to connect')
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
     return redirect(embed_app_url)
+
+@app.route('/refresh-token', methods=['GET'])
+def refresh_token():
+    """Will render the refresh token component
+
+    Returns:
+        str: html for the refresh token component
+    """
+    try:
+        new_token = old_token = session['access_token']
+        if session['password'] == None or session['password'] == "" or session['password'] == session['access_token']:
+            # only refresh the token when it is about to expire
+            if time() + 600 > session['cloud_token']['expires_at']:
+                data = refresh_cloud_token(session['cloud_token'])
+                if data:
+                    session['cloud_token'] = data
+                    new_token = session['password'] = session['access_token'] = data['access_token']
+                    session['refresh_token'] = data['refresh_token']
+    except Exception as e:
+        logger.error(f"Failed at refresh token component view:")
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html',
+                                   name=str(e))
+    return render_template('refresh-token.html',
+                            data=session,
+                            old_token=old_token,
+                            new_token=new_token)
 
 ### END SERVICE CONNECTIONS ###

@@ -61,8 +61,7 @@ class TestZenodoMethods(unittest.TestCase):
 
         expected = True
         with pact:
-            result = Zenodo.check_token(
-                api_key, address="http://localhost:3000")
+            result = Zenodo(api_key, api_address="http://localhost:3000").check_token()
         self.assertEqual(result, expected)
 
         # check if acces token is invalid
@@ -81,8 +80,7 @@ class TestZenodoMethods(unittest.TestCase):
 
         expected = False
         with pact:
-            result = Zenodo.check_token(
-                api_key, address="http://localhost:3000")
+            result = Zenodo(api_key, api_address="http://localhost:3000").check_token()
         self.assertEqual(result, expected)
 
     def test_create_new_empty_deposit(self):
@@ -123,11 +121,11 @@ class TestZenodoMethods(unittest.TestCase):
             'the corresponding user creates a deposit'
         ).with_request(
             'POST', '/api/deposit/depositions'
-        ) .will_respond_with(201, body=expected_body)
+        ) .will_respond_with(200, body=expected_body)
 
         with pact:
             result = Zenodo(
-                api_key, address="http://localhost:3000").create_new_deposition()
+                api_key, api_address="http://localhost:3000").create_new_deposition()
         self.assertEqual(result, expected_body)
 
     def test_metadata_filter(self):
@@ -176,7 +174,7 @@ class TestZenodoMethods(unittest.TestCase):
         expected = {"title": expected_body[0]["metadata"]["title"]}
         with pact:
             result = Zenodo(
-                api_key, address="http://localhost:3000").get_deposition(metadataFilter=filter)
+                api_key, api_address="http://localhost:3000").get_deposition(metadataFilter=filter)
         self.assertEqual(result, expected)
 
         filter = {"title": "", "description": ""}
@@ -193,7 +191,7 @@ class TestZenodoMethods(unittest.TestCase):
                     "description": expected_body[0]["metadata"]["description"]}
         with pact:
             result = Zenodo(
-                api_key, address="http://localhost:3000").get_deposition(metadataFilter=filter)
+                api_key, api_address="http://localhost:3000").get_deposition(metadataFilter=filter)
         self.assertEqual(result, expected)
 
     @unittest.skip("Currently pactman does not support other content types as json")
@@ -228,7 +226,7 @@ class TestZenodoMethods(unittest.TestCase):
         # add a file to deposition
         with pact:
             result = Zenodo(
-                api_key, address="http://localhost:3000").upload_new_file_to_deposition(
+                api_key, api_address="http://localhost:3000").upload_new_file_to_deposition(
                 deposition_id=id, path_to_file=filepath)
 
         # file was uploaded
@@ -253,7 +251,7 @@ class TestZenodoMethods(unittest.TestCase):
         # add a file to deposition
         with pact:
             result = Zenodo(
-                api_key, address="http://localhost:3000").get_files_from_deposition(
+                api_key, api_address="http://localhost:3000").get_files_from_deposition(
                 deposition_id=projectId)
 
         self.assertEqual(result, expected_body)
@@ -283,7 +281,7 @@ class TestZenodoMethods(unittest.TestCase):
         # add a file to deposition
         with pact:
             result = Zenodo(
-                api_key, address="http://localhost:3000").get_files_from_deposition(
+                api_key, api_address="http://localhost:3000").get_files_from_deposition(
                 deposition_id=projectId)
 
         # file was uploaded

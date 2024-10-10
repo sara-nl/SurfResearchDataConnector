@@ -8,6 +8,7 @@
 
 {% block content %}
 {% if not data.connected and not data.failed %}
+
 <script>
     var a = document.createElement('a');
     a.href= '{{ data.srdc_url }}/login';
@@ -80,6 +81,18 @@
 
 <p>Search for open Research Data in most Datahugger supported repositories using <a href="https://cse.google.com/cse?cx=762961cffaa1c4546" target="_blank">Google</a>.</p>
 <p>Search for open Research Data in most Datahugger supported dataverse repositories using <a href="https://www.re3data.org" target="_blank">re3data</a>.</p>
+{% endif %}
+
+{{poll_login}}
+{% if poll_login %}
+{{ data.poll_info.poll_login }}
+<script>
+    var a = document.createElement('a');
+    a.href= '{{ data.poll_info.poll_endpoint }}';
+    a.target = 'popup';
+    document.body.appendChild(a);
+    a.click();
+</script>
 {% endif %}
 
 {% endblock %}

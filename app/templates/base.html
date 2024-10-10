@@ -16,12 +16,31 @@
     {% endblock %}
 </head>
 
+{% from "macros.html" import load_async with context %}
+
 <body>
     <div class="container">
         <div class="row">
             <nav class="navbar navbar-light">
                 {% if data.connected==true %}
                     <div class="m-1">You are connected as: <b>{{data.username}}</b></div>
+                    {% if data.cloud_service | lower == 'nextcloud' %}
+                        {% if 'password' not in data or data.password == '' or data.password == data.access_token %}
+                            
+                            <span id="refresh-token">
+                                {{ load_async("refresh-token", "/refresh-token") }}
+                            </span>
+                             <script>
+                                 $(document).ready(function(){
+                                     setInterval(() => {
+                                         $("#refresh-token").load("/refresh-token");
+                                     },60000);
+                                 });
+                             </script>                 
+                        {% else %}
+                            <small>Your connection is persistent.</small>
+                        {% endif %}
+                    {% endif %}
                     {% if data.showall %}<div class="m-1 text-danger">showing all</div>{% endif %}
                     <div class="m-1">
                         <button class="btn btn-light"><a class="nav-link" href="/connect">YOUR CONNECTIONS</a></button>

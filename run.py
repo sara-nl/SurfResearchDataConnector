@@ -1,11 +1,24 @@
+import os
+import logging
 from app.views import *
+from app.models import app
 
-# os.urandom(24)
-app.secret_key = b'AA\x84o_\xc5I\xdc\xaf\x05\xcbZ\x9c\xb9\xa9\xacV5|c\xa7\x8dz\x9c'
+log = logging.getLogger()
 
 if __name__ == "__main__":
+    try:
+        log.info("running flask db init")
+        os.system("flask db init")
+        log.info("running flask db upgrade")
+        os.system("flask db upgrade")
+    except Exception as e:
+        log.info(str(e))
+
     app.run(
         host="0.0.0.0",
         debug=False,
         port=80
     )
+
+
+

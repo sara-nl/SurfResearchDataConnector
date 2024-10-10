@@ -1,0 +1,9 @@
+dependencies:
+- name: redis-cluster
+  repository: file://../redis-cluster
+  version: 7.6.4
+- name: redis
+  repository: file://../redis
+  version: 16.13.2
+digest: sha256:4971036db0214454dfc4db3c77c9ef37a4fbab095259188bdd92695dfac30ab1
+generated: "2024-09-24T15:24:39.945444544+02:00"

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% from "macros.html" import load_async with context %}
+
+{% block title %}Upload{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<p>Refreshing all data folder paths.</p>
+
+{{ load_async("refresh_folder_paths", "/refresh-folderpaths", 55000) }}
+
+{% endblock %}

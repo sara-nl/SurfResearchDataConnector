@@ -1,0 +1,8 @@
+global:
+  image:
+    tag: v0.2.5
+  namespace:
+    name: surfresearchdataconnector
+loglevel: DEBUG
+# If you set this to "False", SSL will not be verified in all https requests. Default: "True"
+verify_ssl: True

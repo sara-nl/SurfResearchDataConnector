@@ -19,7 +19,7 @@ click==8.1.7
 colorama==0.4.6
 colorful==0.5.5
 cryptography==41.0.3
-datahugger==0.10.3
+datahugger==0.13
 datasets==2.14.4
 decorator==5.1.1
 defusedxml==0.7.1
@@ -80,6 +80,7 @@ python-whois==0.8.0
 pytz==2023.3
 PyYAML==6.0.1
 rdflib==6.3.2
+redis==5.0.1
 requests==2.31.0
 requests-cache==1.1.0
 requests-toolbelt==1.0.0
@@ -106,6 +107,6 @@ uritemplate==4.1.1
 url-normalize==1.4.3
 urllib3==2.0.4
 wcwidth==0.2.8
-Werkzeug==2.3.7
+Werkzeug==2.3.8
 xxhash==3.3.0
 yarl==1.9.2

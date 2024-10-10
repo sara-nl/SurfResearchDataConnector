@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # project_id = '6rgub'
     # project_id = osf.create_project().id
     # print(project_id)
-    # path_to_file = "/home/dave/Projects/surfresearchdataretriever/requirements.txt"
+    # path_to_file = "/home/dave/Projects/surfresearchdataconnector/requirements.txt"
     # print(osf.upload_new_file_to_project(project_id, path_to_file))
     # response = osf.get_repo_content(project_id='rbafs')
     # print(dir(response))

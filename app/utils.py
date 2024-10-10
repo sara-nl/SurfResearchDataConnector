@@ -20,7 +20,7 @@ from rocrate.model.person import Person
 from rocrate.model.dataset import Dataset
 from functools import lru_cache
 import xml.etree.ElementTree as ET
-
+from authlib.integrations.requests_client import OAuth2Session
 
 try:
     from app.models import app, db, History
@@ -30,6 +30,8 @@ except:
     from models import app, db, History
     from globalvars import *
     print("testing")
+    # for v in all_vars:
+    #     print(v)
 
 from pprint import pprint
 
@@ -53,6 +55,38 @@ global summary
 summary = {}
 
 
+def make_connection(username=None, password=None):
+    """This function  will test if the username and password
+    are correct
+
+    Args:
+        username (str): username of the cloud account
+        password (str): password of the cloud account
+
+    Returns:
+        bool: returns True if connection is succesful, otherwise False
+    """
+    try:
+        r = cloud.login(username, password)
+        return True
+    except Exception as e:
+        if cloud_service.lower() == 'nextcloud':
+            if session['password'] == None or session['password'] == "" or session['password'] == session['access_token']:
+                data = refresh_cloud_token(session['cloud_token'])
+                if data:
+                    session['cloud_token'] = data
+                    new_token = session['password'] = session['access_token'] = data['access_token']
+                    session['refresh_token'] = data['refresh_token']
+                    try:
+                        r = cloud.login(username, new_token)
+                        return True
+                    except Exception as ee:
+                        logger.error(ee, exc_info=True)
+                        return False                        
+        logger.error(e, exc_info=True)
+        return False
+
+
 def set_canceled(username, b):
     """set the username to True in the global canceled var (dict)
     Is useful for passing the canceled by user action to a thread
@@ -62,7 +96,10 @@ def set_canceled(username, b):
         username (str): the username in the session
         b (bool): True is user has caneled the process, otherwise False
     """
-    canceled[username] = b
+    try:
+        canceled[username] = b
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def get_canceled(username):
@@ -74,9 +111,12 @@ def get_canceled(username):
     Returns:
         bool: True is user has canceled the process
     """
-    if username in canceled:
-        return canceled[username]
-    return False
+    try:
+        if username in canceled:
+            return canceled[username]
+        return False
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def get_data(url, folder, username=None,):
@@ -98,12 +138,12 @@ def get_data(url, folder, username=None,):
             datahugger.get(url, folder, unzip=False, progress=False)
             message = "data retrieved"
         except Exception as e:
-            message = str(e)
+            message = "failed to retrieve data from url: {e}"
         update_history(username=username, folder=folder,
                        url=url, status=message)
     except Exception as e:
         logger.error(e, exc_info=True)
-        message = "Failed to retrieve data from url"
+        message = "failed to retrieve data from url: {e}"
         update_history(username=username, folder=folder,
                        url=url, status=message)
 
@@ -139,7 +179,7 @@ def check_if_folder_exists(username, password, folder, url=None):
     """
     # first login
     try:
-        cloud.login(username, password)
+        make_connection(username, password)
     except:
         message = "failed to login to webdav"
         if url != None:
@@ -162,13 +202,16 @@ def check_if_url_in_history(username, url):
     Returns:
         bool: True if the url is in history
     """
-    with app.app_context():
-        hist = History.query.filter_by(username=username).filter_by(
-            url=url).filter_by(status='ready').all()
-        if len(hist) > 0:
-            return True
-        else:
-            return False
+    try:
+        with app.app_context():
+            hist = History.query.filter_by(username=username).filter_by(
+                url=url).filter_by(status='ready').all()
+            if len(hist) > 0:
+                return True
+            else:
+                return False
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def get_query_status_history(username, folder, url):
@@ -182,9 +225,12 @@ def get_query_status_history(username, folder, url):
     Returns:
         dict: all query statusses
     """
-    with app.app_context():
-        return History.query.filter_by(username=username).filter_by(
-            url=url).filter_by(folder=folder).order_by(History.id.desc()).all()
+    try:
+        with app.app_context():
+            return History.query.filter_by(username=username).filter_by(
+                url=url).filter_by(folder=folder).order_by(History.id.desc()).all()
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def get_query_status(username, folder, url):
@@ -213,7 +259,10 @@ def set_query_status(username, folder, url, status):
         url (str): the url of the retrieval
         status (str): the new status
     """
-    query_status[(username, folder, url)] = status
+    try:
+        query_status[(username, folder, url)] = status
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def total_files_count(folder):
@@ -225,11 +274,14 @@ def total_files_count(folder):
     Returns:
         int: file count
     """
-    totalfilescount = 0
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            totalfilescount += 1
-    return totalfilescount
+    try:
+        totalfilescount = 0
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                totalfilescount += 1
+        return totalfilescount
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def push_data(username, password, folder, url):
@@ -254,9 +306,10 @@ def push_data(username, password, folder, url):
 
         # first login
         try:
-            cloud.login(username, password)
-        except:
-            message = "failed to login to webdav"
+            make_connection(username, password)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            message = f"failed to login to webdav: {e}"
             update_history(username, folder, url, message)
 
         # calculate the total files count
@@ -269,31 +322,50 @@ def push_data(username, password, folder, url):
                 if not folder_exists:
                     try:
                         cloud.mkdir(root)
-                    except:
-                        message = "failed to create folder"
-                        update_history(username, folder, url, message)
+                    except Exception as e:
+                        # retry after making the connection again
+                        try:
+                            if make_connection(username, password):
+                                cloud.mkdir(root)
+                            else:
+                                message = f"failed to create folder: {e}"
+                                update_history(username, folder, url, message)
+                        except Exception as ee:
+                            message = f"failed to create folder: {ee}"
+                            update_history(username, folder, url, message)
                 for j in files:
                     filepath = os.path.join(root, j)
                     try:
                         cloud.put_file(filepath, filepath)
                         message = f"uploaded file {n} of {totalfilescount}: {filepath}"
-                    except:
-                        message = f"failed to upload file {filepath}"
+                    except Exception as e:
+                        try:
+                            if make_connection(username, password):
+                                cloud.put_file(filepath, filepath)
+                                message = f"uploaded file {n} of {totalfilescount}: {filepath}"
+                            else:
+                                logger.error(e)
+                                message = f"failed to upload file {filepath} - {e}"                               
+                        except Exception as ee:
+                            logger.error(ee)
+                            message = f"failed to upload file {filepath} - {ee}"
                     update_history(username, folder, url, message)
                     n += 1
         
         # remove the local folder with the data
         try:
             shutil.rmtree(folder)
-            update_history(username,folder, url, "Removing temporary data")
+            update_history(username,folder, url, "removing temporary data")
         except Exception as e:
             logger.error(e, exc_info=True)
+            update_history(username,folder, url, f"failed to remove temporary data: {e}")
     except Exception as eee:
         try:
             shutil.rmtree(folder)
-            update_history(username,folder, url, "Removing temporary data")
+            update_history(username,folder, url, "removing temporary data")
         except Exception as ee:
             logger.error(ee, exc_info=True)
+            update_history(username,folder, url, f"failed to remove temporary data: {ee}")
         logger.error(eee, exc_info=True)
         return (False, message)
     return (True, message)
@@ -310,21 +382,22 @@ def check_permission(username, password, folderpath):
     Returns:
         _type_: _description_
     """
-    folder_exists = check_if_folder_exists(username, password, folderpath)
-    if not folder_exists:
-        try:
-            cloud.login(username, password)
-        except:
-            logger.error("failed to login to webdav")
-        try:
-            cloud.mkdir(folderpath)
-            cloud.delete(folderpath)
+    try:
+        folder_exists = check_if_folder_exists(username, password, folderpath)
+        if not folder_exists:
+            if make_connection(username, password):
+                cloud.mkdir(folderpath)
+                cloud.delete(folderpath)
+                return True
+            else:
+                logger.error("failed to login to webdav")
+                return False
+        else:
+            logger.info("folder exists")
             return True
-        except:
-            return False
-    else:
-        logger.info("folder exists")
-        return True
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
 
 # @lru_cache(maxsize=1)
 def get_folders(username, password, folder):
@@ -339,21 +412,26 @@ def get_folders(username, password, folder):
         list: list of available folder paths
     """
     try:
-        cloud.login(username, password)
-    except:
-        message = "failed to login to webdav"
-        logger.error(message)
-    try:
-        result = cloud.list(folder, depth=100)
-        paths = ["/"]
-        for item in result:
-            folder_path = item.get_path()
-            if folder_path not in paths:
-                paths.append(folder_path)
-        return paths
+        if make_connection(username, password):
+            result = cloud.list(folder, depth=100)
+            paths = ["/"]
+            for item in result:
+                folder_path = item.get_path()
+                if folder_path not in paths:
+                    paths.append(folder_path)
+            return paths
+        else:
+            message = "failed to login to webdav"
+            logger.error(message)
     except Exception as e:
         message = "failed to list folders"
         logger.error(message)
+        logger.error(e, exc_info=True)
+
+
+@lru_cache(maxsize=1)
+def get_cached_folders(username, password, folder):
+    return get_folders(username, password, folder)
 
 
 # @lru_cache(maxsize=1)
@@ -369,47 +447,55 @@ def get_folder_content(username, password, folder):
         list: list of available files and folder paths in the specified folder
     """
     try:
-        cloud.login(username, password)
-    except:
-        message = "failed to login to webdav"
-    try:
-        result = cloud.list(folder, depth=100)
-        paths = []
-        for item in result:
-            folder_path = item.path
-            if folder_path not in paths:
-                paths.append(folder_path)
-        return paths
+        if make_connection(username, password):
+            result = cloud.list(folder, depth=100)
+            paths = []
+            for item in result:
+                folder_path = item.path
+                if folder_path not in paths:
+                    paths.append(folder_path)
+            return paths
+        else:
+            logger.error("Failed to make connection.")
+            return []
     except Exception as e:
-        message = "Failed to list folders"
+        logger.error(e, exc_info=True)
         return []
 
-
-def make_connection(username=None, password=None, token=None):
-    """This function  will test if the username and password
-    are correct
+def refresh_cloud_token(data):
+    """Will refresh the cloud token data.
 
     Args:
-        username (str): username of the owncloud account
-        password (str): password of the owncloud account
+        data (dict): the cloud token data
 
     Returns:
-        bool: returns True if connection is succesful, otherwise False
+        dict: refreshed cloud token data
     """
     try:
-        if token == None:
-            r = cloud.login(username, password)
-            return True
-        else:
-            return True
-    except:
-        return False
+        new_token = old_token = data['access_token']
+        refresh_url = f'{drive_url}/index.php/apps/oauth2/api/v1/token'
+        refresh_token = data['refresh_token']
+        extra = {
+            'client_id': cloud_client_id,
+            'client_secret': cloud_client_secret,
+        }
+        rdrive = OAuth2Session(cloud_client_id, token=refresh_token)
+        data = rdrive.refresh_token(url=refresh_url, refresh_token=refresh_token, **extra)
+        new_token = data['access_token']
+        if new_token != old_token:
+            return data
+    except Exception as e:
+        logger.error(f"Failed at refresh access token")
+        logger.error(e, exc_info=True)
 
 
 def get_status_from_history(username, folder, url):
-    with app.app_context():
-        return History.query.filter_by(username=username).filter_by(
-            url=url).filter_by(folder=folder).order_by(History.id.desc()).all()[0].status
+    try:
+        with app.app_context():
+            return History.query.filter_by(username=username).filter_by(
+                url=url).filter_by(folder=folder).order_by(History.id.desc()).all()[0].status
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def update_history(username, folder, url, status):
@@ -422,63 +508,64 @@ def update_history(username, folder, url, status):
         url (str): url of the location of the data
         status (str): status of the data import
     """
-    logger.info(f"update_history: {status}")
-    if status == 'started':
-        summary[username] = {}
-    if 'failed' in status.lower():
-        if 'failed' not in summary[username]:
-            summary[username]['failed'] = 1
-        else:
-            summary[username]['failed'] += 1
-    if 'uploaded' in status.lower():
-        if 'processed' not in summary[username]:
-            summary[username]['processed'] = 1
-        else:
-            summary[username]['processed'] += 1
-    if 'created' in status.lower():
-        if 'created' not in summary[username]:
-            summary[username]['created'] = 1
-        else:
-            summary[username]['created'] += 1
+    try:
+        logger.info(f"update_history: {status}")
+        if status == 'started':
+            summary[username] = {}
+        if 'failed' in status.lower():
+            if 'failed' not in summary[username]:
+                summary[username]['failed'] = 1
+            else:
+                summary[username]['failed'] += 1
+        if 'uploaded' in status.lower():
+            if 'processed' not in summary[username]:
+                summary[username]['processed'] = 1
+            else:
+                summary[username]['processed'] += 1
+        if 'created' in status.lower():
+            if 'created' not in summary[username]:
+                summary[username]['created'] = 1
+            else:
+                summary[username]['created'] += 1
 
-    # status can be up to 128 chars long
-    status = status[:128]
-    
-    with app.app_context():
-        history = History(username=username,
-                          folder=folder,
-                          url=url,
-                          status=status)
-        db.session.add(history)
-        db.session.commit()
-    
-    if status == 'ready':
-        logger.error(summary)
-        canc = get_canceled(username)
-        if 'failed' not in summary[username] and not canc:
-            final_message = "Success! "
-        else:
-            final_message = "Completed with issues. Check the history. "
-            
-        if 'failed' in summary[username]:
-            final_message += "Failures: {}. ".format(summary[username]['failed'])
-        if 'created' in summary[username]:
-            final_message += "Files created: {}. ".format(summary[username]['created'])
-        if 'processed' in summary[username]:
-            final_message += "Files processed: {}. ".format(summary[username]['processed'])
-        if canc:
-            final_message += "Process was canceled by user."
-        final_message = final_message[:128]
+        # status can be up to 128 chars long
+        status = status[:128]
+        
         with app.app_context():
             history = History(username=username,
                             folder=folder,
                             url=url,
-                            status=final_message)
+                            status=status)
             db.session.add(history)
-            db.session.commit() 
+            db.session.commit()
+        
+        if status == 'ready':
+            canc = get_canceled(username)
+            if 'failed' not in summary[username] and not canc:
+                final_message = "Success! "
+            else:
+                final_message = "Completed with issues. Check the history. "
+                
+            if 'failed' in summary[username]:
+                final_message += "Failures: {}. ".format(summary[username]['failed'])
+            if 'created' in summary[username]:
+                final_message += "Files created: {}. ".format(summary[username]['created'])
+            if 'processed' in summary[username]:
+                final_message += "Files processed: {}. ".format(summary[username]['processed'])
+            if canc:
+                final_message += "Process was canceled by user."
+            final_message = final_message[:128]
+            with app.app_context():
+                history = History(username=username,
+                                folder=folder,
+                                url=url,
+                                status=final_message)
+                db.session.add(history)
+                db.session.commit() 
 
-    set_query_status(username, folder, url, status)
-
+        set_query_status(username, folder, url, status)
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 def check_checksums(username, url, folder, files_info=None):
     """Will pull info on the data to be retrieved including the checksums
@@ -539,8 +626,7 @@ def check_checksums(username, url, folder, files_info=None):
         with open(f"{generated_path}/checksums{timestamp}.json", "w") as f:
             json.dump(checksums, f)
     except Exception as e:
-        print(e)
-        logger.error(f"Failed at checksum: {e}")
+        logger.error(e, exc_info=True)
 
 
 def run_import(username, password, folder, url):
@@ -552,39 +638,43 @@ def run_import(username, password, folder, url):
         folder (str): folder path of the data
         url (str): url of the location of the data
     """
-    update_history(username, folder, url, 'started')
-    if not get_canceled(username):
-        get_data(url=url, folder=folder, username=username)
-    if not get_canceled(username):
-        update_history(username, folder, url, 'start checking checksums')
-        check_checksums(username, url, folder)
-        update_history(username, folder, url, 'created checksums')
+    try:
+        update_history(username, folder, url, 'started')
+        if not get_canceled(username):
+            get_data(url=url, folder=folder, username=username)
+        if not get_canceled(username):
+            update_history(username, folder, url, 'start checking checksums')
+            check_checksums(username, url, folder)
+            update_history(username, folder, url, 'created checksums')
 
-    if not get_canceled(username):
-        # check if there is just one file and it is a zip, then:
-        # unzip that file
-        for subdir, dirs, files in os.walk(folder):
-            if len(files) == 1 and files[0].endswith(".zip"):
-                # there is one file and it is a zip file
-                update_history(username, folder, url, 'unzipping the zip file')
-                zipfilepath = os.path.join(subdir, files[0])
-                import zipfile
-                with zipfile.ZipFile(zipfilepath, 'r') as zip_ref:
-                    zip_ref.extractall(folder)
-                # remove the zipfile
-                update_history(username, folder, url, 'removing the zip file')
-                os.remove(zipfilepath)
+        if not get_canceled(username):
+            # check if there is just one file and it is a zip, then:
+            # unzip that file
+            for subdir, dirs, files in os.walk(folder):
+                if len(files) == 1 and files[0].endswith(".zip"):
+                    # there is one file and it is a zip file
+                    update_history(username, folder, url, 'unzipping the zip file')
+                    zipfilepath = os.path.join(subdir, files[0])
+                    import zipfile
+                    with zipfile.ZipFile(zipfilepath, 'r') as zip_ref:
+                        zip_ref.extractall(folder)
+                    # remove the zipfile
+                    update_history(username, folder, url, 'removing the zip file')
+                    os.remove(zipfilepath)
 
-    if not get_canceled(username):
-        update_history(username, folder, url,
-                    'creating ro-crate-metadata.json file ')
-        create_rocrate(url, folder)
-        update_history(username, folder, url,
-                    'created ro-crate-metadata.json file ')
-    if not get_canceled(username):
-        update_history(username, folder, url, 'start pushing dataset to storage')
-        push_data(username, password, folder, url)
-    update_history(username, folder, url, 'ready')
+        if not get_canceled(username):
+            update_history(username, folder, url,
+                        'creating ro-crate-metadata.json file ')
+            create_rocrate(url, folder)
+            update_history(username, folder, url,
+                        'created ro-crate-metadata.json file ')
+        if not get_canceled(username):
+            update_history(username, folder, url, 'start pushing dataset to storage')
+            push_data(username, password, folder, url)
+        update_history(username, folder, url, 'ready')
+    except Exception as e:
+        update_history(username, folder, url, f"failed at import: {e}")
+        logger.error(e, exc_info=True)
 
 
 def get_quota_text(username, password, folder=None):
@@ -602,17 +692,26 @@ def get_quota_text(username, password, folder=None):
         quota = get_quota(username, password, folder)
         used = int(quota[0])
         available = int(quota[1])
-        have_permission = quota[2]
-        total = used + available
-        percent = round((used / total) * 100.0)
+
+        if cloud_service == 'nextcloud' and available < 0:
+            total = "unlimited"
+            percent = 0
+        else:
+            total = used + available
+            percent = round((used / total) * 100.0)
+
         result = f"You are using {convert_size(used)} of {convert_size(total)} ({percent}%). "
+        
+        have_permission = quota[2]
         if have_permission:
             result += "You have write permission to this folder."
         else:
             result += "You do not have write permission to this folder."
+        
         return result
-    except:
-        return None
+    except Exception as e:
+        logger.error("Exception at get_quota_text")
+        logger.error(e, exc_info=True)
 
 
 def get_quota(username, password, folder=None):
@@ -626,60 +725,71 @@ def get_quota(username, password, folder=None):
     Returns:
         tuple: the used and available quota in bytes
     """
-    r = cloud.login(username, password)
-    
-    root_folder = "/"
-    used = 0
-    available = 0
-
-    ### determine the project folder if there is one
-    folders = folder.split("/")
-    # by default the project folder is the folder on top of root
-    project_folder = "/{}/".format(folders[1])   
-    # Or it can have (Projectfolder) in it's name
-    for item in folders:
-        if item.find(" (Projectfolder)") != -1:
-            project_folder = f"/{item}/"
-
-    have_permission = False
-    test_folder = f"{project_folder}/testingpermissions"
     try:
-        try:
-            # delete test folder if there is any
-            cloud.delete(test_folder)
-        except:
-            # if there is no test folder the delete will throw an exception
-            pass
-        # Now make the test folder. Will return True is we have permission else False
-        have_permission = cloud.mkdir(test_folder)
-        cloud.delete(test_folder)
-    except:
-        # if the mkdir or delete returns exception then we do not have permission.
-        pass
+        root_folder = "/"
+        used = 0
+        available = 0
+        ### determine the project folder if there is one
+        folders = folder.split("/")
+        project_folder = "/"
+        # by default the project folder is the folder on top of root
+        if len(folders) > 1:
+            project_folder = "/{}/".format(folders[1])
+        # Or it can have (Projectfolder) in it's name
+        for item in folders:
+            if item.find(" (Projectfolder)") != -1:
+                project_folder = f"/{item}/"
 
-
-    result = cloud.list(root_folder, depth=1)
-    
-    # if project_folder != root_folder:
-    if project_folder.find(" (Projectfolder)") != -1:
-        for r in result:
+        have_permission = False
+        test_folder = f"{project_folder}/testingpermissions"
+ 
+        if make_connection(username, password):
             try:
-                if r.path == project_folder:
-                    used += int(r.attributes['{DAV:}quota-used-bytes'])
-                    available += int(r.attributes['{DAV:}quota-available-bytes'])
+                try:
+                    # delete test folder if there is any
+                    cloud.delete(test_folder)
+                except:
+                    # if there is no test folder the delete will throw an exception
+                    pass
+                # Now make the test folder. Will return True is we have permission else False
+                have_permission = cloud.mkdir(test_folder)
+                cloud.delete(test_folder)
             except:
-                pass   
-    else:
-        for r in result:
-            if r.path == project_folder:
-                available = int(r.attributes['{DAV:}quota-available-bytes'])
-            try:
-                used += int(r.attributes['{DAV:}quota-used-bytes'])
-            except:
-                used += int(r.attributes['{DAV:}getcontentlength'])
+                # if the mkdir or delete returns exception then we do not have permission.
+                pass
 
-    return (used, available, have_permission)
+            result = cloud.list(root_folder, depth=1)
 
+            # if project_folder != root_folder:
+            if project_folder.find(" (Projectfolder)") != -1:
+                for r in result:
+                    try:
+                        if r.path == project_folder:
+                            used += int(r.attributes['{DAV:}quota-used-bytes'])
+                            available += int(r.attributes['{DAV:}quota-available-bytes'])
+                    except:
+                        pass   
+            else:
+                for r in result:
+                    if r.path == project_folder:
+                        available = int(r.attributes['{DAV:}quota-available-bytes'])
+                    try:
+                        used += int(r.attributes['{DAV:}quota-used-bytes'])
+                    except:
+                        used += int(r.attributes['{DAV:}getcontentlength'])
+
+            if cloud_service == "nextcloud":
+                result = cloud.list(root_folder, depth=1)
+                for r in result:
+                    try:
+                        used += int(r.attributes['{DAV:}quota-used-bytes'])
+                        available = int(r.attributes['{DAV:}quota-available-bytes'])
+                    except:
+                        pass
+
+        return (used, available, have_permission)
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 def convert_to_size(number, size_name):
     """convert a number size_name combination to bytes
@@ -691,10 +801,13 @@ def convert_to_size(number, size_name):
     Returns:
         int: the size in bytes
     """
-    size_names = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    i = size_names.index(size_name)
-    p = math.pow(1024, i)
-    return int(number * p)
+    try:
+        size_names = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+        i = size_names.index(size_name)
+        p = math.pow(1024, i)
+        return int(number * p)
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def convert_size(size_bytes):
@@ -714,16 +827,50 @@ def convert_size(size_bytes):
         p = math.pow(1024, i)
         s = round(size_bytes / p, 2)
         return "%s %s" % (s, size_name[i])
-    except:
+    except Exception as e:
+        logger.error(e, exc_info=True)
         return size_bytes
 
 
-def repo_content_fits(repo_content, quota_text):
-    """compares the total filesize from the repo_content to the free storage size in the quota_text.
+def repo_content_fits(repo_content, username, password, folder):
+    """compares the total filesize from the repo_content to the free storage size at RD.
 
     Args:
         repo_content (list): the repo_content_data
-        quota_text (str): the quoata text from the owncloud general settingspage
+        username (str): webdav username
+        password (str): webdav password
+        folder (str): path tof the folder to hold the repo content
+
+    Returns:
+        bool: True if the files in repo_content will fit into the free storage space.
+    """
+    try:
+        quota = get_quota(username, password, folder)
+        free_bytes = int(quota[1])
+        if free_bytes < 0 and cloud_service == 'nextcloud':
+            return True
+
+        # calculate the total size in bytes that the files will take up
+        total_file_size = 0
+        for item in repo_content:
+            total_file_size += int(item['size'])
+
+        if free_bytes > total_file_size:
+            return True
+
+    except Exception as e:
+        logger.error("Exception at repo_content_fits")
+        logger.error(e)
+        return None
+
+    return False
+
+
+def repo_content_can_be_processed(repo_content):
+    """compares the total filesize from the repo_content to the free storage size at the pod.
+
+    Args:
+        repo_content (list): the repo_content_data
 
     Returns:
         bool: True if the files in repo_content will fit into the free storage space.
@@ -734,22 +881,53 @@ def repo_content_fits(repo_content, quota_text):
         for item in repo_content:
             total_file_size += int(item['size'])
 
-        # figure out how many free bytes we have in OC storage
-        parsed_quota_text = quota_text.split()
-        number_one = float(parsed_quota_text[3])
-        size_name_one = parsed_quota_text[4]
-        number_two = float(parsed_quota_text[6])
-        size_name_two = parsed_quota_text[7]
-        one = convert_to_size(number_one, size_name_one)
-        two = convert_to_size(number_two, size_name_two)
-        free_bytes = two - one
-
-        if free_bytes > total_file_size:
+        # get the free bytes on the pod disk
+        free_bytes = shutil.disk_usage("/").free
+        
+        # compare: we need twice the repo_content size as diskspace as we also download the content as a zip
+        if free_bytes > total_file_size * 2.0:
             return True
+
     except Exception as e:
+        logger.error("Exception at repo_content_can_be_processed")
         logger.error(e)
         return None
+
     return False
+
+
+
+def folder_content_can_be_processed(username, password, folder):
+    """Will get a the folder content and see if it is not to large to be processed by the pod.
+
+    Args:
+        username (str): username for logging on to the owncloud instance.
+        password (str): application password for logging on to the owncloud instance.
+        folder (str): folder path
+
+    Returns:
+        bool: True is processing can be done
+    """
+    result = {'can_be_processed' : False, 'total_size': 0, 'free_bytes' : 0}
+    try:
+        # calculate the total size in bytes that the files will take up
+        if make_connection(username, password):
+            list_result = cloud.list(folder, depth=100)
+            for item in list_result:
+                try:
+                    result['total_size'] += item.get_size()
+                except:
+                    pass
+        
+        # get the free bytes on the pod disk
+        result['free_bytes'] = int(shutil.disk_usage("/").free)
+
+        # compare: we need twice the folder_content size as diskspace as we also create the content as a zip
+        if result['free_bytes'] > result['total_size'] * 2.0:
+            result['can_be_processed'] = True
+    except Exception as e:
+        logger.error(e, exc_info=True)
+    return result
 
 
 # @lru_cache(maxsize=1)
@@ -766,7 +944,8 @@ def get_doi_metadata(url):
         service = datahugger.info(url)
         metadata = service.resource.metadata.cls()
         return metadata
-    except:
+    except Exception as e:
+        logger.error(e, exc_info=True)
         return {}
 
 
@@ -779,12 +958,15 @@ def get_rocrate(folder, rocrate_filename='ro-crate-metadata.json'):
     Returns:
         dict: the content of the file
     """
-    for dirpath, subdirs, files in os.walk(folder):
-        if rocrate_filename in files:
-            ro_crate_filepath = f"{dirpath}/ro-crate-metadata.json"
-            with open(ro_crate_filepath, 'r') as f:
-                result = json.loads(f.read())
-            return result
+    try:
+        for dirpath, subdirs, files in os.walk(folder):
+            if rocrate_filename in files:
+                ro_crate_filepath = f"{dirpath}/ro-crate-metadata.json"
+                with open(ro_crate_filepath, 'r') as f:
+                    result = json.loads(f.read())
+                return result
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def create_generated_folder(folder):
@@ -793,10 +975,13 @@ def create_generated_folder(folder):
     Args:
         folder (str): the folder path where the generated folder needs to be created
     """
-    generated_path = f"{folder}/generated"
-    if not os.path.isdir(generated_path):
-        os.mkdir(generated_path)
-    return generated_path
+    try:
+        generated_path = f"{folder}/generated"
+        if not os.path.isdir(generated_path):
+            os.mkdir(generated_path)
+        return generated_path
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def create_rocrate(url, folder, metadata = None):
@@ -807,50 +992,52 @@ def create_rocrate(url, folder, metadata = None):
         url (str): the url where the data will be retrieved from
         folder (str): the folder where the data will be written to
     """
-    # TODO: if metadata is not none then use that data to ccreate rocrate file. This is for upload
-    crate = ROCrate()
-    dataset = crate.add(Dataset(crate, dest_path="./"))
+    try:
+        # TODO: if metadata is not none then use that data to ccreate rocrate file. This is for upload
+        crate = ROCrate()
+        dataset = crate.add(Dataset(crate, dest_path="./"))
 
-    # get metadata from doi url if available
-    if url.find('http') != -1:
-        metadata = get_doi_metadata(url)
-    
-    # if we have mata data use this
-    if metadata != {} and metadata != None:
-        logger.error("we have metadata")
-        metadata = parse_doi_metadata(metadata)
-        if 'author' in metadata:
-            authors = []
-            if type(metadata['author']) == 'list':
-                for author in metadata['author']:
-                    auth = crate.add(Person(crate, properties=author))
-                    authors.append(auth)
-                dataset['author'] = authors
-            else:
-                dataset['author'] = metadata['author']
-        for key, value in metadata.items():
-            if key not in ['author']:
-                dataset[key] = value
-    # else check to see if we have a ro-crate file to use as metadata.
-    else:
-        # see if there is a rocrate file with metadata
-        rocrate_metadata = get_rocrate(folder)
-        if rocrate_metadata:
-            try:
-                crate.add_jsonld(rocrate_metadata)
-            except:
-                # TODO: check if this works for adding metadata
-                logger.info("no valid rocrate data to add")
+        # get metadata from doi url if available
+        if url.find('http') != -1:
+            metadata = get_doi_metadata(url)
+        
+        # if we have mata data use this
+        if metadata != {} and metadata != None:
+            metadata = parse_doi_metadata(metadata)
+            if 'author' in metadata:
+                authors = []
+                if type(metadata['author']) == 'list':
+                    for author in metadata['author']:
+                        auth = crate.add(Person(crate, properties=author))
+                        authors.append(auth)
+                    dataset['author'] = authors
+                else:
+                    dataset['author'] = metadata['author']
+            for key, value in metadata.items():
+                if key not in ['author']:
+                    dataset[key] = value
+        # else check to see if we have a ro-crate file to use as metadata.
+        else:
+            # see if there is a rocrate file with metadata
+            rocrate_metadata = get_rocrate(folder)
+            if rocrate_metadata:
+                try:
+                    crate.add_jsonld(rocrate_metadata)
+                except:
+                    # TODO: check if this works for adding metadata
+                    logger.info("no valid rocrate data to add")
 
-    # add the files
-    files_info = get_files_info(url)
-    dataset['files'] = files_info
+        # add the files
+        files_info = get_files_info(url)
+        dataset['files'] = files_info
 
-    # timestamp the ro-crate file
-    dataset["timestamp"] = str(datetime.datetime.now())
+        # timestamp the ro-crate file
+        dataset["timestamp"] = str(datetime.datetime.now())
 
-    generated_path = create_generated_folder(folder)
-    crate.write(generated_path)
+        generated_path = create_generated_folder(folder)
+        crate.write(generated_path)
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 def parse_doi_metadata(metadata):
@@ -915,59 +1102,77 @@ def parse_folder_structure(list_of_paths, folder_path):
     Returns:
         _type_: _description_
     """
-    # if folder_path[-1] != "/":
-    #     folder_path += "/"
-    base = [
-            {
-                'folder': folder_path,
-                'subfolders': [],
-                'files': []
-            }
-    ]
+    try:
+        base = [
+                {
+                    'folder': folder_path,
+                    'subfolders': [],
+                    'files': []
+                }
+        ]
 
-    for item in list_of_paths:
-        if folder_path in item:
-            remaining_path = item.split(folder_path)[-1]
-            remaining_path_list = remaining_path.split('/')
-            # if the remaining path is is file
-            if len(remaining_path_list) == 1 and remaining_path != "":
-                if remaining_path not in base[0]['files']:
-                    # logger.error(remaining_path)
-                    base[0]['files'].append(remaining_path)
-            elif len(remaining_path_list) > 1 and remaining_path != "":
-                subfolder = f"{folder_path}{remaining_path_list[0]}/"
-                sub = parse_folder_structure(list_of_paths, subfolder)[0]
-                if sub not in base[0]['subfolders']:
-                    # logger.error(sub)
-                    base[0]['subfolders'].append(sub)
-    return base
+        for item in list_of_paths:
+            if folder_path in item:
+                remaining_path = item.split(folder_path)[-1]
+                remaining_path_list = remaining_path.split('/')
+                # if the remaining path is is file
+                if len(remaining_path_list) == 1 and remaining_path != "":
+                    if remaining_path not in base[0]['files']:
+                        base[0]['files'].append(remaining_path)
+                elif len(remaining_path_list) > 1 and remaining_path != "":
+                    subfolder = f"{folder_path}{remaining_path_list[0]}/"
+                    sub = parse_folder_structure(list_of_paths, subfolder)[0]
+                    if sub not in base[0]['subfolders']:
+                        base[0]['subfolders'].append(sub)
+        return base
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
 # @lru_cache(maxsize=1)
 def get_raw_folders(username, password, folder):
-    list_of_paths = get_folder_content(username, password, folder)
-    # logger.error(list_of_paths)
-    return parse_folder_structure(list_of_paths, folder)
+    try:
+        list_of_paths = get_folder_content(username, password, folder)
+        return parse_folder_structure(list_of_paths, folder)
+    except Exception as e:
+        logger.error(e, exc_info=True)
 
 
-def get_user_info(token):
-    """Gets the OC userinfo
+def get_user_info(username, password):
+    """Gets the RD userinfo
 
     Args:
-        token (str): _description_
+        username (str): username for connecting to RD
+        password (str): the app password (OC) or token (NC)
 
     Returns:
-        _type_: _description_
+        dict: all available user information
     """
-    url = f"{drive_url}/index.php/apps/oauth2/api/v1/userinfo"
-    headers = {'Authorization': f'Bearer {token}'}
-    response = requests.request("GET", url, headers=headers)
-    if response.status_code == 200:
-        return response.json()
+    cloud.login(username, password)
+    return cloud.get_user(username)
+
+
+def get_user_info_by_token(token):
+    """Gets the RD userinfo by oauth access_token
+
+    Args:
+        token (str): the oauth2 access_token
+
+    Returns:
+        dict: user info sub and name
+    """
+    try:
+        url = f"{drive_url}/index.php/apps/oauth2/api/v1/userinfo"
+        headers = {'Authorization': f'Bearer {token}'}
+        response = requests.request("GET", url, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        logger.error(e, exc_info=True)
  
 
 def get_webdav_token(token, username):
-    """Will get a webdav token.
+    """Will get a webdav token for owncloud.
 
     Args:
         token (str): the auth token
@@ -975,24 +1180,77 @@ def get_webdav_token(token, username):
     Returns:
         str: the webdav token that has been set as app password under the name RDC
     """
-    url = f"{drive_url}/ocs/v1.php/RDC/token/{username}"
-    logger.debug(url)
-    headers = {'Authorization': f'Bearer {token}'}
-    logger.debug(headers)
-    response = requests.request("GET", url, headers=headers)
-    logger.debug(response)
-    if response.status_code == 200:
-        logger.debug(response.text)
-        tree = ET.fromstring(response.text)
-        for webdavtoken in tree.iter('token'):
-            return webdavtoken.text
+    try:
+        url = f"{drive_url}/ocs/v1.php/RDC/token/{username}"
+        logger.debug(url)
+        headers = {'Authorization': f'Bearer {token}'}
+        logger.debug(headers)
+        response = requests.request("GET", url, headers=headers)
+        logger.debug(response)
+        if response.status_code == 200:
+            logger.debug(response.text)
+            tree = ET.fromstring(response.text)
+            for webdavtoken in tree.iter('token'):
+                return webdavtoken.text
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
+
+def get_webdav_poll_info_nc(token):
+    """Will get a webdav poll info for nextcloud.
+
+    Args:
+        token (str): the auth token
+    Returns:
+        dict: the webdav poll info that can be used to set app password
+    """
+    try:
+        result = {}
+        url = f"{drive_url}/index.php/login/v2"
+        print("url", url)
+        headers = {'Authorization': f'Bearer {token}', 'User-Agent': 'SRDC'}
+        response = requests.request("POST", url, headers=headers)
+        if response.status_code == 200:
+            result['poll_login'] = response.json()['login']
+            poll_token = response.json()['poll']['token']
+            result['poll_endpoint'] = response.json()['poll']['endpoint'] + "?token=" + poll_token
+        return result
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
+
+def get_webdav_token_nc(poll_endpoint):
+    """Will get a webdav token for nextcloud.
+
+    Args:
+        poll_endpoint (str): the endpoint url for polling the webdav app password
+    Returns:
+        dict: the webdav loginName and appPassword that has been set as app password
+    """
+    try: 
+        headers = {'User-Agent': 'SRDC'}
+        poll_response = requests.request("POST", poll_endpoint, headers=headers)
+        if poll_response.status_code == 200:
+            return poll_response.json()
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
 
 
 if __name__ == "__main__":
-    from prettyprinter import pprint
-    username = ""
+    # token = ""
+
+    # poll_info = get_webdav_poll_info_nc(token)
+    # print(poll_info['poll_login'])
+
+    # input('continue?')
+    
+    # poll_endpoint = poll_info['poll_endpoint']
+    # result = get_webdav_token_nc(poll_endpoint)
+
+    # print(result)
+    user_id = ""
     password = ""
-    folder = ""
-    result = get_quota(username, password)
-    print(result)
-    # print(cloud.get_permissions())
+    token = ""
+    print(get_user_info(username=user_id, password=password))
+    print(get_user_info_by_token(token))

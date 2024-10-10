@@ -375,6 +375,28 @@
     </div>
 </div>
 
+
+{% elif data.repo == 'sharekit' %}
+<p>These are basic metadata fields for <b>Sharekit</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+
 {% else %}
 <p>These are general fields. Fields specificly for <b>{{data.repo}}</b> still need to be implemented. Most of below fields will still work. So go ahead and fill some out.</p>
 <div class="row">

@@ -4,6 +4,7 @@
 <div class="form-group mt-3 mb-3">
     <p>Select a repository:</p>
     {% for service in registered_services %}
+    {% if service not in data.temp_hidden_services %}
     {% if service != 'owncloud' %}
     {% if ('showall' in data and data.showall) or (service not in data.hidden_services)%}
     {% set imgfilepath = '/img/'+service+'.png' %}
@@ -25,6 +26,7 @@
     </div>
     {% endif %}
     {% endif %}
+    {% endif %}
     {% endfor %}
     <div class="form-check form-check-inline mt-3 mb-3 col-3">
         <input class="form-check-input" type="radio" name="selected_repo" id="radio-none" value="none" required hidden>
@@ -39,30 +41,42 @@
 $('input[type=radio][name=selected_repo]').change(function() {
     if (this.value == 'figshare') {
         $("#show_meta").load("/metadata?repo=figshare");
+        $("#show_dataverses").empty();
     }
     else if (this.value == 'zenodo') {
         $("#show_meta").load("/metadata?repo=zenodo");
+        $("#show_dataverses").empty();
     }
     else if (this.value == 'osf') {
         $("#show_meta").load("/metadata?repo=osf");
+        $("#show_dataverses").empty();
     }
     else if (this.value == 'dataverse') {
+        $("#show_dataverses").load("/dataverses"); 
         $("#show_meta").load("/metadata?repo=dataverse");
     }
     else if (this.value == 'irods') {
         $("#show_meta").load("/metadata?repo=irods");
+        $("#show_dataverses").empty();
     }
     else if (this.value == 'sharekit') {
         $("#show_meta").load("/metadata?repo=sharekit");
+        $("#show_dataverses").empty();
     }
 
 });
 </script>
 {% for service in registered_services %}
-{% if service == data.repo %}
+    {% if service == data.repo %}
+    <script>
+        $('input[type=radio][name=selected_repo][value={{service}}]').attr('checked',true);
+        $("#show_meta").load("/metadata?repo={{service}}");
+    </script>
+    {% endif %}
+{% endfor %}
+
+{% if data.repo == 'dataverse' %}
 <script>
-    $('input[type=radio][name=selected_repo][value={{service}}]').attr('checked',true);
-    $("#show_meta").load("/metadata?repo={{service}}");
+    $("#show_dataverses").load("/dataverses"); 
 </script>
 {% endif %}
-{% endfor %}

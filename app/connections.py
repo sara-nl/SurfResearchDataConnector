@@ -14,7 +14,7 @@ oauth = OAuth(app)
 # Oauth connection config for owncloud
 try:
     oauth.register(
-        name='owncloud',
+        name='rdrive',
         client_id=cloud_client_id,
         client_secret=cloud_client_secret,
         access_token_url=f'{drive_url}/index.php/apps/oauth2/api/v1/token',
@@ -83,14 +83,29 @@ except:
     pass
 
 
-token_based_services = ['figshare','zenodo','osf','dataverse', 'irods', 'sharekit']
+if 'token_based_services' not in all_vars:
+    token_based_services = ['figshare','zenodo','osf','dataverse', 'irods', 'sharekit']
 
-try:
-    oauth_services = list(oauth._registry.keys())
-    oauth_services.remove('owncloud')
-except:
-    oauth_services = []
-registered_services = token_based_services
+if 'oauth_services' not in all_vars:
+    try:
+        oauth_services = list(oauth._registry.keys())
+        oauth_services.remove('owncloud')
+    except:
+        oauth_services = []
+
+# remove items that are empty string
+if '' in oauth_services:
+    try:
+        oauth_services.remove('')
+    except Exception as e:
+        logger.error(e)
+if '' in token_based_services:
+    try:
+        token_based_services.remove('')
+    except Exception as e:
+        logger.error(e)
+        
+registered_services = list(set(token_based_services + oauth_services))
 
 
 if __name__ == "__main__":

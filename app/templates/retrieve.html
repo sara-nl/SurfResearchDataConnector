@@ -61,10 +61,10 @@
                     <label for="Folder">Data Folder Path: </label>
                     
                     <!-- async loading folder paths -->
-                    {{ load_async("folderpaths", "/folder-paths") }}
+                    {{ load_async("folderpaths", "/folder-paths", 55000) }}
                     <!-- end async -->
 
-                    <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder" required>
+                    <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder (optional)" pattern="[\--_-A-Za-z0-9]+" >
                     <div class="invalid-feedback">
                         Please fill out the folder name where you want store the data.
                     </div>
@@ -98,7 +98,7 @@
                 
                 <h2>Data Folder</h2>
                 <!-- async loading folder content -->
-                {{ load_async("foldercontent", "/folder-content") }}
+                {{ load_async("foldercontent", "/folder-content/down", 55000) }}
                 <!-- end async -->
 
                 <h2>Data Set</h2>
@@ -126,7 +126,7 @@
             <input type="text" name="preview" value={{preview}} hidden>
             <input type="text" name="check_accept_folder_first" value={{check_accept_folder_first}} hidden>
             <input type="text" name="check_accept_url_in_history_first" value={{check_accept_url_in_history_first}} hidden>
-            <button type="submit" class="btn btn-secondary">Cancel Download</button>
+            <button type="submit" class="btn btn-secondary">Cancel Process</button>
             <div class="form-check mt-3 mb-3">
                 <input class="form-check-input" id="flexCheckCancel" type="checkbox" value="" name="checked" required>
                 <label class="form-check-label" for="flexCheckCancel">

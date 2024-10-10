@@ -218,7 +218,7 @@ class TestDataverseMethodsNew(unittest.TestCase):
         dataverse = Dataverse(api_key=api_key, api_address=api_address)
 
         # act
-        response = dataverse.check_token(api_key)
+        response = dataverse.check_token()
 
         # assert
         self.assertTrue(response)
