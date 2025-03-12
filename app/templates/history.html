@@ -14,7 +14,8 @@
     <table class="table table-striped table-hover table-sm table-bordered table-responsive-sm">
         <thead class="table-light">
             <tr>
-            <th scope="col">#</th>
+            <th scope="col">Date</th>
+            <th scope="col">Project name</th>
             <th scope="col">Local (folder)</th>
             <th scope="col">Remote (url, doi, repo)</th>
             <th scope="col">Status</th>
@@ -22,24 +23,42 @@
         </thead>
         <tbody>
             {% for item in history %}
+            {% if item.status == "started" %}
+            <tr class="table-primary">
+            {% elif item.status == "ready" %}
+            <tr class="table-success">
+            {% elif "Success!" in item.status %}
+            <tr class="table-success">
+            {% elif "Completed with issues" in item.status %}
+            <tr class="table-warning">
+            {% elif "canceled by user" in item.status %}
+            <tr class="table-danger">
+            {% else %}
             <tr>
-                <th scope="row">{{ item.time_created }}</th>
+            {% endif %}
+                <th scope="row"><small>{{ item.time_created }}</small></th>
+                <td><a href="/history/{{ item.id }}">{{ item.projectname }}</a></td>
                 <td><a href="{{drive_url}}/index.php/apps/files?dir={{ item.folder }}" target="_top" rel="noopener noreferrer">{{ item.folder }}</a></td>
                 {% if 'http' in item.url %}
-                <td><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.url | truncate(80,true,'') }}</a></td>
+                <td><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.url | truncate(80,true,'') }}</td>
                 {% else %}
                 <td>Upload to {{ item.url }}</td>
                 {% endif %}
-                <td><a href="/history/{{ item.id }}">{{ item.status }}</a></td>
+                <td>{{ item.status }}</a></td>
             </tr>
+            {% if item.status == "started" %}
+            <tr class="table-secondary"><th></th><td></td><td></td><td></td><td></td></tr>
+            {% endif %}
+
             {% endfor %}
         </tbody>
     </table>
 
-
 {% else %}
+
 <p>Please connect first.</p>
 <a href="/connect"><button class="btn btn-secondary">Connect</button></a>
+
 {% endif %}
 {% endblock %}
 

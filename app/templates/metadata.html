@@ -1,5 +1,6 @@
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
+{% from "macros.html" import load_async with context %}
 {% if data.repo == 'irods' %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
 <p>These are customized <b>required</b> metadata fields for <b>Irods</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
@@ -84,18 +85,18 @@
     </div>
 </div>
 
-{% elif data.repo == 'dataverse' %}
-<p>These are customized <b>required</b> metadata fields for <b>Dataverse</b>.</p>
+{% elif data.repo == 'dataverse' or data.repo == 'datastation' %}
+<p>These are the metadata fields for <b>{{data.repo}}</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
+        <label for="Title">Title (required)</label>
         <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the title for your project.
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
+        <label for="Author">Author (required)</label>
         <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the author for your project.
@@ -104,17 +105,21 @@
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Affiliation">Affiliation (optional)</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
         <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
         <div class="invalid-feedback">
             Please fill out the affiliation for your project.
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Subject">Subject</label>
-        <input type="text" class="form-control" name="subject" value="{{data.metadata.subject}}" placeholder="Subject of the project" disabled>
-        <small>Please select the subject for your project in the Dataverse portal. As default it will be set to: 'Other'.</small>
+        <label for="Subject">Subject (required)</label>
+         <select class="form-select" name="subject" required {% if disabled %} disabled {% endif %}>
+            <option value="{{data.metadata.subject}}">{{data.metadata.subject}}</option>
+            {% for subject in dataverse_subjects %}
+            <option value="{{subject}}">{{subject}}</option>
+            {% endfor %}
+         </select>
         <div class="invalid-feedback">
             Please fill out the subject for your project.
         </div>
@@ -122,7 +127,7 @@
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
+        <label for="Description">Description (required)</label>
         <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
             Please fill out the description for your project.
@@ -132,14 +137,14 @@
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Contact name">Contact name</label>
+        <label for="Contact name">Contact name (required)</label>
         <input type="text" class="form-control" name="contact_name" value="{{data.metadata.contact_name}}" placeholder="Name of the contact person of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the name of the contact person for your project.
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Contact email">Contact email</label>
+        <label for="Contact email">Contact email (required)</label>
         <input type="email" class="form-control" name="contact_email" value="{{data.metadata.contact_email}}" placeholder="Email of the contact person of the project" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
             Please fill out the email of the contact person for your project.
@@ -147,8 +152,79 @@
     </div>
 </div>
 
+<!-- DANS Relation -->
+{% if data.repo == 'datastation' %}
+<h3>Rights Metadata</h3>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Rights holder name">Rights holder (required)</label>
+        <input type="text" class="form-control" name="dansRights_holder" value="{{data.metadata.dansRights_holder}}" placeholder="Name of the rights holder of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the name of the rights holder for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Language">Language (required)</label>
+         <select class="form-select" name="dansRights_language" required {% if disabled %} disabled {% endif %}>
+            <option value="{{data.metadata.dansRights_language}}">{{data.metadata.dansRights_language}}</option>
+            {% for language in dansRights_languages %}
+            <option value="{{language}}">{{language}}</option>
+            {% endfor %}
+         </select>
+        <div class="invalid-feedback">
+            Please fill out the metadata language for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="PersonalData">Personal data present? (required)</label>
+         <select class="form-select" name="dansRights_personal" required {% if disabled %} disabled {% endif %}>
+            <option value="{{data.metadata.dansRights_personal}}">{{data.metadata.dansRights_personal}}</option>
+            {% for personal in dansRights_personal_data %}
+            <option value="{{personal}}">{{personal}}</option>
+            {% endfor %}
+         </select>
+        <div class="invalid-feedback">
+            Please fill out the personal data present setting for your project.
+        </div>
+    </div>
+</div>
+{% endif %}
+<!-- END DANS Relation -->
+
+<!-- DANS Audience -->
+{% if data.repo == 'datastation' %}
+    {% if disabled and data.metadata.dans_audience_uri %}
+    <div class="row">
+        <h3>Relation Metadata</h3>
+        <div class="form-group col-6 mt-3 mb-3">
+            <label for="Audience">You selected the following audience</label>
+                <a href="{{ data.metadata.dans_audience_uri }}" target="_new">{{ data.metadata.dans_audience_uri }}</a>
+        </div>   
+    </div>
+    {% else %}
+    <div class="row">
+        <h3>Relation Metadata</h3>
+        <div class="form-group col-6 mt-3 mb-3">
+            <label for="Lookup-audience">Lookup Audience (required)</label>
+            <select class="form-select" name="dans_audience_uri" required>
+                {% for r in dansRelationMetadata_audiences %}
+                <option value={{r.uri}}>{{ r.prefLabel }}</option>
+                {% endfor %}
+            </select>
+            <div class="invalid-feedback">
+                Please select the audience for your project.
+            </div>
+        </div>
+    </div>
+        
+    {% endif %}
+{% endif %}
+<!-- END DANS Audience -->
 
 {% elif data.repo == 'osf' %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
 <p>These are customized <b>required</b> metadata fields for <b>Osf</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
@@ -221,6 +297,7 @@
 </div>
 
 {% elif data.repo == 'zenodo' %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
 <p>These are customized <b>required</b> metadata fields for <b>Zenodo</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
@@ -305,7 +382,79 @@
     </div>
 </div>
 
+{% elif data.repo == 'data4tu' %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
+<p>These are customized <b>required</b> metadata fields for <b>4TU.ResearchData</b>.</p>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Title">Title</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the title for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Author">Author</label>
+        <input type="text" class="form-control" name="author" value="" placeholder="Author of the project" disabled>
+        <small>Please fill out the author for your project in the 4TU.ResearchData portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the author for your project.
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Affiliation">Affiliation</label>
+        <input type="text" class="form-control" name="affiliation" value="" placeholder="Affiliation of the project" disabled>
+        <small>Please fill out the affiliation for your project in the 4TU.ResearchData portal.</small>
+        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <div class="invalid-feedback">
+            Please fill out the affiliation for your project.
+        </div>
+    </div>   
+</div>
+<div class="row">
+    <div class="form-group col-12 mt-3 mb-3">
+        <label for="Description">Description</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <div class="invalid-feedback">
+            Please fill out the description for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Tags">Tags</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" disabled>
+        <small>Please fill out the tags for your project in the 4TU.ResearchData portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the tags for your project.
+        </div>
+    </div>
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Categories">Categories</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled>
+        <small>Please fill out the categories for your project in the 4TU.ResearchData portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the categories for your project.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <label for="Licence">Licence</label>
+        <input type="text" class="form-control" name="licence" value="{{data.metadata.licence}}" placeholder="Licence of the project" disabled>
+        <small>Please fill out the licence for your project in the 4TU.ResearchData portal.</small>
+        <div class="invalid-feedback">
+            Please fill out the licence for your project.
+        </div>
+    </div>
+</div>
+
 {% elif data.repo == 'figshare' %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
 <p>These are customized <b>required</b> metadata fields for <b>Figshare</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
@@ -377,6 +526,7 @@
 
 
 {% elif data.repo == 'sharekit' %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
 <p>These are basic metadata fields for <b>Sharekit</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
@@ -397,7 +547,21 @@
     </div>
 </div>
 
+{% elif data.repo == 'surfs3' %}
+<div class="row">
+    <div class="form-group col-6 mt-3 mb-3">
+        <h3>S3 Archive</h3>
+        <p>Fill out the information for the S3 archive.</p>
+        <label for="s3archivename">S3 Archive Name</label>
+        <input type="text" class="form-control" name="s3archivename" value="{{data.metadata.s3archivename}}" placeholder="Name of the S3 archive name" required {% if disabled %} disabled {% endif %}>
+        <div class="invalid-feedback">
+            Please fill out the name for your archive.
+        </div>
+    </div>
+</div>
+
 {% else %}
+<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
 <p>These are general fields. Fields specificly for <b>{{data.repo}}</b> still need to be implemented. Most of below fields will still work. So go ahead and fill some out.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
@@ -443,9 +607,3 @@
     </div>
 </div>
 {% endif %}
-
-{% block script %}
-    <script>
-        form_validate();
-    </script>
-{% endblock %}

@@ -2,7 +2,7 @@
 
 {% from "macros.html" import load_async with context %}
 
-{% block title %}Download{% endblock %}
+{% block title %}Import{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -20,7 +20,7 @@
                     {% if message=='Data folder already exists on your drive. Please check the box if you want to use this folder.' %}
                         {% if vars.update({'folder_exists_message': True}) %} {% endif%}
                     {% endif %}
-                    {% if message=='Data has already been downloaded from this url. Please check the box if you want to download again from this url.' %}
+                    {% if message=='Data has already been imported from this url. Please check the box if you want to import again from this url.' %}
                         {% if vars.update({'url_exists_message': True}) %} {% endif%}
                     {% endif %}
                 {% endfor %}
@@ -31,12 +31,16 @@
 <!-- END BEGIN HELPER LOGIC ### -->
 
 {% if not preview %}
-<h1>Download</h1>
-<p>Download data from your connected repositories to your Research Drive.</p>
+{% if data.query_status==None or data.query_status=='ready' and data.process==None%}
+<h1>Import</h1>
+{% else %}
+<h1>Processing import</h1>
+{% endif %}
+<p>Project name: <b>{{ data.projectname }}</b></p>
 {% endif %}
 
 {% if data.connected==True %}
-{% if data.query_status==None or data.query_status=='ready' %}
+{% if data.query_status==None or data.query_status=='ready' and data.process==None %}
 <form method="post" action="/download" class="needs-validation mt-3 mb-3" novalidate>
     <div {% if preview %} hidden {% endif %}>
         <!-- async loading repo selection -->
@@ -46,9 +50,9 @@
         <div class="form-group mt-3 mb-3">
             <label for="Url">Url: </label>
             <input type="url" pattern="https://.*" class="form-control" name="url" value="{{data.url}}"
-                placeholder="A private or preview url" required>
+                placeholder="A preview url" required>
             <div class="invalid-feedback">
-                Please fill out a preview url to a private research dataset.
+                Please fill out a preview url to a research dataset.
             </div>
         </div>
 
@@ -57,13 +61,13 @@
             <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {%
                 endif %} id="flexCheckUrl" name="accept_url_in_history" required>
             <label class="form-check-label" for="flexCheckUrl">
-                Check this to retrieve even if this url is in your history of downloads.
+                Check this to retrieve even if this url is in your history of imports.
             </label>
         </div>
         {% endif %}
         <div class="form-group mt-3 mb-3">
-            <label for="Folder">Data Folder Path: </label>
 
+            <h2>Import Data Folder Path</h2>
             <!-- async loading folder paths -->
             {{ load_async("folderpaths", "/folder-paths", 55000) }}
             <!-- end async -->
@@ -94,13 +98,14 @@
 
     <!-- ### BEGIN PREVIEW BUTTON -->
     <input type="text" name="preview" value="true" hidden>
-    <button type="submit" class="btn btn-secondary">Preview Download</button>
+    <button type="submit" class="btn btn-secondary">Preview Import</button>
     <!-- ### END PREVIEW BUTTON -->
 
     {% else %}
 
     <!-- ### BEGIN PREVIEW ### -->
-    <h1>Download - Preview</h1>
+    <h1>Import - Preview</h1>
+    <p>Project name: <b>{{ data.projectname }}</b></p>
 
     <!-- async loading check connection -->
     {% set checkconnectionurl = '/check-connection/' + data.repo %}
@@ -121,9 +126,19 @@
 
     <!-- Needs specific implementation for the private repo choosen-->
 
+    {% if data.repo == 'datahugger' %}
+
+    <!-- async loading metadata -->
+    {{ load_async("doi_metadata", "/doi-metadata") }}
+    <!-- end async -->
+
+    {% else %}
+
     <!-- async loading metadata -->
     {{ load_async("private_metadata", "/private-metadata") }}
     <!-- end async -->
+
+    {% endif %}
 
     <!-- async loading repocontent -->
     {{ load_async("repocontent", "/repocontent") }}
@@ -136,7 +151,7 @@
 
 {% else %}
 
-<form action="/cancel_download" method="post">
+<form id="cancel_process" action="/cancel_download" method="post">
     <input type="text" name="cancel" value="true" hidden>
     <input type="text" name="preview" value={{preview}} hidden>
     <input type="text" name="check_accept_folder_first" value={{check_accept_folder_first}} hidden>

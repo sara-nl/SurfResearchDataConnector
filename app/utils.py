@@ -15,6 +15,7 @@ import json
 import time
 import glob
 import datetime
+import string
 from rocrate.rocrate import ROCrate
 from rocrate.model.person import Person
 from rocrate.model.dataset import Dataset
@@ -54,6 +55,11 @@ canceled = {}
 global summary
 summary = {}
 
+global query_projectname
+query_projectname = {}
+
+global query_project_id
+query_project_id = {}
 
 def make_connection(username=None, password=None):
     """This function  will test if the username and password
@@ -71,18 +77,19 @@ def make_connection(username=None, password=None):
         return True
     except Exception as e:
         if cloud_service.lower() == 'nextcloud':
-            if session['password'] == None or session['password'] == "" or session['password'] == session['access_token']:
-                data = refresh_cloud_token(session['cloud_token'])
-                if data:
-                    session['cloud_token'] = data
-                    new_token = session['password'] = session['access_token'] = data['access_token']
-                    session['refresh_token'] = data['refresh_token']
-                    try:
-                        r = cloud.login(username, new_token)
-                        return True
-                    except Exception as ee:
-                        logger.error(ee, exc_info=True)
-                        return False                        
+            if 'password' in session and 'access_token' in session and 'cloud_token' in session:
+                if session['password'] == None or session['password'] == "" or session['password'] == session['access_token']:
+                    data = refresh_cloud_token(session['cloud_token'])
+                    if data:
+                        session['cloud_token'] = data
+                        new_token = session['password'] = session['access_token'] = data['access_token']
+                        session['refresh_token'] = data['refresh_token']
+                        try:
+                            r = cloud.login(username, new_token)
+                            return True
+                        except Exception as ee:
+                            logger.error(ee, exc_info=True)
+                            return False                        
         logger.error(e, exc_info=True)
         return False
 
@@ -265,6 +272,78 @@ def set_query_status(username, folder, url, status):
         logger.error(e, exc_info=True)
 
 
+def set_projectname(username, folder, url, projectname):
+    """will set the projectname
+
+    Args:
+        username (str): username of the OC account
+        folder (str): the folder path of the retrieval
+        url (str): the url of the retrieval
+        projectname (str): the new projectname
+    """
+    try:
+        query_projectname[(username, folder, url)] = projectname
+    except Exception as e:
+        logger.error("failed to set the projectname")
+        logger.error(e, exc_info=True)
+
+
+def get_projectname(username, folder, url):
+    """will get the current projectname
+
+    Args:
+        username (str): username of the OC account
+        folder (str): the folder path of the retrieval
+        url (str): the url of the retrieval
+
+    Returns:
+        str: the current projectname
+    """
+    try:
+        return query_projectname[(username, folder, url)]
+    except Exception as e:
+        logger.error("failed to get the projectname")
+        logger.error((username, folder, url))
+        logger.error(query_projectname)
+        logger.error(e, exc_info=True)
+        return None
+
+
+def set_project_id(username, folder, url, project_id):
+    """will set the project_id
+
+    Args:
+        username (str): username of the OC account
+        folder (str): the folder path of the retrieval
+        url (str): the url of the retrieval
+        project_id (str): the new project_id
+    """
+    try:
+        query_project_id[(username, folder, url)] = project_id
+    except Exception as e:
+        logger.error("failed to set the project_id")
+        logger.error(e, exc_info=True)
+
+
+def get_project_id(username, folder, url):
+    """will get the current project_id
+
+    Args:
+        username (str): username of the OC account
+        folder (str): the folder path of the retrieval
+        url (str): the url of the retrieval
+
+    Returns:
+        str: the current project_id
+    """
+    try:
+        return query_project_id[(username, folder, url)]
+    except:
+        return None
+
+
+
+
 def total_files_count(folder):
     """calculate the total files count for a folder
 
@@ -345,10 +424,10 @@ def push_data(username, password, folder, url):
                                 message = f"uploaded file {n} of {totalfilescount}: {filepath}"
                             else:
                                 logger.error(e)
-                                message = f"failed to upload file {filepath} - {e}"                               
+                                message = f"failed to upload file {n} of {totalfilescount}: {filepath} - {e}"                               
                         except Exception as ee:
                             logger.error(ee)
-                            message = f"failed to upload file {filepath} - {ee}"
+                            message = f"failed to upload file {n} of {totalfilescount}: {filepath} - {ee}"
                     update_history(username, folder, url, message)
                     n += 1
         
@@ -507,6 +586,7 @@ def update_history(username, folder, url, status):
         folder (str): folder path of the data
         url (str): url of the location of the data
         status (str): status of the data import
+        projectname (str): name of the project
     """
     try:
         logger.info(f"update_history: {status}")
@@ -531,11 +611,14 @@ def update_history(username, folder, url, status):
         # status can be up to 128 chars long
         status = status[:128]
         
+        projectname = get_projectname(username, folder, url)
+
         with app.app_context():
             history = History(username=username,
                             folder=folder,
                             url=url,
-                            status=status)
+                            status=status,
+                            projectname=projectname)
             db.session.add(history)
             db.session.commit()
         
@@ -559,7 +642,8 @@ def update_history(username, folder, url, status):
                 history = History(username=username,
                                 folder=folder,
                                 url=url,
-                                status=final_message)
+                                status=final_message,
+                                projectname=projectname)
                 db.session.add(history)
                 db.session.commit() 
 
@@ -1235,6 +1319,20 @@ def get_webdav_token_nc(poll_endpoint):
     except Exception as e:
         logger.error(e, exc_info=True)
 
+@lru_cache(maxsize=1)
+def get_dans_audiences():
+    results = []
+    for i in list(string.ascii_lowercase):
+        url = f'https://demo.vocabs.datastations.nl/rest/v1/search?unique=true&maxhits=2000&vocab=NARCIS&parent=&lang=en&&query=*{i}*'
+        response = requests.get(url)
+        for item in response.json()['results']:
+            if item not in results:
+                results.append(item)
+    return results
+
+@lru_cache(maxsize=1)
+def memoize(f):
+    return f
 
 
 if __name__ == "__main__":
@@ -1249,8 +1347,9 @@ if __name__ == "__main__":
     # result = get_webdav_token_nc(poll_endpoint)
 
     # print(result)
-    user_id = ""
-    password = ""
-    token = ""
-    print(get_user_info(username=user_id, password=password))
-    print(get_user_info_by_token(token))
+    # user_id = ""
+    # password = ""
+    # token = ""
+    # print(get_user_info(username=user_id, password=password))
+    # print(get_user_info_by_token(token))
+    print(get_dans_audiences())

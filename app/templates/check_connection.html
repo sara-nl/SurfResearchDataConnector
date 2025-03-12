@@ -2,8 +2,11 @@
 <img src="{{ url_for('static', filename = imgfilepath) }}" alt="{{data.repo}}"/>
 
 {% if connection_ok %}
-<p>{{data.repo | upper}}: connection OK</p>
-
+    {% if data.repo == 'data4tu' %}
+    <p>4TU.ResearchData: connection OK</p>
+    {% else %}
+    <p>{{data.repo | upper}}: connection OK</p>
+    {% endif %}
 {% else %}
 
 <p style='color: red;'>{{data.repo | upper}}: connection NOT OK</p>

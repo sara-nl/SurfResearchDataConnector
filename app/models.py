@@ -76,6 +76,7 @@ class History(db.Model):
     """
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(128))
+    projectname = db.Column(db.String(128))
     folder = db.Column(db.String(128))
     url = db.Column(db.String(128))
     status = db.Column(db.String(128))

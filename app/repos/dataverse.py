@@ -51,15 +51,24 @@ def _rate_limit(func=None, per_second=1):
 
 class Dataverse(object):
 
-    def __init__(self, api_key, api_address=None, dataverse_alias=None, *args, **kwargs):
+    def __init__(self, api_key, api_address=None, dataverse_alias=None, datastation=None, *args, **kwargs):
         self.dataverse_api_address = api_address
-        if api_address is None:
+        if api_address is None and datastation is None:
             self.dataverse_api_address = os.getenv(
                 "DATAVERSE_API_ADDRESS", "https://demo.dataverse.nl/api"
             )
-
+        if api_address is None and datastation is not None:
+            self.dataverse_api_address = os.getenv(
+                "DATASTATION_API_ADDRESS", "https://demo.ssh.dataverse.nl/api"
+            )
+        if datastation is None:
+            self.dataverse_parent_dataverse = dataverse_parent_dataverse
+        else:
+            self.dataverse_parent_dataverse = datastation_parent_dataverse
+        
         self.api_key = api_key
         self.dataverse_alias = dataverse_alias
+        self.datastation = datastation
 
         # monkeypatching all functions with internals
         self.get_dataset = self.get_dataset_internal
@@ -81,9 +90,11 @@ class Dataverse(object):
             if dataverse_create_user_dataverse.lower() == "ok":
                 user_dataverse = self.get_user_dataverse()
             response = self.create_new_dataset(return_response=True)
+            log.error("check_token")
+            log.error(response)
             persistent_id = response.json()['data']['persistentId']
             r = self.get_dataset(persistent_id=persistent_id, return_response=True)
-            log.debug(f"Check Token: Status Code: {r.status_code}")
+            log.error(f"Check Token: Status Code: {r.status_code}")
             # cleanup
             self.remove_dataset(persistent_id)
             return r.status_code == 200
@@ -186,7 +197,48 @@ class Dataverse(object):
                         }
                     }
                 }
-        log.debug(f"set_metadata out: {metadata}")
+            if self.datastation:
+                metadata['metadataBlocks']['dansRights'] = {
+                        "displayName": "Rights Metadata",
+                        "name": "dansRights",
+                        "fields": [
+                            {
+                                "typeName": "dansRightsHolder",
+                                "multiple": True,
+                                "typeClass": "primitive",
+                                "value": [
+                                    "Not set"
+                                ]
+                            },
+                            {
+                                "typeName": "dansPersonalDataPresent",
+                                "multiple": False,
+                                "typeClass": "controlledVocabulary",
+                                "value": "Unknown"
+                            },
+                            {
+                                "typeName": "dansMetadataLanguage",
+                                "multiple": True,
+                                "typeClass": "controlledVocabulary",
+                                "value": [
+                                    "Not applicable"
+                                ]
+                            }
+                        ]
+                    }
+                metadata['metadataBlocks']['dansRelationMetadata'] = {
+                        "displayName": "Relation Metadata",
+                        "name": "dansRelationMetadata",
+                        "fields": [
+                            {
+                                "typeName": "dansAudience",
+                                "multiple": True,
+                                "typeClass": "primitive",
+                                "value": ["https://www.narcis.nl/classification/E14000"]
+                            }
+                        ]
+                    }
+            log.debug(f"set_metadata out: {metadata}")
         return metadata
 
 
@@ -197,6 +249,11 @@ class Dataverse(object):
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
+
         req = requests.request("GET", url, headers=headers)
         if req.status_code == 200:
             if req.json()['status'] == 'OK':
@@ -209,10 +266,15 @@ class Dataverse(object):
     def get_sub_dataverses(self, root_dataverse=dataverse_parent_dataverse):
         subdataverses = []
         url = f"{self.dataverse_api_address}/dataverses/{root_dataverse}/contents"
+        
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
         rr = requests.request("GET", url, headers=headers)
         if rr.status_code == 200:
             if rr.json()['status'] == 'OK':
@@ -225,6 +287,10 @@ class Dataverse(object):
                                 'X-Dataverse-key': self.api_key,
                                 'Content-Type': 'application/json'
                             }
+
+                            if datastation_basicauth_token:
+                                headers['X-Authorization'] = datastation_basicauth_token
+
                             req = requests.request("GET", url, headers=headers)
                             item['alias'] = req.json()['data']['alias']
                             subdataverses.append(item)
@@ -245,17 +311,22 @@ class Dataverse(object):
         """
         
         if dataverse_create_user_dataverse.lower() != "ok":
-            return #dataverse_parent_dataverse
+            return #self.dataverse_parent_dataverse
 
         # parent dataverse at demo.dataverse.nl is "surf"
-        parent_dataverse = dataverse_parent_dataverse
+        parent_dataverse = self.dataverse_parent_dataverse
 
         # get user and email
         url = f"{self.dataverse_api_address}/users/:me"
+
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
         try:
             rr = requests.request("GET", url, headers=headers).json()['data']
             
@@ -277,10 +348,15 @@ class Dataverse(object):
                 "description": "This dataverse has been created as part of the automated transfer of data from Surf Research Drive",
                 "dataverseType": "UNCATEGORIZED"
                 }
+
             headers = {
                 'X-Dataverse-key': self.api_key,
                 'Content-Type': 'application/json'
             }
+
+            if datastation_basicauth_token:
+                headers['X-Authorization'] = datastation_basicauth_token
+
             url = f"{self.dataverse_api_address}/dataverses/{parent_dataverse}"
             payload = json.dumps(dataverse)
             r = requests.request("POST", url, headers=headers, data=payload)
@@ -305,6 +381,9 @@ class Dataverse(object):
             'Content-Type': 'application/json'
         }
         
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
         url = f"{self.dataverse_api_address}/datasets/{id}/"
         
         r = requests.request("GET", url, headers=headers)
@@ -326,12 +405,15 @@ class Dataverse(object):
             'Content-Type': 'application/json'
         }
         
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
         if dataverse_create_user_dataverse.lower() == "ok":
             dataverse_alias = self.get_user_dataverse()
         elif self.dataverse_alias:
             dataverse_alias = self.dataverse_alias
         else:
-            dataverse_alias = dataverse_parent_dataverse
+            dataverse_alias = self.dataverse_parent_dataverse
 
         url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/contents"
         r = requests.request("GET", url, headers=headers)
@@ -358,7 +440,7 @@ class Dataverse(object):
             json: : API response if return_response is set to True
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
 
         try:
             headers = {
@@ -366,20 +448,22 @@ class Dataverse(object):
                 'Content-Type': 'application/json'
             }
 
-            if persistent_id is not None:
-                url = f"{self.dataverse_api_address}/datasets/:persistentId/?persistentId={persistent_id}"
-            else:
+            if datastation_basicauth_token:
+                headers['X-Authorization'] = datastation_basicauth_token
 
+            if persistent_id is not None:
+                url = f"{self.dataverse_api_address}/datasets/:persistentId"
+                params = {"persistentId" : persistent_id}
+                r = requests.get(url, params=params, headers=headers)
+            else:
                 if dataverse_create_user_dataverse.lower() == "ok":
                     dataverse_alias = self.get_user_dataverse()
                 elif self.dataverse_alias:
                     dataverse_alias = self.dataverse_alias
                 else:
-                    dataverse_alias = dataverse_parent_dataverse
-                    
+                    dataverse_alias = self.dataverse_parent_dataverse
                 url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/contents"
-
-            r = requests.request("GET", url, headers=headers)
+                r = requests.get(url, headers=headers)
             if return_response:
                 return r
             if r.status_code >= 300:
@@ -390,7 +474,7 @@ class Dataverse(object):
     
         except Exception as e:
             log.error(
-                f"Exception at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+                f"Exception at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
             log.error(str(e))
 
 
@@ -415,24 +499,34 @@ class Dataverse(object):
             'Content-Type': 'application/json'
         }
 
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
+        log.error(headers)
+
         # Create a dataset as part of the parent dataverse
         if dataverse_create_user_dataverse.lower() == "ok":
             dataverse_alias = self.get_user_dataverse()
         elif self.dataverse_alias:
             dataverse_alias = self.dataverse_alias
         else:
-            dataverse_alias = dataverse_parent_dataverse
+            dataverse_alias = self.dataverse_parent_dataverse
 
         url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/datasets"
         
+        log.error(url)
+
         # use metadata here to set values of below variables els:
         
         metadata = self.set_metadata(metadata)
         metadata = { 'datasetVersion': metadata }
         payload = json.dumps(metadata)
+
+        log.error(payload)
+
         r = requests.request("POST", url, headers=headers, data=payload)
 
-        log.debug(
+        log.error(
             f"Create new datasets: Status Code: {r.json()}")
 
         return r.json() if not return_response else r
@@ -448,11 +542,15 @@ class Dataverse(object):
             json: API response if return_response is set to True
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+        
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
 
         url = f"{self.dataverse_api_address}/datasets/:persistentId/?persistentId={persistent_id}"
         r = requests.request("DELETE", url, headers=headers)
@@ -474,7 +572,7 @@ class Dataverse(object):
             bool: Alternative: json if return_response=True
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
                
         try:
             file_content = open(path_to_file, 'rb')
@@ -492,9 +590,13 @@ class Dataverse(object):
 
             url_persistent_id = f"{self.dataverse_api_address}/datasets/:persistentId/add?persistentId={persistent_id}&key={self.api_key}"
 
+
+            headers = {}
+            if datastation_basicauth_token:
+                headers['X-Authorization'] = datastation_basicauth_token
+
             response = requests.post(
-                url_persistent_id, data=payload, files=files)
-            
+                url_persistent_id, headers=headers, data=payload, files=files)
             if return_response:
                 return response           
 
@@ -507,7 +609,7 @@ class Dataverse(object):
             
         except Exception as e:
             log.error(
-                f"Exception at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+                f"Exception at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
             log.error(str(e))
             return str(e)
 
@@ -547,7 +649,7 @@ class Dataverse(object):
         ```
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
 
         response = self.get_dataset(
             persistent_id=persistent_id, return_response=True)
@@ -571,12 +673,15 @@ class Dataverse(object):
             object: response of the PUT request to the datasets endpoint
         """
         log.debug(
-            f"### Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"### Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
 
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
 
         url = f"{self.dataverse_api_address}/datasets/:persistentId/versions/:draft?persistentId={persistent_id}"
 
@@ -605,11 +710,15 @@ class Dataverse(object):
             object: response of the POST request to the datasets publish endpoint
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+        
         headers = {
             'X-Dataverse-key': self.api_key,
             'Content-Type': 'application/json'
         }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
 
         url = f"{self.dataverse_api_address}/datasets/:persistentId/actions/:publish?persistentId={persistent_id}&type=major"
 
@@ -627,7 +736,7 @@ class Dataverse(object):
             bool: True if successful, False if not
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
         for file in self.get_files_from_dataset(persistent_id):
             log.debug(f"found file: {file}")
 
@@ -648,7 +757,7 @@ class Dataverse(object):
             bool: True if successful, False if not
         """
         log.debug(
-            f"Entering at lib/upload_dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
+            f"Entering at repos/dataverse.py {inspect.getframeinfo(inspect.currentframe()).function}")
         log.debug("Deletion of dataset files is not supported by the Dataverse API")
 
         return False
@@ -762,10 +871,15 @@ class Dataverse(object):
                     file_path = os.path.join(dest_folder, filename)
                 file_id = item['link']
                 url = f'{self.dataverse_api_address}/access/datafile/{file_id}?persistentId={persistent_id}'
+                
                 headers = {
                     'X-Dataverse-key': self.api_key,
                     'Content-Type': 'application/json'
                 }
+
+                if datastation_basicauth_token:
+                    headers['X-Authorization'] = datastation_basicauth_token
+
                 r = requests.get(url,
                                 headers=headers,
                                 stream=True)
@@ -782,6 +896,11 @@ class Dataverse(object):
             return True
         except Exception as e:
             return str(e)
+
+
+class DansDatastation(Dataverse):
+    pass
+
 
 if __name__ == "__main__":
     """Below code will test the code that interfaces the uploads to dataverse

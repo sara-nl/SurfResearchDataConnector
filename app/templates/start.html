@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+
+{% if  not data['homestart'] %}
+
+    <!-- BEGIN Get started -->
+    <h1>Get started with a project</h1>
+    Get started in three easy steps:
+    </p>
+    <ol>
+        {% if not data.connected %}
+        <li><a href="/connect">Connect</a> to your research drive.</li>
+        {% else %}
+        <li>Connect to your research drive: You are already connected as <b>{{ data.username }}</b>.</li>
+        {% endif %}
+        <li><a href="/connect">Connect</a> to one or more repositories.</li>
+        <li>Set a name for your project and start an <b>Export</b> or <b>Import</b>.</li>
+    </ol>
+
+    <!-- ### BEGIN START BUTTON -->
+    <form method="post" action="/start" class="needs-validation mt-3 mb-3" novalidate >
+        <input type="text" name="homestart" value="true" hidden>
+        <button type="submit" class="btn btn-secondary">Start</button>
+    </form>
+    <!-- ### END START BUTTON -->
+
+    <!-- END WELCOME -->
+
+{% else %}
+
+        {% if data.process == None or 'process' not in data %}
+            <h1>Project</h1>
+            {% if 'projectname' not in data or data.projectname == None %}
+            <div>First set a name for your project.</div>
+            <form method="post" class="needs-validation mt-3 mb-3" action="/start">
+                <div class=" col-3 form-group mt-3 mb-3">
+                    <input type="text" name="projectname" value="{{data.projectname}}" class="form-control" required>
+                </div>
+                <div>Select if you want to start an <b>Import</b> or an <b>Export</b>.</div>
+                <div class=" col-3 form-group mt-3 mb-3">
+                    <select class="form-select" name="importexport" id="importexport" required>
+                        <option value="startimport">Import</option>
+                        <option value="startexport">Export</option>
+                    </select>
+                </div>
+                <div class="form-group mt-3 mb-3">
+                    <button type="submit" class="btn btn-secondary">Start</button>
+                </div>
+            </form>
+            {% else %}
+            <div>You have set the following project name: <b>{{data.projectname}}</b>.</div>
+            <form method="post" class="mt-3 mb-3" action="/start">
+                <div class=" col-3 form-group mt-3 mb-3">
+                    <input type="text" name="clearprojectname" value="" class="form-control" hidden>
+                </div>
+                <div class="form-group mt-3 mb-3">
+                    <button type="submit" class="btn btn-secondary">Clear project name</button>
+                </div>
+            </form>
+            {% endif %}
+
+            {% if 'projectname' in data %}
+            <form method="post" class="needs-validation mt-3 mb-3" action="/start">
+                <div class=" col-3 form-group mt-3 mb-3">
+                    <input type="text" name="projectname" value="{{data.projectname}}" class="form-control" required hidden>
+                </div>
+                <div>Select if you want to start an <b>Import</b> or an <b>Export</b>.</div>
+                <div class=" col-3 form-group mt-3 mb-3">
+                    <select class="form-select" name="importexport" id="importexport" required>
+                        <option value="startimport">Import</option>
+                        <option value="startexport">Export</option>
+                    </select>
+                </div>
+                <div class="form-group mt-3 mb-3">
+                    <button type="submit" class="btn btn-secondary">Start</button>
+                </div>
+            </form>
+            {% endif %}
+            {% if  data['homestart'] %}
+                <small><a href="/start?homeshow=true" type="submit" >How to get started</a></small>
+            {% endif %}
+
+        {% endif %}
+
+    {%if data.process == 'import' %}
+        <h1>Processing import</h1>
+        <p>Project name: <b>{{ data.projectname }}</b></p>
+        <p>There is an import process running.</p>
+        <a href="/download"><button class="btn btn-secondary">Check import status</button></a>
+        <script>
+            window.location.href = "/download";
+        </script>
+    {% endif %}
+
+    {%if data.process == 'export' %}
+        <h1>Processing export</h1>
+        <p>Project name: <b>{{ data.projectname }}</b></p>
+        <p>There is an export process running.</p>
+        <a href="/upload"><button class="btn btn-secondary">Check export status</button></a>
+        <script>
+            window.location.href = "/upload";
+        </script>
+    {% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block script %}
+<script>
+    form_validate();
+</script>
+{% endblock %}

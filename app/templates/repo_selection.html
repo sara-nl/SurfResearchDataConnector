@@ -2,7 +2,7 @@
 
 <!-- NOTE: only show inputes for repos that are configured for making connections. Grey out the once that the user has not yet connected to. -->
 <div class="form-group mt-3 mb-3">
-    <p>Select a repository:</p>
+    <h2>Repository</h2>
     {% for service in registered_services %}
     {% if service not in data.temp_hidden_services %}
     {% if service != 'owncloud' %}
@@ -12,16 +12,37 @@
     <div class="form-check form-check-inline mt-3 mb-3 col-3">
         <input class="form-check-input" type="radio" name="selected_repo" id="radio-{{service}}" value="{{service}}"
             {% if service == data.repo %} checked {% endif %}
-            {% if access_token_name not in data %}disabled{% endif %} required >
+            {% if access_token_name not in data and service!="datahugger" %}disabled{% endif %} required >
         <label for="radio-{{service}}"><img src="{{ url_for('static', filename = imgfilepath) }}"
-                alt="{{service}}" {% if access_token_name not in data %}style="-webkit-filter: grayscale(100%); filter: grayscale(100%); opacity: 0.4;"{% endif %}></label>
+                alt="{{service}}" {% if access_token_name not in data and service!="datahugger" %}style="-webkit-filter: grayscale(100%); filter: grayscale(100%); opacity: 0.4;"{% endif %}></label>
         {% set service_description = service+'_description' %}
         {% set service_website = service+'_website' %}
-        <p><small>{{ all_vars[service_description] }}</small></p>
-        {% if access_token_name in data %}
-        <p><small><a href="{{ all_vars[service_website] }}" target="_blank" >Go to {{ service }}</a></small></p>
+        
+        {% if service == 'datahugger' %}
+        <p><small>Import open data with Datahugger</small></p>
         {% else %}
-        <p><small><a href="/connect">Connect to {{ service }}</a></small></p>
+        <p><small>{{ all_vars[service_description] }}</small></p>
+        {% endif %}
+        
+        {% if access_token_name in data %}
+
+        {% if service == 'data4tu' %}
+        <p><small><a href="{{ all_vars[service_website] }}" target="_blank" >Go to 4TU.ResearchData</a></small></p>
+        {% else %}
+        <p><small><a href="{{ all_vars[service_website] }}" target="_blank" >Go to {{ service }}</a></small></p>
+        {% endif %}
+
+        
+        {% else %}
+            {% if service == 'datahugger' %}
+            <p><small>Uses the <a href="https://j535d165.github.io/datahugger/" target="_blank">Datahugger project</a></small></p>
+            {% else %}
+                {% if service == 'data4tu' %}
+                <p><small>Go to <a href="/connect">your connections</a> to connect to 4TU.ResearchData</small></p>
+                {% else %}
+                <p><small>Go to <a href="/connect">your connections</a> to connect to {{ service }}</small></p>
+                {% endif %}
+            {% endif %}
         {% endif %}
     </div>
     {% endif %}
@@ -40,27 +61,50 @@
     // This will load the correct metadata fields when the user changes the repo.
 $('input[type=radio][name=selected_repo]').change(function() {
     if (this.value == 'figshare') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=figshare");
         $("#show_dataverses").empty();
     }
+    else if (this.value == 'data4tu') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
+        $("#show_meta").load("/metadata?repo=data4tu");
+        $("#show_dataverses").empty();
+    }
     else if (this.value == 'zenodo') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=zenodo");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'osf') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=osf");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'dataverse') {
-        $("#show_dataverses").load("/dataverses"); 
+        $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+        $("#show_dataverses").load("/dataverses");
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=dataverse");
     }
+    else if (this.value == 'datastation') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
+        $("#show_meta").load("/metadata?repo=datastation");
+        $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+        $("#show_dataverses").load("/dataverses?datastation=true"); 
+    }
     else if (this.value == 'irods') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=irods");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'sharekit') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=sharekit");
+        $("#show_dataverses").empty();
+    }
+    else if (this.value == 'surfs3') {
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
+        $("#show_meta").load("/metadata?repo=surfs3");
         $("#show_dataverses").empty();
     }
 
@@ -70,6 +114,7 @@ $('input[type=radio][name=selected_repo]').change(function() {
     {% if service == data.repo %}
     <script>
         $('input[type=radio][name=selected_repo][value={{service}}]').attr('checked',true);
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo={{service}}");
     </script>
     {% endif %}
@@ -77,6 +122,14 @@ $('input[type=radio][name=selected_repo]').change(function() {
 
 {% if data.repo == 'dataverse' %}
 <script>
+    $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
     $("#show_dataverses").load("/dataverses"); 
+</script>
+{% endif %}
+
+{% if data.repo == 'datastation' %}
+<script>
+    $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+    $("#show_dataverses").load("/dataverses?datastation=true"); 
 </script>
 {% endif %}

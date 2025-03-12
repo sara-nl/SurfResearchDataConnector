@@ -12,8 +12,6 @@
         integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
         crossorigin="anonymous"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script> -->
-    <script src="https://unpkg.com/vue@3.1.1/dist/vue.global.prod.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <title>{% block title %}{% endblock %} - Reversed ScieboRDS</title>
     {% endblock %}
@@ -29,36 +27,6 @@
                     <img alt="" class="logo" src="{{drive_url}}/dashboard/images/logo.png">
                     <a class="navbar-brand m-2" href="/">SRDC</a>
                 </div>
-                {% if data.connected==true %}
-                <div class="m-3">
-                    <div class="notification-message">
-                        {% if data.cloud_service | lower == 'nextcloud' %}
-                            {% if 'password' not in data or data.password == '' or data.password == data.access_token %}
-                            <span id="refresh-token">
-                                {{ load_async("refresh-token", "/refresh-token") }}
-                            </span>
-                            <script>
-                                $(document).ready(function () {
-                                    setInterval(() => {
-                                        $("#refresh-token").load("/refresh-token");
-                                    }, 60000);
-                                });
-                            </script>
-                            {% else %}
-                            <small><i>Your cloud connection is persistent.</i></small>
-                            {% endif %}
-                        {% endif %}
-                        {% if data.showall %}<div class="m-1 text-danger">showing all</div>{% endif %}
-                    </div>
-                    <b class="username">{{data.username}}</b>
-                    <button class="btn btn-secondary"><a class="nav-link" href="/connect">Connect repositories</a></button>
-                </div>
-                {% else %}
-                <div class="m-1">
-                    <b class="username disconnected">You are not connected yet.</b>
-                    <button class="btn btn-secondary"><a class="nav-link" href="/connect">Connect</a></button>
-                </div>
-                {% endif %}
             </nav>
         </div>
 
@@ -70,27 +38,6 @@
                         aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
                     </button>
-                    <div class="collapse navbar-collapse" id="navbarContent">
-                        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                            <li class="nav-item">
-                                <button class="btn btn-secondary"><a class="nav-link" href="/">Home</a></button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="btn btn-secondary"><a class="nav-link" href="/start">Project</a></button>
-                            </li>
-                        </ul>
-                        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                            <li class="nav-item">
-                                <button class="btn btn-secondary"><a href="/faq" class="nav-link">FAQ</a></button>
-                            </li>
-                            {% if data.connected==true %}
-                            <li class="nav-item">
-                                <button class="btn btn-secondary"><a href="/history"
-                                        class="nav-link">History</a></button>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </div>
                 </div>
             </nav>
         </div>
@@ -108,7 +55,8 @@
                 </div>
                 {% endif %}
                 {% endwith %}
-                {% block content %}{% endblock %}
+                <p>Please close this window.</p>
+                <p><a href="#" onclick="window.close();">close</a></p>
             </div>
         </div>
         <hr />
@@ -125,5 +73,7 @@
 </body>
 {% block script %}
 {% endblock %}
-
+<script>
+    window.close();
+</script>
 </html>

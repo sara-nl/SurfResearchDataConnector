@@ -319,7 +319,7 @@ class Sharekit(object):
         Returns:
             json: data structure with info on possible meta fields for uploads
         """
-        url = f"{self.sharekit_api_address}/repoitemupload/v1/format"
+        url = f"{self.sharekit_api_address}/upload/v1/discover/metafields"
         payload = {}
         headers = {'Authorization': f'Bearer {self.api_key}'}
         response = requests.request("GET", url, headers=headers, data=payload)
@@ -353,11 +353,12 @@ class Sharekit(object):
             response: the response of the API call at endpoint create
         """
         try:
-            log.debug("create_item")
-            log.debug(files)
-            log.debug(metadata)
+            # log.error("create_item")
+            # log.error(files)
+            # log.error(metadata)
+            
             if files is not None and isinstance(files, list) and len(files)==1:
-                log.debug(f"files: {files}")
+                log.error(f"files: {files}")
                 try:
                     title = "File uploaded by SurfRDC: {}".format(files[0]['title'])
                 except:
@@ -368,7 +369,7 @@ class Sharekit(object):
             summary = "This item was automatically created by SurfRDC."
             
             if metadata is not None and isinstance(metadata, dict):
-                log.debug(f"### Metadata in create item: {metadata}")
+                log.error(f"### Metadata in create item: {metadata}")
                 try:
                     title = metadata["title"]
                 except:
@@ -405,12 +406,12 @@ class Sharekit(object):
             }
 
             payload = json.dumps(data)
-            log.error(f"### create_item payload:{payload}")
+            # log.error(f"### create_item payload:{payload}")
             
             headers = {'Authorization': f'Bearer {self.api_key}'}
             response = requests.request("POST", url, headers=headers, data=payload)
             rjson = response.json()
-            log.error(f"### create_item response:{rjson}")
+            # log.error(f"### create_item response:{rjson}")
             
             # set the status to Submitted
             UUID = rjson['id']

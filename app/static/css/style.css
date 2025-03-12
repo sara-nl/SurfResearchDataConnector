@@ -1,0 +1,39 @@
+img.logo {
+    max-width: 250px;
+    max-height: 50px;
+}
+
+.nav-item {
+    margin: 0 4px 0 4px !important;
+}
+
+.navbar-nav .nav-item .nav-link {
+    color: #fff !important;
+    --bs-nav-link-padding-y: 0 !important;
+}
+
+b.username {
+    margin-right: 10px;
+}
+
+b.disconnected {
+    font-style: italic;
+}
+
+div.footer-text-right {
+    text-align: right;
+    font-size: 14px;
+}
+
+div.notification-message {
+    display: inline-block;
+}
+
+div.row.footer-bar {
+    margin-bottom: 10px;
+}
+
+.spinner-border {
+    width: 20px;
+    height: 20px;
+}

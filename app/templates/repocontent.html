@@ -40,7 +40,7 @@
         <p>It looks like there is enough storage space to host and resources to process the dataset.</p>
         {% if not data.permission %}
         <p>Your account does not have permission to create this folder: <b>{{ data.complete_folder_path }}</b>.</p>
-        <a href="/retrieve"><div class="btn btn-secondary">Go back</div></a>
+        <a href="/download"><div class="btn btn-secondary">Go back</div></a>
         {% endif %}
 
 {% else %}
@@ -65,16 +65,16 @@
     <p>There is enough storage space to host and resources to process the dataset.</p>
     {% endif %}
 
-<a href="/retrieve"><div class="btn btn-secondary">Go back</div></a>
+<a href="/download"><div class="btn btn-secondary">Go back</div></a>
 
 {% endif %}
 
 {% if data.permission and repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
-<button type="submit" class="btn btn-secondary" id="start_download">Start Download</button>
+<button type="submit" class="btn btn-secondary" id="start_download">Start Import</button>
 <div class="form-check mt-3 mb-3">
     <input class="form-check-input" type="checkbox" id="flexCheckRetrieval" value="" name="start_download" required>
     <label class="form-check-label" for="flexCheckRetrieval">
-        Check to confirm start of download.
+        Check to confirm start of import.
     </label>
 </div>
 {% endif %}

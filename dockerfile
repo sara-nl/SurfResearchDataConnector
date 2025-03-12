@@ -21,6 +21,12 @@ COPY run.py run.py
 COPY startup.sh startup.sh
 RUN ["chmod", "+x", "./startup.sh"]
 
+# run tests
+COPY ./tests ./tests
+RUN ["python", "-m", "pytest", "./tests/repos/test_repos_mocked_api_dataverse.py"]
+RUN ["python", "-m", "pytest", "./tests/repos/test_repos_mocked_api_figshare.py"]
+RUN ["python", "-m", "pytest", "./tests/repos/test_repos_mocked_api_zenodo.py"]
+
 EXPOSE 8080
 
 ENTRYPOINT [ "sh", "./startup.sh" ]

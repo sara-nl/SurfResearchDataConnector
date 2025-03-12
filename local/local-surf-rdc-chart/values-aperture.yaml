@@ -109,7 +109,7 @@ env:
   - name: OAUTH_SERVICES
     value: figshare,zenodo,osf
   - name: TOKEN_BASED_SERVICES
-    value: dataverse,irods,figshare,zenodo,osf,sharekit
+    value: datastation,irods,figshare,zenodo,osf,sharekit,data4tu,dataverse,surfs3
   - name: USE_SQLITE
     value: ok
 
@@ -120,6 +120,8 @@ env:
     value: ABC
   - name: DB_HOST
     value: 1.1.1.1
+  - name: DB_PORT
+    value: :3306
   - name: DB_DATABASE
     value: ABC
   # redis
@@ -133,7 +135,21 @@ env:
   - name: CLOUD_CLIENT_SECRET
     value: ABC
 
-  # Figshare connection
+  - name: OSF_API_URL
+    value: https://api.osf.io/v2
+  - name: OSF_AUTHORIZE_URL
+    value: https://accounts.osf.io/oauth2/authorize
+  - name: OSF_ACCESSTOKEN_URL
+    value: https://accounts.osf.io/oauth2/token
+  - name: OSF_CLIENT_ID
+    value: ABC
+  - name: OSF_CLIENT_SECRET
+    value: ABC
+  - name: OSF_DESCRIPTION
+    value: Connection to the test environment of OSF.
+  - name: OSF_WEBSITE
+    value: https://osf.io
+
   - name: FIGSHARE_API_URL
     value: https://api.figshare.com/v2
   - name: FIGSHARE_AUTHORIZE_URL
@@ -147,23 +163,26 @@ env:
   - name: FIGSHARE_WEBSITE
     value: https://figshare.com
 
-  # OSF (test) connection
-  - name: OSF_API_URL
-    value: https://api.test.osf.io/v2
-  - name: OSF_AUTHORIZE_URL
-    value: https://accounts.test.osf.io/oauth2/authorize
-  - name: OSF_ACCESSTOKEN_URL
-    value: https://accounts.test.osf.io/oauth2/token
-  - name: OSF_CLIENT_ID
+  - name: SURFS3_API_URL
+    value: https://objectstore.surf.nl
+  - name: SURFS3_DESCRIPTION
+    value: Connection to Surfs S3 Archive
+  - name: SURFS3_WEBSITE
+    value: https://surf.nl
+  - name: SURFS3_CLIENT_ID
     value: ABC
-  - name: OSF_CLIENT_SECRET
+  - name: SURFS3_CLIENT_SECRET
     value: ABC
-  - name: OSF_DESCRIPTION
-    value: Connection to the test environment of OSF.
-  - name: OSF_WEBSITE
-    value: https://test.osf.io
 
-  # Zenodo (Sandbox) connection
+  - name: DATA4TU_API_URL
+    value: https://data.4tu.nl/v2
+  - name: DATA4TU_DESCRIPTION
+    value: Connection to 4TU.ResearchData
+  - name: DATA4TU_WEBSITE
+    value: https://data.4tu.nl
+  - name: DATA4TU_WEBSITE_NAME
+    value: 4TU.ResearchData
+
   - name: ZENODO_API_URL
     value: https://sandbox.zenodo.org/api
   - name: ZENODO_AUTHORIZE_URL
@@ -189,7 +208,17 @@ env:
   - name: DATAVERSE_PARENT_DATAVERSE
     value: surf
 
-  # Irods connection
+  - name: DATASTATION_API_URL
+    value: https://demo.ssh.datastations.nl/api
+  - name: DATASTATION_DESCRIPTION
+    value: Connection to demo.ssh.datastations.nl.
+  - name: DATASTATION_WEBSITE
+    value: https://demo.ssh.datastations.nl
+  - name: DATASTATION_PARENT_DATAVERSE
+    value: root
+  - name: DATASTATION_BASICAUTH_TOKEN
+    value: ABC
+
   - name: IRODS_API_URL
     value: surf-yoda.irods.surfsara.nl
   - name: IRODS_ZONE

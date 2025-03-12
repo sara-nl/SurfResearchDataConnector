@@ -5,7 +5,7 @@ from app.utils import get_user_info, set_query_status, set_canceled, get_cached_
 from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, get_query_status, get_status_from_history
 from app.utils import get_folders, get_folder_content, get_files_info, check_checksums, update_history, push_data, get_raw_folders
 from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission
-from app.utils import refresh_cloud_token, get_user_info
+from app.utils import refresh_cloud_token, get_user_info, get_projectname, set_projectname, get_dans_audiences, memoize, get_project_id, set_project_id
 from app.repos import run_export, check_connection, get_private_metadata, get_repocontent, get_sharekit_token
 from app.repos.dataverse import Dataverse
 from app.repos.sharekit import Sharekit
@@ -16,16 +16,18 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
+import requests
 from sqlalchemy import and_
 from app.repos import run_private_import
 import whois
 from time import time
 
 logger = logging.getLogger()
+ 
 
-
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def home():
     """Will render the home page
 
@@ -34,13 +36,93 @@ def home():
     """
     try:
         session['persist'] = False
+        session['code_version'] = code_version
         session['srdc_url'] = srdc_url
         session['hidden_services'] = hidden_services
+        session['registered_services'] = registered_services
         session['cloud_service'] = cloud_service
     except Exception as e:
         flash("something went wrong (1b)")
         logger.error(e, exc_info=True)
-    return render_template('home.html', data=session)
+    return render_template('home.html', data=session, drive_url=drive_url)
+
+ 
+@app.route('/start', methods=['GET', 'POST'])
+def start():
+    """Will render the start page 
+
+    Returns:
+        str: html for the start page
+    """
+    startexport = False
+    startimport = False
+    try:
+        if 'process' in request.args:
+            session['process'] = None
+            del session['projectname']
+            set_project_id(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], project_id=None)
+            try:
+                del session['project_id']
+            except:
+                pass
+            try:
+                del session['metadata']
+            except:
+                pass
+            try:
+                del session['folder']
+            except:
+                pass
+            try:
+                del session['folder_path']
+            except:
+                pass
+            try:
+                del session['complete_folder_path']
+            except:
+                pass
+            try:
+                del session['remote']
+            except:
+                pass
+            try:
+                del session['url']
+            except:
+                pass
+        elif 'background' in request.args:
+            session['background'] = True
+            session['process'] = None
+            del session['projectname']
+        elif request.method == "POST":
+            if 'projectname' in request.form:
+                session['projectname'] = request.form['projectname']
+            if 'clearprojectname' in request.form:
+                del session['projectname']
+            if 'importexport' in request.form:
+                if request.form['importexport'] == 'startimport':
+                    startimport = True
+                if request.form['importexport'] == 'startexport':
+                    startexport = True
+        session['persist'] = False
+        session['code_version'] = code_version
+        session['srdc_url'] = srdc_url
+        session['hidden_services'] = hidden_services
+        session['registered_services'] = registered_services
+        session['cloud_service'] = cloud_service
+        if request.method == "POST":
+            if 'homestart' in request.form:
+                session['homestart'] = request.form['homestart']
+        else:
+            if 'homeshow' in request.args:
+                del session['homestart']
+    except Exception as e:
+        flash("something went wrong (1b2)")
+        logger.error(e, exc_info=True)
+    if startexport:
+        return redirect("/upload")
+    if startimport:
+        return redirect("/download")
+    return render_template('start.html', data=session, drive_url=drive_url)
 
 
 @app.route('/refresh-folderpaths')
@@ -56,12 +138,10 @@ def refresh_folder_paths():
             get_cached_folders.cache_clear()
             get_cached_folders(username = session['username'], password = session['password'], folder = '/')
             flash('Data Folder Paths refreshed')
-            # if cloud_service.lower() == 'nextcloud' and 'persist' in session and session['persist'] == True:
-            #     flash('Please login and grant access in the window that just opened to make your connection persistent.')
     except Exception as e:
         flash("something went wrong (22)")
         logger.error(e, exc_info=True)
-    return render_template('refresh-folderpaths.html', data=session, embed_app_url=embed_app_url)
+    return render_template('refresh-folderpaths.html', data=session, drive_url=drive_url)
 
 
 @app.route('/refresh')
@@ -86,7 +166,7 @@ def faq():
     except Exception as e:
         flash("something went wrong (2)")
         logger.error(e, exc_info=True)
-    return render_template('faq.html', data=session, faqitems=faqitems)
+    return render_template('faq.html', data=session, drive_url=drive_url , faqitems=faqitems)
 
 
 @app.route('/messages')
@@ -102,7 +182,7 @@ def messages():
     except Exception as e:
         flash("something went wrong (3)")
         logger.error(e, exc_info=True)
-    return render_template('messages.html', data=session, messages=messages)
+    return render_template('messages.html', data=session, drive_url=drive_url, messages=messages)
 
 
 @app.route('/history/<id>', methods=['GET'])
@@ -113,6 +193,10 @@ def history(id=None):
     Returns:
         str: html for the history page
     """
+    history = []
+    username = ""
+    folder = ""
+    url = ""
     try:
         username = None
         password = None
@@ -125,14 +209,9 @@ def history(id=None):
         else:
             if 'access_token' in session:
                 password = session['access_token']
-        if not make_connection(username=session['username'], password=session['password']):
-            flash('Not connected')
+        if not make_connection(username=username, password=password):
+            flash('Not connected. Please connect to see your history.')
             return redirect('/connect')
-            
-        history = []
-        username = ""
-        folder = ""
-        url = ""
     except Exception as e:
         flash("something went wrong (15)")
         logger.error(e, exc_info=True)
@@ -143,11 +222,13 @@ def history(id=None):
                 hist_of_id = History.query.filter_by(id=id).one()
                 folder = hist_of_id.folder
                 url = hist_of_id.url
+                projectname = hist_of_id.projectname
                 history = History.query.filter(
                     and_(
                         History.username == username,
                         History.folder == folder,
-                        History.url == url
+                        History.url == url,
+                        History.projectname == projectname
                         )
                     ).order_by(History.id.desc()).all()
 
@@ -159,9 +240,9 @@ def history(id=None):
                 latest_folder_url = []
                 # only get latest status per retrieval
                 for item in history:
-                    if [item.folder, item.url] != latest_folder_url:
+                    if [item.folder, item.url, item.projectname] != latest_folder_url:
                         tmp_hist.append(item)
-                        latest_folder_url = [item.folder, item.url]
+                        latest_folder_url = [item.folder, item.url, item.projectname]
                 history = tmp_hist
     except Exception as e:
         flash("something went wrong (4)")
@@ -176,6 +257,16 @@ def connect():
     Returns:
         str: html for the connect page
     """
+    if request.method == "GET" and 'oauth' in request.args:
+        repo = request.args.get('oauth')
+        if f'{repo}_access_token' in session:
+            api_key = session[f'{repo}_access_token']
+            if check_connection(repo, api_key):
+                flash(f'{repo} connected')
+            else:
+                flash(f'failed to connect {repo}')
+        else:
+            flash(f'failed to connect {repo}')
     try:
         session['hidden_services'] = hidden_services
         if 'username' in session and 'password' in session and make_connection(session['username'], session['password']):
@@ -226,6 +317,18 @@ def connect():
             ### END Oauth based service connections ###
 
             ### BEGIN token based service connections ###
+            if 'data4tu_disconnect' in request.form:
+                if 'data4tu_access_token' in session:
+                    del session['data4tu_access_token']
+                    if 'repo' in session and session['repo'] == 'data4tu':
+                        session['repo'] = None
+                    flash('data4tu disconnected')
+            elif 'data4tu_access_token' in request.form:
+                if check_connection(repo='data4tu', api_key=request.form['data4tu_access_token']):
+                    session['data4tu_access_token'] = request.form['data4tu_access_token']
+                    flash('4TU.ResearchData connected')
+                else:
+                    flash('could not connect to 4TU.ResearchData')
             if 'figshare_disconnect' in request.form:
                 if 'figshare_access_token' in session:
                     del session['figshare_access_token']
@@ -274,6 +377,18 @@ def connect():
                     flash('dataverse connected')
                 else:
                     flash('could not connect to dataverse')
+            if 'datastation_disconnect' in request.form:
+                if 'datastation_access_token' in session:
+                    del session['datastation_access_token']
+                    if 'repo' in session and session['repo'] == 'datastation':
+                        session['repo'] = None
+                    flash('datastation disconnected')
+            elif 'datastation_access_token' in request.form:
+                if check_connection(repo='datastation', api_key=request.form['datastation_access_token']):
+                    session['datastation_access_token'] = request.form['datastation_access_token']
+                    flash('datastation connected')
+                else:
+                    flash('could not connect to datastation')
             if 'irods_disconnect' in request.form:
                 if 'irods_access_token' in session:
                     del session['irods_access_token']
@@ -288,6 +403,20 @@ def connect():
                     flash('irods connected')
                 else:
                     flash('could not connect to irods')
+            if 'surfs3_disconnect' in request.form:
+                if 'surfs3_access_token' in session:
+                    del session['surfs3_access_token']
+                    del session['surfs3_user']
+                    if 'repo' in session and session['repo'] == 'surfs3':
+                        session['repo'] = None
+                    flash('surfs3 disconnected')
+            elif 'surfs3_access_token' in request.form and 'surfs3_user' in request.form:
+                if check_connection(repo='surfs3', api_key=request.form['surfs3_access_token'], user=request.form['surfs3_user']):
+                    session['surfs3_user'] = request.form['surfs3_user']
+                    session['surfs3_access_token'] = request.form['surfs3_access_token']
+                    flash('surfs3 connected')
+                else:
+                    flash('could not connect to surfs3')                
             if 'sharekit_disconnect' in request.form:
                 if 'sharekit_access_token' in session:
                     del session['sharekit_access_token']
@@ -322,7 +451,7 @@ def upload():
     Returns:
         str: html for the upload page
     """
-    session['temp_hidden_services'] = []
+    session['temp_hidden_services'] = ['datahugger']
     try:
         username = None
         password = None
@@ -386,7 +515,15 @@ def upload():
                     email = None
                 if 'subject' in request.form:
                     session['metadata']['subject'] = request.form['subject']
-
+                if 'dansRights_personal' in request.form:
+                    session['metadata']['dansRights_personal'] = request.form['dansRights_personal']
+                if 'dansRights_language' in request.form:
+                    session['metadata']['dansRights_language'] = request.form['dansRights_language']
+                if 'dansRights_holder' in request.form:
+                    session['metadata']['dansRights_holder'] = request.form['dansRights_holder']
+                if 's3archivename' in request.form:
+                    session['metadata']['s3archivename'] = request.form['s3archivename']
+                
                 # get the metadata fields
                 metadata = session['metadata']
 
@@ -403,6 +540,8 @@ def upload():
 
                 if 'preview' in request.form:
                     preview = True
+                    if 'dans_audience_uri'in request.form:
+                        session['metadata']['dans_audience_uri'] = request.form['dans_audience_uri']
 
                     if 'selected_repo' in request.form and request.form['selected_repo']!='none':
                         # get the repo
@@ -435,15 +574,21 @@ def upload():
                         if 'dataverse' in session:
                             if 'alias' in session['dataverse']:
                                 dataverse_alias = session['dataverse']['alias']
-                    
+                    if repo == 'datastation':
+                        if 'datastation' in session:
+                            if 'alias' in session['datastation']:
+                                dataverse_alias = session['datastation']['alias']
+
                     repo_user = None
                     if repo == "irods":
                         repo_user = session['irods_user']
+                    if repo == "surfs3":
+                        repo_user = session['surfs3_user']
                     
                     api_key=session[f'{repo}_access_token']
                     
                     use_zip=False
-                    if 'use_zip' in request.form:
+                    if 'use_zip' in request.form or repo == 'dataverse' or repo == 'datastation':
                         use_zip=True
                     # setting the canceled status to false for this user
                     set_canceled(username, False)
@@ -471,10 +616,13 @@ def upload():
                         metadata['rd_user'] = f"{displayname} ({username})"
                         metadata['matched_person'] = person['name'] + " (" + person['id'] + ")"
                         
+                    set_projectname(username=session['username'],folder=session['complete_folder_path'],url=session['remote'],projectname=session['projectname'])
                     t = Thread(target=run_export, args=(
                         username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip, dataverse_alias))
                     t.start()
                     session['query_status'] = 'started'
+                    session['process'] = 'export'
+                    del session['metadata']
                 else:
                     preview = True
     except Exception as e:
@@ -489,11 +637,12 @@ def upload():
 @app.route('/retrieve', methods=['GET', 'POST'])
 def retrieve():
     """Will render the retrieve page
-
+    ===> This route is no longer in use
     Returns:
         str: html for the retrieve page
     """
     session['temp_hidden_services'] = ['sharekit']
+    session['process'] = None
     try:
         username = None
         password = None
@@ -576,7 +725,7 @@ def retrieve():
                 check_accept_url_in_history_first = False
                 if url_in_history and not accept_url_in_history:
                     flash(
-                        "Data has already been downloaded from this url. Please check the box if you want to download again from this url.")
+                        "Data has already been imported from this url. Please check the box if you want to import again from this url.")
                     check_accept_url_in_history_first = True
 
                 if check_accept_folder_first or check_accept_url_in_history_first:
@@ -588,9 +737,10 @@ def retrieve():
                             username, password, complete_folder_path, url))
                         t.start()
                         session['query_status'] = 'started'
+                        session['process'] = 'import'
                     else:
                         preview = True
-                        flash("Previewing data download.")
+                        # flash("Previewing data import.")
     except Exception as e:
         flash("something went wrong (7)")
         logger.error(e, exc_info=True)
@@ -638,6 +788,7 @@ def download():
         session['query_status'] = None
         logger.info(f"Failed to get query_status:")
         logger.info(e, exc_info=True)
+
     try:
         if request.method == "POST":
 
@@ -697,34 +848,42 @@ def download():
                 check_accept_url_in_history_first = False
                 if url_in_history and not accept_url_in_history:
                     flash(
-                        "Data has already been downloaded from this url. Please check the box if you want to download again from this url.")
+                        "Data has already been imported from this url. Please check the box if you want to import again from this url.")
                     check_accept_url_in_history_first = True
 
                 if check_accept_folder_first or check_accept_url_in_history_first:
                     pass
                 else:
                     if 'start_download' in request.form:
-                        repo_user = None
-                        if f'{repo}_user' in session:
-                            repo_user = session[f'{repo}_user']
-                        api_key=session[f'{repo}_access_token']
-                        set_canceled(session['username'], False)
-                        t = Thread(target=run_private_import, args=(
-                                    username, password, complete_folder_path, url, repo, api_key, repo_user))
-                        t.start()
+                        set_projectname(username=session['username'],folder=session['complete_folder_path'],url=session['remote'],projectname=session['projectname'])
+                        if repo == 'datahugger':
+                            set_canceled(username, False)
+                            t = Thread(target=run_import, args=(
+                                username, password, complete_folder_path, url))
+                            t.start()
+                        else:
+                            repo_user = None
+                            if f'{repo}_user' in session:
+                                repo_user = session[f'{repo}_user']
+                            api_key=session[f'{repo}_access_token']
+                            set_canceled(session['username'], False)
+                            t = Thread(target=run_private_import, args=(
+                                        username, password, complete_folder_path, url, repo, api_key, repo_user))
+                            t.start()
                         session['query_status'] = 'started'
+                        session['process'] = 'import'
                     else:
                         preview = True
-                        flash("Previewing data download.")
+                        # flash("Previewing data import.")
     except Exception as e:
         flash("something went wrong (8)")
         logger.error(e, exc_info=True)
     return render_template('download.html',
-                            data=session,
-                            preview=preview,
-                            check_accept_folder_first=check_accept_folder_first,
-                            check_accept_url_in_history_first=check_accept_url_in_history_first,
-                            drive_url=drive_url)
+                                data=session,
+                                preview=preview,
+                                check_accept_folder_first=check_accept_folder_first,
+                                check_accept_url_in_history_first=check_accept_url_in_history_first,
+                                drive_url=drive_url)
 
 
 @app.route('/cancel_download', methods=['POST'])
@@ -739,14 +898,15 @@ def cancel_download():
                 if status == 'ready':
                     flash('Process is ready. Will not cancel.')
                 else:
+                    set_projectname(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], projectname=session['projectname'])
                     update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
                     set_query_status(session['username'], session['complete_folder_path'], session['remote'], 'ready')
                     session['query_status'] = 'ready'
                     set_canceled(session['username'], True)
                     preview = False
                     check_accept_folder_first=False
-                    check_accept_url_in_history_first=False 
-                    flash("Download was canceled by user.")
+                    check_accept_url_in_history_first=False
+                    flash("Import was canceled by user.")
                     # do some clean up
                     tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
                     try:
@@ -783,14 +943,15 @@ def cancel_retrieval():
                 if status == 'ready':
                     flash('Process is ready. Will not cancel.')
                 else:
+                    set_projectname(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], projectname=session['projectname'])
                     update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
                     set_query_status(session['username'], session['complete_folder_path'], session['remote'], 'ready')
                     session['query_status'] = 'ready'
                     set_canceled(session['username'], True)
                     preview = False
                     check_accept_folder_first=False
-                    check_accept_url_in_history_first=False 
-                    flash("Download was canceled by user.")
+                    check_accept_url_in_history_first=False
+                    flash("Import was canceled by user.")
                     # do some clean up
                     tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
                     try:
@@ -825,12 +986,13 @@ def cancel_upload():
                 if status == 'ready':
                     flash('Process is ready. Will not cancel.')
                 else:
+                    set_projectname(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], projectname=session['projectname'])
                     update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
                     set_query_status(session['username'], session['complete_folder_path'], session['remote'], 'ready')
                     session['query_status'] = 'ready'
                     set_canceled(session['username'], True)
                     preview = False
-                    flash("Upload was canceled by user.")
+                    flash("Export was canceled by user.")
                     # do some clean up
                     tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
                     try:
@@ -865,7 +1027,7 @@ def debug():
     try:
         session['showversion'] = False
         if 'showversion' in request.args and request.args.get('showversion').lower() == 'true':
-            flash("Release 20241001")
+            flash("Release 20241125")
     except Exception as e:
         flash("something went wrong (13)")
         logger.error(e, exc_info=True)
@@ -873,14 +1035,14 @@ def debug():
         session['showallvars'] = False
         if 'showallvars' in request.args and request.args.get('showallvars').lower() == 'true':
             try:
-                flash(all_vars['redis_host'])
+                flash(all_vars)
             except:
                 flash("not showing all_vars")
     except Exception as e:
         flash("something went wrong (13)")
         logger.error(e, exc_info=True)
     return render_template('connect.html',
-                            data=session)
+                            data=session,drive_url=drive_url)
 
 
 ### BEGIN FILTERS ###
@@ -905,6 +1067,17 @@ def convertsize(size_bytes):
 
 ### BEGIN COMPONENTS ###
 
+@app.route('/s3archive', methods=['GET'])
+def s3archive():
+    """Will render the s3archive component
+
+    Returns:
+        str: html for the s3archive component
+    """
+    # Load available
+    return render_template('s3archive.html')
+
+
 @app.route('/dataverses', methods=['GET'])
 def dataverses():
     """Will render the dataverses component
@@ -913,17 +1086,25 @@ def dataverses():
         str: html for the dataverses component
     """
     try:
-        dataverse = Dataverse(api_key=session['dataverse_access_token'], api_address=dataverse_api_url)
-        dataverses = dataverse.get_sub_dataverses()
-        parent_dataverse_info = dataverse.get_dataverse_info(dataverse_parent_dataverse)
-        dataverses.append(parent_dataverse_info)
+        if 'datastation' in request.args:
+            datastation = Dataverse(api_key=session['datastation_access_token'], api_address=datastation_api_url, datastation=True)
+            dataverses = datastation.get_sub_dataverses()
+            parent_dataverse_info = datastation.get_dataverse_info(datastation_parent_dataverse)
+            dataverses.append(parent_dataverse_info)
+        else:
+            dataverse = Dataverse(api_key=session['dataverse_access_token'], api_address=dataverse_api_url)
+            dataverses = dataverse.get_sub_dataverses()
+            parent_dataverse_info = dataverse.get_dataverse_info(dataverse_parent_dataverse)
+            dataverses.append(parent_dataverse_info)
     except Exception as e:
         logger.error(f"Failed at dataverses component view:")
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                   drive_url=drive_url,
                                    name="dataverses")
     return render_template('dataverses.html',
                             data=session,
+                            drive_url=drive_url,
                             dataverses = dataverses)
 
 
@@ -938,13 +1119,260 @@ def metadata():
         disabled = request.args.get('disabled')
         repo = request.args.get('repo')
         session['repo'] = repo
+
+        headers = {}
+        if repo == 'datastation' and datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token            
+
+
+        dataverse_subjects = [
+            "### Below are some defaults as we could not retrieve the subjects from the service API. ###",
+            "Agricultural Sciences",
+            "Arts and Humanities",
+            "Astronomy and Astrophysics",
+            "Business and Management",
+            "Chemistry",
+            "Computer and Information Science",
+            "Earth and Environmental Sciences",
+            "Engineering",
+            "Law",
+            "Mathematical Sciences",
+            "Medicine, Health and Life Sciences",
+            "Physics",
+            "Social Sciences",
+            "Other"
+        ]
+        dansRights_languages = None
+        dansRights_personal_data = None
+        dansRelationMetadata_audiences = []
+
+        if repo == 'datastation':
+            dansRights_languages = [
+                "### Below are some defaults as we could not retrieve the languages from the service API. ###",
+                "Abkhaz",
+                "Afar",
+                "Afrikaans",
+                "Akan",
+                "Albanian",
+                "Amharic",
+                "Arabic",
+                "Aragonese",
+                "Armenian",
+                "Assamese",
+                "Avaric",
+                "Avestan",
+                "Aymara",
+                "Azerbaijani",
+                "Bambara",
+                "Bashkir",
+                "Basque",
+                "Belarusian",
+                "Bengali, Bangla",
+                "Bihari",
+                "Bislama",
+                "Bosnian",
+                "Breton",
+                "Bulgarian",
+                "Burmese",
+                "Catalan,Valencian",
+                "Chamorro",
+                "Chechen",
+                "Chichewa, Chewa, Nyanja",
+                "Chinese",
+                "Chuvash",
+                "Cornish",
+                "Corsican",
+                "Cree",
+                "Croatian",
+                "Czech",
+                "Danish",
+                "Divehi, Dhivehi, Maldivian",
+                "Dutch",
+                "Dzongkha",
+                "English",
+                "Esperanto",
+                "Estonian",
+                "Ewe",
+                "Faroese",
+                "Fijian",
+                "Finnish",
+                "French",
+                "Fula, Fulah, Pulaar, Pular",
+                "Galician",
+                "Georgian",
+                "German",
+                "Greek (modern)",
+                "Guaraní",
+                "Gujarati",
+                "Haitian, Haitian Creole",
+                "Hausa",
+                "Hebrew (modern)",
+                "Herero",
+                "Hindi",
+                "Hiri Motu",
+                "Hungarian",
+                "Interlingua",
+                "Indonesian",
+                "Interlingue",
+                "Irish",
+                "Igbo",
+                "Inupiaq",
+                "Ido",
+                "Icelandic",
+                "Italian",
+                "Inuktitut",
+                "Japanese",
+                "Javanese",
+                "Kalaallisut, Greenlandic",
+                "Kannada",
+                "Kanuri",
+                "Kashmiri",
+                "Kazakh",
+                "Khmer",
+                "Kikuyu, Gikuyu",
+                "Kinyarwanda",
+                "Kyrgyz",
+                "Komi",
+                "Kongo",
+                "Korean",
+                "Kurdish",
+                "Kwanyama, Kuanyama",
+                "Latin",
+                "Luxembourgish, Letzeburgesch",
+                "Ganda",
+                "Limburgish, Limburgan, Limburger",
+                "Lingala",
+                "Lao",
+                "Lithuanian",
+                "Luba-Katanga",
+                "Latvian",
+                "Manx",
+                "Macedonian",
+                "Malagasy",
+                "Malay",
+                "Malayalam",
+                "Maltese",
+                "Māori",
+                "Marathi (Marāṭhī)",
+                "Marshallese",
+                "Mixtepec Mixtec",
+                "Mongolian",
+                "Nauru",
+                "Navajo, Navaho",
+                "Northern Ndebele",
+                "Nepali",
+                "Ndonga",
+                "Norwegian Bokmål",
+                "Norwegian Nynorsk",
+                "Norwegian",
+                "Nuosu",
+                "Southern Ndebele",
+                "Occitan",
+                "Ojibwe, Ojibwa",
+                "Old Church Slavonic,Church Slavonic,Old Bulgarian",
+                "Oromo",
+                "Oriya",
+                "Ossetian, Ossetic",
+                "Panjabi, Punjabi",
+                "Pāli",
+                "Persian (Farsi)",
+                "Polish",
+                "Pashto, Pushto",
+                "Portuguese",
+                "Quechua",
+                "Romansh",
+                "Kirundi",
+                "Romanian",
+                "Russian",
+                "Sanskrit (Saṁskṛta)",
+                "Sardinian",
+                "Sindhi",
+                "Northern Sami",
+                "Samoan",
+                "Sango",
+                "Serbian",
+                "Scottish Gaelic, Gaelic",
+                "Shona",
+                "Sinhala, Sinhalese",
+                "Slovak",
+                "Slovene",
+                "Somali",
+                "Southern Sotho",
+                "Spanish, Castilian",
+                "Sundanese",
+                "Swahili",
+                "Swati",
+                "Swedish",
+                "Tamil",
+                "Telugu",
+                "Tajik",
+                "Thai",
+                "Tigrinya",
+                "Tibetan Standard, Tibetan, Central",
+                "Turkmen",
+                "Tagalog",
+                "Tswana",
+                "Tonga (Tonga Islands)",
+                "Turkish",
+                "Tsonga",
+                "Tatar",
+                "Twi",
+                "Tahitian",
+                "Uyghur, Uighur",
+                "Ukrainian",
+                "Urdu",
+                "Uzbek",
+                "Venda",
+                "Vietnamese",
+                "Volapük",
+                "Walloon",
+                "Welsh",
+                "Wolof",
+                "Western Frisian",
+                "Xhosa",
+                "Yiddish",
+                "Yoruba",
+                "Zhuang, Chuang",
+                "Zulu",
+                "Not applicable"
+            ]
+            dansRights_personal_data = ['### Below are some defaults as we could not retrieve the languages from the service API. ###', 'Yes', 'No', 'Unknown']
+            dansRelationMetadata_audiences = get_dans_audiences()
+
+            url = f"{datastation_api_url}/metadatablocks/dansRights"
+            logger.error(url)
+            response = requests.get(url, headers=headers)
+            logger.error(response)
+            if response.status_code == 200:
+                dansRights_data = response.json()
+                dansRights_languages = dansRights_data['data']['fields']['dansMetadataLanguage']['controlledVocabularyValues']
+                dansRights_personal_data = dansRights_data['data']['fields']['dansPersonalDataPresent']['controlledVocabularyValues']
+        try:
+            dataurl = ''
+            if repo == 'dataverse':
+                dataurl = f"{dataverse_api_url}/metadatablocks/citation"
+            if repo == 'datastation':
+                dataurl = f"{datastation_api_url}/metadatablocks/citation"
+            if dataurl != '':
+                response = memoize(requests.get(dataurl, headers=headers))
+                if response.status_code == 200:
+                    dataverse_citation_data = response.json()
+                    dataverse_subjects = dataverse_citation_data['data']['fields']['subject']['controlledVocabularyValues']
+        except:
+            pass
         return render_template('metadata.html',
                                 data=session,
+                                drive_url=drive_url,
                                 disabled=disabled,
-                                repo=repo)
+                                repo=repo,
+                                dataverse_subjects=dataverse_subjects,
+                                dansRights_languages=dansRights_languages,
+                                dansRights_personal_data=dansRights_personal_data,
+                                dansRelationMetadata_audiences=dansRelationMetadata_audiences)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                    drive_url=drive_url,
                                     name="metadata")
 
 @app.route('/check-connection/<repo>', methods=['GET'])
@@ -959,20 +1387,26 @@ def checkconnection(repo=None):
         if repo == 'sharekit':
             session['sharekit_access_token'] = get_sharekit_token()
         try:
-            repo_user = None
-            if repo == 'irods':
-                repo_user = session[f'{repo}_user']
-            api_key = session[f'{repo}_access_token']
-            connection_ok = check_connection(repo=repo, api_key=api_key, user=repo_user)
+            if repo == 'datahugger':
+                connection_ok = True
+            else:
+                repo_user = None
+                if repo == 'irods' or repo == 'surfs3':
+                    repo_user = session[f'{repo}_user']
+                api_key = session[f'{repo}_access_token']
+                connection_ok = check_connection(repo=repo, api_key=api_key, user=repo_user)
         except Exception as e:
             logger.info(e, exc_info=True)
             connection_ok = None
         return render_template('check_connection.html',
                                 data=session,
+                                drive_url=drive_url,
                                 connection_ok=connection_ok)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,             
                                     name="check connection")
                                     
 @app.route('/repo-selection', methods=['GET'])
@@ -986,10 +1420,36 @@ def repo_selection():
         session['hidden_services'] = hidden_services
         if registered_services == []:
             return render_template('component_load_failure.html',
-                                    name="repo selection")
+                                    data=session,
+                                    drive_url=drive_url,
+                                    name="No repositories have been configured")
+        available_services = []
+        for service in registered_services:
+            if service not in hidden_services:
+                available_services.append(service)
+        if available_services == []:
+            session['repo'] = ''
+            return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,
+                                    name="No repositories have been configured")
+        # sort the repos here with the active ones first.
+        active_services = []
+        inactive_services = []
+        for service in available_services:
+            if f"{service}_access_token" in session and session[f"{service}_access_token"] != "" and session[f"{service}_access_token"] != None:
+                active_services.append(service)
+            else:
+                inactive_services.append(service)
+        
+        active_services = sorted(['datahugger'] + active_services, key=str.lower)
+        inactive_services = sorted(inactive_services, key=str.lower)
+        sorted_services =  active_services + inactive_services
+
         return render_template('repo_selection.html',
                                 data=session,
-                                registered_services = registered_services,
+                                drive_url=drive_url,
+                                registered_services = sorted_services,
                                 all_vars = all_vars)
     except Exception as e:
         logger.error(e, exc_info=True)
@@ -1014,10 +1474,13 @@ def folder_paths():
                                     name="folder paths")
         return render_template('select_folder_path.html',
                                 data=session,
+                                drive_url=drive_url,
                                 folder_paths = folder_paths)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,
                                     name="folder paths")
 
 @app.route('/folder-content/<direction>', methods=['GET'])
@@ -1036,16 +1499,21 @@ def folder_content(direction=None):
                 content_can_be_processed = {'can_be_processed': None, 'total_size': None, 'free_bytes': None}
         else:
             return render_template('component_load_failure.html',
+                                        data=session,
+                                        drive_url=drive_url,
                                         name="folder content")
         
         return render_template('folder_content.html',
                                 data=session,
+                                drive_url=drive_url,
                                 folder_content = folder_content,
                                 folder_content_can_be_processed = content_can_be_processed,
                                 direction = direction)
     except Exception as e:
         logger.error(e)
         return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,
                                     name="folder content")
 
 @app.route('/repocontent', methods=['GET'])
@@ -1059,19 +1527,23 @@ def repocontent():
         # currently just getting info from data hugger
         try:
             url = session['url']
-            if 'repo' not in session or session['repo'] == None:
+            if 'repo' not in session or session['repo'] == 'datahugger' or session['repo'] == None:
                 repo_content = get_files_info(url)
             else:
                 repo = session['repo']
                 user = None
                 if repo == 'figshare':
                     api_key = session['figshare_access_token']
+                if repo == 'data4tu':
+                    api_key = session['data4tu_access_token']
                 if repo == 'zenodo':
                     api_key = session['zenodo_access_token']
                 if repo == 'osf':
                     api_key = session['osf_access_token']
                 if repo == 'dataverse':
                     api_key = session['dataverse_access_token']
+                if repo == 'datastation':
+                    api_key = session['datastation_access_token']
                 if repo == 'irods':
                     api_key = session['irods_access_token']
                     user = session['irods_user']
@@ -1091,6 +1563,7 @@ def repocontent():
             content_fits = None
         return render_template('repocontent.html',
                                 data=session,
+                                drive_url=drive_url,
                                 repo_content = repo_content,
                                 repo_content_fits = content_fits,
                                 repo_content_can_be_processed = content_can_be_processed)
@@ -1114,10 +1587,13 @@ def doi_metadata():
             doi_metadata = {}
         return render_template('doi_metadata.html',
                                 data=session,
+                                drive_url=drive_url,
                                 doi_metadata = doi_metadata)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,
                                     name="doi metadata")
 
 @app.route('/private-metadata', methods=['GET'])
@@ -1134,12 +1610,16 @@ def private_metadata():
             user = None
             if repo == 'figshare':
                 api_key = session['figshare_access_token']
+            if repo == 'data4tu':
+                api_key = session['data4tu_access_token']
             if repo == 'zenodo':
                 api_key = session['zenodo_access_token']
             if repo == 'osf':
                 api_key = session['osf_access_token']
             if repo == 'dataverse':
                 api_key = session['dataverse_access_token']
+            if repo == 'datastation':
+                api_key = session['datastation_access_token']
             if repo == 'irods':
                 api_key = session['irods_access_token']
                 user = session['irods_user']
@@ -1151,6 +1631,7 @@ def private_metadata():
             private_metadata = {}
         return render_template('private_metadata.html',
                                 data=session,
+                                drive_url=drive_url,
                                 private_metadata = private_metadata)
     except Exception as e:
         logger.error(e, exc_info=True)
@@ -1174,6 +1655,8 @@ def quote_text():
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,
                                     name="quote text")
 
 @app.route('/status', methods=['GET'])
@@ -1189,16 +1672,133 @@ def status():
             complete_folder_path = session['complete_folder_path']
             remote = session['remote']
             query_status_history = get_query_status_history(username, complete_folder_path, remote)
+            
+            # check where we are in the process and based on that send a percentage to the status.html
+            # in the status.html add a progress bar showing the percentage.
+            def get_progress(n):
+                """check where we are in the process and based on that return a number
+
+                Args:
+                    n (int): index of the status to use for the progress check
+
+                Returns:
+                    int: the progress percentage
+                """
+
+                progress = None
+
+                ### general progress ###
+                if query_status_history[n].status == 'started':
+                    progress = 1
+                elif query_status_history[n].status.find('uploaded file') != -1:
+                    progress = 60
+                    try:
+                        filecount =  re.findall(r'\d+', query_status_history[n].status)
+                        additional_progress = int(25 * (int(filecount[0]) / int(filecount[1]) ))
+                        if additional_progress <= 25:
+                            progress += additional_progress
+                    except Exception as e:
+                        logger.error(e)
+                elif query_status_history[n].status.find('failed to upload file') != -1:
+                    logger.error('failed to upload file')
+                    progress = 60
+                    try:
+                        filecount =  re.findall(r'\d+', query_status_history[n].status)
+                        additional_progress = int(25 * (int(filecount[0]) / int(filecount[1]) ))
+                        if additional_progress <= 25:
+                            progress += additional_progress
+                    except Exception as e:
+                        logger.error(e)
+                elif query_status_history[n].status == 'ready':
+                    progress = 100
+                elif query_status_history[n].status.find('Completed with issues') != -1:
+                    progress = 100
+                elif query_status_history[n].status.find('Success!') != -1:
+                    progress = 100
+                ### end general progress ###
+
+                ### Upload specific progress ###
+                elif query_status_history[n].status.find('start downloading project as zipfile') != -1:
+                    progress = 5
+                elif query_status_history[n].status.find('done downloading project as zipfile') != -1:
+                    progress = 10
+                elif query_status_history[n].status.find('unzipping the zipfile') != -1:
+                    progress = 15
+                elif query_status_history[n].status.find('removing the zipfile') != -1:
+                    progress = 20
+                elif query_status_history[n].status.find("creating ro-crate file") != -1:
+                    progress = 25
+                elif query_status_history[n].status.find('upload finished') != -1:
+                    progress = 85
+                elif query_status_history[n].status.find('removing temporary files') != -1:
+                    progress = 95
+                ### end upload specific progress ###
+
+                ### opendata download specific ###
+                elif query_status_history[n].status.find('start data retrieval') != -1:
+                    progress = 5
+                ### end opendata download specific ###
+
+                ### download specific progress ###
+                elif query_status_history[n].status.find("getting file data") != -1:
+                    progress = 20
+                elif query_status_history[n].status.find("getting file data done") != -1:
+                    progress = 30
+                elif query_status_history[n].status.find("hecksum") != -1:
+                    progress = 40
+                elif query_status_history[n].status.find("start pushing dataset to storage") != -1:
+                    progress = 40
+                elif query_status_history[n].status.find('Removing temporary data') != -1:
+                    progress = 95
+                ### end download specific progress ###
+
+                return progress
+            
+            progress = None
+            for n in range(0,1):
+                try:
+                    progress = get_progress(n)
+                    if progress and type(progress)=='int':
+                        break
+                except Exception as e:
+                    progress = 0
+                    logger.error(e)
+
+            #TODO: turn this into a url based on the repo and the url endpoint configured for it
+            project_url = None
+            project_id = get_project_id(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
+            if project_id:
+                if session['repo'] == 'dataverse':
+                    project_url = f"{dataverse_website}/dataset.xhtml?persistentId={project_id}"
+                elif session['repo'] == 'datastation':
+                    project_url = f"{datastation_website}/dataset.xhtml?persistentId={project_id}"
+                elif session['repo'] == 'figshare':
+                    project_url = f"{figshare_website}/account/items/{project_id}/edit"
+                elif session['repo'] == 'zenodo':
+                    project_url = f"{zenodo_website}/uploads/{project_id}"
+                elif session['repo'] == 'osf':
+                    project_url = f"{osf_website}/{project_id}"
+                elif session['repo'] == 'data4tu':
+                    project_url = f"{data4tu_website}/my/datasets/{project_id}/edit"
+                elif session['repo'] == 'irods':
+                    project_url = f"{irods_website}"
+                elif session['repo'] == 'sharekit':
+                    project_url = f"{sharekit_website}"
         except Exception as e:
             logger.error(e, exc_info=True)
             query_status_history = {}
         return render_template('status.html',
                                 data=session,
                                 drive_url=drive_url,
-                                query_status_history = query_status_history)
+                                query_status_history = query_status_history,
+                                progress = progress,
+                                project_id=project_id,
+                                project_url=project_url)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
+                                    data=session,
+                                    drive_url=drive_url,
                                     name="status")
 
 ### END COMPONENTS ###
@@ -1228,7 +1828,8 @@ def persistent_connection(persist=None):
     except Exception as e:
         logger.error(e)
     return render_template('persistent-connection.html',
-                            data=session)
+                                data=session,
+                                drive_url=drive_url )
 
 @app.route('/login/<service>', methods=['GET'])
 @app.route('/login', methods=['GET'])
@@ -1314,11 +1915,10 @@ def authorize(service=None):
                 flash(f'{service} connected')
             except Exception as e:
                 logger.error(f"failed at connecting {service}: {e}")
-                flash('failed to connect')
+                flash('failed to connect')            
     except Exception as e:
         logger.error(e, exc_info=True)
-
-    return redirect(embed_app_url)
+    return render_template("close.html", data=session, drive_url=drive_url)
 
 @app.route('/refresh-token', methods=['GET'])
 def refresh_token():
@@ -1341,9 +1941,12 @@ def refresh_token():
         logger.error(f"Failed at refresh token component view:")
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html',
-                                   name=str(e))
+                                data=session,
+                                drive_url=drive_url,
+                                name=str(e))
     return render_template('refresh-token.html',
                             data=session,
+                            drive_url=drive_url,
                             old_token=old_token,
                             new_token=new_token)
 

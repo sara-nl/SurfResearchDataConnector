@@ -7,12 +7,13 @@
 {% endblock %}
 
 {% block content %}
-{% if not data.connected and not data.failed %}
 
+
+<!-- BEGIN AUTOCONNECT -->
+{% if not data.connected and not data.failed %}
 <script>
     var a = document.createElement('a');
     a.href= '{{ data.srdc_url }}/login';
-    a.target = '_top';
     document.body.appendChild(a);
     a.click();
 </script>
@@ -22,68 +23,57 @@
     </div>
 </div>
 {% endif %}
+<!-- END AUTOCONNECT -->
+
+<!-- BEGIN WELCOME -->
 <h1>Welcome to SURF Research Data Connector</h1>
 <h4>Your extension for connecting research data</h4>
 <p>
-    Surf Research Data Connector is an extension that will allow you to easily pull (open) data from and push data to different research data publication
+    Surf Research Data Connector (SRDC) is an extension that will allow you to easily import data from and export data to different research data publication
     service repositories. Some of the major repositories that are supported are: Dataverse, Zenodo, Figshare, and OSF.
 </p>
 
-<h4>Upload to connected private repositories</h4>
-<p>The extension enables you to upload data to your connected repositories.</p>
-<p>Currently the following repo platforms are supported:</p>
+<p>The following repositories are available in your SRDC:</p>
 <ul>
-    <li>Figshare</li>
-    <li>Zenodo</li>
-    <li>OSF</li>
-    <li>Dataverse</li>
-    {% if data.showall %}
-    <li>iRods</li>
-    <li>Sharekit</li>
-    {% endif %}
-</ul>
-
-<p>
-    Get started in three easy steps:
-</p>
-<ol>
-    {% if not data.connected %}
-    <li><a href="/connect">Connect</a> to your research drive.</li>
+    {% for service in data.registered_services %}
+    {% if service not in data.hidden_services %}
+    {% if service == 'data4tu'%}
+    <li>4TU.ResearchData</li>
     {% else %}
-    <li><b>Connect</b>: you are already connected as <b>{{ data.username }}</b>.</li>
+    <li>{{service | capitalize}}</li>
     {% endif %}
-    <li><a href="/connect">Connect</a> to one or more repositories.</li>
-    <li><a href="/upload">Upload</a> data.</li>
-</ol>
-
-<h4>Download from connected private repositories</h4>
-<p>The extension also allows you to <a href="/download">download</a> data from your private repositories. This enables you to download your own data or data that has been shared with you on these repositories.</p>
-
-{% if 'datahugger' not in data.hidden_services or data.showall %}
-<h4>Download open data</h4>
+    {% endif %}
+    {% endfor %}
+</ul>
 <p>
-    In the backend the extension uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>pull open data</b>.
-    To see which repositories are currently supported for pulling open data, please check out: <a
+
+<h4>Export to connected repositories</h4>
+<p>This extension enables you to export data to your connected repositories.</p>
+
+<h4>Import from connected private repositories</h4>
+<p>This extension also allows you to import data from your private repositories. This enables you to import your own data or data that has been shared with you on these repositories.</p>
+
+<!-- BEGIN DATAHUGGER -->
+{% if 'datahugger' not in data.hidden_services or data.showall %}
+<h4>Import open data</h4>
+<p>
+    In the backend the SRDC uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>import open data</b>.
+    To see which repositories are currently supported for importing open data, please check out: <a
         href="https://j535d165.github.io/datahugger/repositories/" target="new">the Datahugger Supported Repositories
         page</a>.
 </p>
-<p>
-    Get started in two easy steps:
-</p>
-<ol>
-    {% if not data.connected %}
-    <li><a href="/connect">Connect</a> to your research drive.</li>
-    {% else %}
-    <li><b>Connect</b>: you are already connected as <b>{{ data.username }}</b>.</li>
-    {% endif %}
-    <li><a href="/retrieve">Download</a> open data.</li>
-</ol>
 
 <p>Search for open Research Data in most Datahugger supported repositories using <a href="https://cse.google.com/cse?cx=762961cffaa1c4546" target="_blank">Google</a>.</p>
 <p>Search for open Research Data in most Datahugger supported dataverse repositories using <a href="https://www.re3data.org" target="_blank">re3data</a>.</p>
-{% endif %}
 
-{{poll_login}}
+<p><a href="/start"> <button class="btn btn-secondary">Get started here!</button></a></p>
+{% endif %}
+<!-- END DATAHUGGER -->
+
+<!-- END WELCOME -->
+
+   
+<!-- BEGIN NC LOGIN -->
 {% if poll_login %}
 {{ data.poll_info.poll_login }}
 <script>
@@ -94,5 +84,12 @@
     a.click();
 </script>
 {% endif %}
+<!-- END NC LOGIN -->
 
+{% endblock %}
+
+{% block script %}
+<script>
+    form_validate();
+</script>
 {% endblock %}

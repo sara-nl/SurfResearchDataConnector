@@ -2,7 +2,7 @@
 
 {% from "macros.html" import load_async with context %}
 
-{% block title %}Download{% endblock %}
+{% block title %}Import{% endblock %}
 
 {% block head %}{{ super() }}{% endblock %}
 
@@ -18,7 +18,7 @@
                     {% if message=='Data folder already exists on your drive. Please check the box if you want to use this folder.' %}
                         {% if vars.update({'folder_exists_message': True}) %} {% endif%}
                     {% endif %}
-                    {% if message=='Data has already been downloaded from this url. Please check the box if you want to download again from this url.' %}
+                    {% if message=='Data has already been imported from this url. Please check the box if you want to import again from this url.' %}
                         {% if vars.update({'url_exists_message': True}) %} {% endif%}
                     {% endif %}
                 {% endfor %}
@@ -29,9 +29,9 @@
 <!-- END BEGIN HELPER LOGIC ### -->
 
 {% if not preview %}
-    <h1>Download Open Data</h1>
-    <p>Download open data to your Research Drive using <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a>.</p>
-    <p>Datahugger is used in the background to try and retrieve metadata and to download the data. If you encounter any issues with retrieving metadata or the data itself, then please consider providing feedback about this to the Datahugger project.</p>
+    <h1>Import Open Data</h1>
+    <p>Import open data to your Research Drive using <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a>.</p>
+    <p>Datahugger is used in the background to try and retrieve metadata and to import the data. If you encounter any issues with retrieving metadata or the data itself, then please consider providing feedback about this to the Datahugger project.</p>
 {% endif %}
 
 {% if data.connected==True %}
@@ -53,13 +53,12 @@
                 <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {% endif %} id="flexCheckUrl" name="accept_url_in_history" required>
                     <label class="form-check-label" for="flexCheckUrl">
-                    Check this to retrieve even if this url is in your history of downloads.
+                    Check this to retrieve even if this url is in your history of imports.
                     </label>
                 </div>
                 {% endif %}
                 <div class="form-group mt-3 mb-3">
-                    <label for="Folder">Data Folder Path: </label>
-                    
+                    <h2>Import Data Folder Path</h2>
                     <!-- async loading folder paths -->
                     {{ load_async("folderpaths", "/folder-paths", 55000) }}
                     <!-- end async -->
@@ -82,14 +81,14 @@
             {% if not preview %}
 
                 <!-- ### BEGIN PREVIEW BUTTON -->
-                <p><button type="submit" class="btn btn-secondary">Preview Download</button></p>
-                <p><a href="/download"><small>I want to download a private dataset.</small></a></p>
+                <p><button type="submit" class="btn btn-secondary">Preview Import</button></p>
+                <p><a href="/download"><small>I want to import a private dataset.</small></a></p>
                 <!-- ### END PREVIEW BUTTON -->
 
             {% else %}
 
                 <!-- ### BEGIN PREVIEW ### -->
-                <h1>Download Open Data - Preview</h1>
+                <h1>Import Open Data - Preview</h1>
                 
                 <h2>Drive Storage</h2>
                 <!-- async loading quote_text -->
@@ -114,14 +113,14 @@
                 <!-- ### END PREVIEW ### -->
                 <p></p>
                 <p>This is what is able to be retrieved using the <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> project.</p>
-                <p>You can also try to <a href="/download">download</a> using a repository service you are <a href="/connect">connected</a> to.</p>
+                <p>You can also try to <a href="/download">import</a> using a repository service you are <a href="/connect">connected</a> to.</p>
                 {% endif %}
             </form>
         <!-- ### END FORM ### -->
 
     {% else %}
     
-        <form action="/cancel_retrieval" method="post">
+        <form id="cancel_process" action="/cancel_retrieval" method="post">
             <input type="text" name="cancel" value="true" hidden>
             <input type="text" name="preview" value={{preview}} hidden>
             <input type="text" name="check_accept_folder_first" value={{check_accept_folder_first}} hidden>

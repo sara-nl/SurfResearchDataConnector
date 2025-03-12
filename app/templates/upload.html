@@ -2,7 +2,7 @@
 
 {% from "macros.html" import load_async with context %}
 
-{% block title %}Upload{% endblock %}
+{% block title %}Export{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -11,12 +11,19 @@
 {% block content %}
 
 {% if not preview %}
-<h1>Upload</h1>
-<p>Upload data from your Research Drive to your connected repositories. Your data is always only uploaded and never published. You can review your data on the repository platform and then decide to publish from within that platform.</p>
+
+{% if data.query_status==None or data.query_status=='ready' and data.process==None%}
+<h1>Export</h1>
+<p>Export data from your Research Drive to your connected repositories. Your data is always only exported and never published. You can review your data on the repository platform and then decide to publish from within that platform.</p>
+{% else %}
+
+<h1>Processing export</h1>
+{% endif %}
+<p>Project name: <b>{{ data.projectname }}</b></p>
 {% endif %}
 
 {% if data.connected==True %}
-    {% if data.query_status==None or data.query_status=='ready' %}
+    {% if data.query_status==None or data.query_status=='ready' and data.process==None %}
         <form method="post" action="/upload" class="needs-validation mt-3 mb-3" novalidate >
             <div {% if preview %} hidden {% endif %}>
                 <!-- async loading repo selection -->
@@ -25,7 +32,7 @@
                 {% if not preview %}
                 <div id="show_dataverses"></div>
                 <div class="form-group mt-3 mb-3">
-                    <label for="Folder">Select the folder to upload:</label>
+                    <h2>Export Data Folder Path</h2>
                     <!-- async loading folder paths -->
                     {{ load_async("folderpaths", "/folder-paths", 55000) }}
                     <!-- end async -->
@@ -37,42 +44,46 @@
                 </select>
                 {% endif %}
                 
-                <h2>Metadata</h2>
-                <div id="show_meta">Please select a repository. The repository specific metadata fields will show here.</div>
+                
+                <div id="show_meta">Please select a repository.</div>
+                
             </div>
             {% if not preview %}
 
                 <!-- ### BEGIN PREVIEW BUTTON -->
                 <input type="text" name="preview" value="true" hidden>
-                <button type="submit" class="btn btn-secondary">Preview Upload</button>
+                <button type="submit" class="btn btn-secondary">Preview Export</button>
                 <!-- ### END PREVIEW BUTTON -->
 
             {% else %}
 
                 <!-- ### BEGIN PREVIEW ### -->
-                <h1>Upload - Preview</h1>
+                <h1>Export - Preview</h1>
+                <p>Project name: <b>{{ data.projectname }}</b></p>
                 
-                <h2>Repo</h2>
+                <h2>Repository</h2>
                 <!-- async loading check connection -->
                 {% set checkconnectionurl = '/check-connection/' + data.repo %}
                 {{ load_async("check_connection", checkconnectionurl) }}
                 <!-- end async -->
 
                 {% if data.repo == 'dataverse' %}
-                <div>Uploading to dataverse: {{data.dataverse.title}}</div>
+                <div>Exporting to dataverse: {{data.dataverse.title}}</div>
                 {% endif %}
                 
                 
-                <h2>Data Folder to upload</h2>
+                <h2>Data Folder to export</h2>
                 <!-- async loading folder content -->
                 {{ load_async("foldercontent", "/folder-content/up", 55000) }}
                 <!-- end async -->
 
-                <h2>Metadata</h2>
                 
                 <!-- async loading metadata -->
                 {% if data.repo=='figshare' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=figshare") }}
+                {% endif %}
+                {% if data.repo=='data4tu' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=data4tu") }}
                 {% endif %}
                 {% if data.repo=='zenodo' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=zenodo") }}
@@ -81,7 +92,10 @@
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=osf") }}
                 {% endif%}
                 {% if data.repo=='dataverse' %}
-                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=dataverse") }}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=dataverse", 30000) }}
+                {% endif%}
+                {% if data.repo=='datastation' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=datastation", 30000) }}
                 {% endif%}
                 {% if data.repo=='irods' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=irods") }}
@@ -89,32 +103,37 @@
                 {% if data.repo=='sharekit' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=sharekit") }}
                 {% endif%}
-                <!-- end async -->
+                {% if data.repo=='surfs3' %}
+                {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=surfs3") }}
+                {% endif%}
+                <!-- end async --> 
 
                 <!-- ### END PREVIEW ### -->
 
                 <a href="/upload" class="btn btn-secondary">Back</a>
-                <button type="submit" class="btn btn-secondary">Start Upload</button>
+                <button type="submit" class="btn btn-secondary">Start Export</button>
+                {% if data.repo !='dataverse' and data.repo!='datastation' %}
                 <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" id="flexUploadZip" value="" name="use_zip">
                     <label class="form-check-label" for="flexUploadZip">
-                        Check to upload all files as 1 zipfile.
+                        Check to export all files as 1 zipfile.
                     </label>
                 </div>
+                {% endif %}
                 <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" id="flexCheckUpload" value="" name="start_upload" required>
                     <label class="form-check-label" for="flexCheckUpload">
-                        Check to confirm start of upload.
+                        Check to confirm start of export.
                     </label>
                     <div class="invalid-feedback">
-                        Please check this box to confirm upload!
+                        Please check this box to confirm export!
                     </div>
                 </div> 
             {% endif %}
         </form>
     {% else %}
 
-        <form action="/cancel_upload" method="post">
+        <form id="cancel_process" action="/cancel_upload" method="post">
             <input type="text" name="cancel" value="true" hidden>
             <input type="text" name="preview" value={{preview}} hidden>
             <button type="submit" class="btn btn-secondary">Cancel Process</button>
@@ -159,4 +178,14 @@
 <script>
     form_validate();
 </script>
+
+
+{% if preview %}
+<script>
+    $(document).ready(function () {
+        $("#show_meta").remove();
+    });
+</script>
+{% endif %}
+
 {% endblock %}

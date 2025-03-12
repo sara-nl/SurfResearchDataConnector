@@ -5,25 +5,28 @@ import os
 from app.repos.zenodo import Zenodo
 from pactman import Consumer, Provider
 
-# api_key = os.getenv("ZENODO_API_KEY", default=None)
+api_key = os.getenv("ZENODO_API_KEY", default=None)
 
-try:
-    config = configparser.ConfigParser()
-    config.read('env.ini')
-except Exception as e:
-    config = None
-    log.error(str(e))
+## Not needed as these test use mocked api calls
 
-try:
-    api_key = os.getenv(
-        "ZENODO_API_KEY",
-        config.get('TESTS', 'ZENODO_API_KEY')
-    )
-except Exception as e:
-    log.error(f"Could not get an api_key for testing: {str(e)}")
-    log.info("Halting tests")
-    sys.exit()
+# try:
+#     config = configparser.ConfigParser()
+#     config.read('env.ini')
+# except Exception as e:
+#     config = None
+#     log.error(str(e))
 
+# try:
+#     api_key = os.getenv(
+#         "ZENODO_API_KEY",
+#         config.get('TESTS', 'ZENODO_API_KEY')
+#     )
+# except Exception as e:
+#     log.error(f"Could not get an api_key for testing: {str(e)}")
+#     log.info("Halting tests")
+#     sys.exit()
+
+## Will need it once we implement tests against the live / sandbox API.
 
 def create_app():
     from src import bootstrap

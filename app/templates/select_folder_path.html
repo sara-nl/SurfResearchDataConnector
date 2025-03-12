@@ -1,14 +1,44 @@
-<select name="folder_path" class="form-select" required>
-    <option></option>
-    {% for folder_path in folder_paths %}
-        {% if folder_path == data.folder_path %}
-        <option value="{{folder_path}}" selected='selected' >{{ folder_path }}</option>
-        {% else %}
-            <option value="{{folder_path}}">{{ folder_path }}</option>
-        {% endif %}
-    {% endfor %}
-</select>
+<div class="row">
+    <div class="col-4">
+        <p>Filter the Data Folder Paths (optional):</p>
+        <input class="form-control" id="myInput" type="text" placeholder="Type to filter the paths in the dropdown list.">
+    </div>
+    <div class="col-8">
+        <p>Select the Data Folder Path:</p>
+        <select name="folder_path" class="form-select" id="myList" required>
+            <option></option>
+            {% for folder_path in folder_paths %}
+                {% if folder_path == data.folder_path %}
+                <option value="{{folder_path}}" selected='selected' >{{ folder_path }}</option>
+                {% else %}
+                    <option value="{{folder_path}}">{{ folder_path }}</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+    </div>        
+</div>
 <p><small><a href="/refresh">Refresh</a> all data folder paths.</small></p>
 <div class="invalid-feedback">
     Please select a folder path!
 </div>
+
+<script>
+    $(document).ready(function(){
+     $("#myInput").on("click",function(){
+        var se=$("#myList");
+        se.show();
+        se[0].size=10;
+        });
+    $("#myList").on("click",function(){
+        var se=$("#myList");
+        se.show();
+        se[0].size=1;
+        });
+      $("#myInput").on("keyup", function() {
+        var value = $(this).val().toLowerCase();
+        $("#myList option").filter(function() {
+          $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+        });
+      });
+    });
+    </script>

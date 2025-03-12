@@ -2,7 +2,22 @@ global:
   image:
     tag: v0.2.5
   namespace:
-    name: surfresearchdataconnector
+    name: srdc-redis
 loglevel: DEBUG
 # If you set this to "False", SSL will not be verified in all https requests. Default: "True"
 verify_ssl: True
+
+nameOverride: "surfresearchdataconnector"
+fullnameOverride: "surfresearchdataconnector"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: local-srdr-rd-redis-acc.data.surfsara.nl
+      # paths:
+      #   - path: /
+      #     pathType: ImplementationSpecific
+  tls:
+   - secretName: localdomain-redis-tls
+    #  hosts:
+    #    - reversed-rd-app-acc.data.surfsara.nl

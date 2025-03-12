@@ -553,8 +553,9 @@ class Figshare(object):
             f"Entering at lib/figshare.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
             # we will get the latest created article_id
-            article_id = self.get_article_internal(return_response=True).json()[0]['id']
-            article_id = int(article_id)
+            if article_id == None:
+                article_id = self.get_article_internal(return_response=True).json()[0]['id']
+                article_id = int(article_id)
 
             file_info = self.initiate_new_upload(article_id, path_to_file)
             self.upload_parts(file_info, path_to_file)

@@ -119,6 +119,9 @@ env:
     value: ABC
   - name: DB_HOST
     value: 1.1.1.1
+    # define the port with colon like so: :3306
+  - name: DB_PORT
+    value: :3306
   - name: DB_DATABASE
     value: ABC
 

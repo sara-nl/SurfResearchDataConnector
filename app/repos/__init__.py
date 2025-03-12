@@ -3,9 +3,10 @@ from app.repos.figshare import Figshare
 from app.repos.zenodo import Zenodo
 from app.repos.dataverse import Dataverse
 from app.repos.irods import Irods
+from app.repos.surfs3 import Surfs3
 from app.repos.sharekit import Sharekit
 from app.utils import update_history, create_generated_folder, total_files_count, get_canceled, cloud, make_connection
-from app.utils import create_rocrate, check_checksums, push_data, get_query_status, get_status_from_history
+from app.utils import create_rocrate, check_checksums, push_data, get_query_status, get_status_from_history, set_project_id
 import logging
 import owncloud
 import nextcloud_client
@@ -48,6 +49,13 @@ def get_repocontent(repo, url, api_key, user=None):
         except:
             article_id = int(url.split('/')[-2])
         repo_content = figshare.get_repo_content(article_id=article_id)
+    if repo == 'data4tu':
+        data4tu = Figshare(api_key=api_key, api_address=data4tu_api_url)
+        try:
+            article_id = url.split('/')[-1]
+        except:
+            article_id = url.split('/')[-2]
+        repo_content = data4tu.get_repo_content(article_id=article_id)
     if repo == 'zenodo':
         zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
         try:
@@ -76,6 +84,19 @@ def get_repocontent(repo, url, api_key, user=None):
             repo_content = dataverse.get_repo_content(persistent_id=persistent_id)
         except:
             repo_content = []
+    if repo == 'datastation':
+        try:
+            datastation = Dataverse(api_key=api_key, api_address=datastation_api_url, datastation=True)
+            if url.find('doi.org') == -1:
+                persistent_id = url.split('?')[-1]
+                persistent_id = persistent_id.split('&')[0]
+                persistent_id = persistent_id.split('=')[-1]
+            else:
+                persistent_id = url.split('doi.org/')[-1]
+                persistent_id = 'doi:' + persistent_id
+            repo_content = datastation.get_repo_content(persistent_id=persistent_id)
+        except:
+            repo_content = []
     if repo == 'irods':
         # irods = Irods(api_key=api_key, user=user, api_address=irods_api_url)
         irods = Irods(api_key=api_key, api_address=irods_api_url, user=user)
@@ -101,6 +122,13 @@ def get_private_metadata(repo, url, api_key, user=None):
         except:
             article_id = int(url.split('/')[-2])
         private_metadata = figshare.get_private_metadata(article_id=article_id)
+    if repo == 'data4tu':
+        data4tu = Figshare(api_key=api_key, api_address=data4tu_api_url)
+        try:
+            article_id = url.split('/')[-1]
+        except:
+            article_id = url.split('/')[-2]
+        private_metadata = data4tu.get_private_metadata(article_id=article_id)
     if repo == 'zenodo':
         zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
         try:
@@ -126,6 +154,16 @@ def get_private_metadata(repo, url, api_key, user=None):
             persistent_id = url.split('doi.org/')[-1]
             persistent_id = 'doi:' + persistent_id
         private_metadata = dataverse.get_private_metadata(persistent_id=persistent_id)
+    if repo == 'datastation':
+        datastation = Dataverse(api_key=api_key, api_address=datastation_api_url, datastation=True)
+        if url.find('doi.org') == -1:
+            persistent_id = url.split('?')[-1]
+            persistent_id = persistent_id.split('&')[0]
+            persistent_id = persistent_id.split('=')[-1]
+        else:
+            persistent_id = url.split('doi.org/')[-1]
+            persistent_id = 'doi:' + persistent_id
+        private_metadata = datastation.get_private_metadata(persistent_id=persistent_id)
     if repo == 'irods':
         irods = Irods(api_key=api_key, user=user, api_address=irods_api_url)
         parsed = urlparse(url)
@@ -151,6 +189,13 @@ def get_private_files(repo, url, folder, api_key, user=None):
         except:
             article_id = int(url.split('/')[-2])
         private_files = figshare.download_files(article_id=article_id, dest_folder=folder)
+    if repo == 'data4tu':
+        data4tu = Figshare(api_key=api_key, api_address=data4tu_api_url)
+        try:
+            article_id = url.split('/')[-1]
+        except:
+            article_id = url.split('/')[-2]
+        private_files = data4tu.download_files(article_id=article_id, dest_folder=folder)
     if repo == 'zenodo':
         zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
         try:
@@ -176,6 +221,16 @@ def get_private_files(repo, url, folder, api_key, user=None):
             persistent_id = url.split('doi.org/')[-1]
             persistent_id = 'doi:' + persistent_id
         private_files = dataverse.download_files(persistent_id=persistent_id, dest_folder=folder)
+    if repo == 'datastation':
+        datastation = Dataverse(api_key=api_key, api_address=datastation_api_url, datastation=True)
+        if url.find('doi.org') == -1:
+            persistent_id = url.split('?')[-1]
+            persistent_id = persistent_id.split('&')[0]
+            persistent_id = persistent_id.split('=')[-1]
+        else:
+            persistent_id = url.split('doi.org/')[-1]
+            persistent_id = 'doi:' + persistent_id
+        private_files = datastation.download_files(persistent_id=persistent_id, dest_folder=folder)
     if repo == 'irods':
         irods = Irods(api_key=api_key, user=user, api_address=irods_api_url)
         parsed = urlparse(url)
@@ -235,7 +290,7 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
 
 
 
-def check_connection(repo, api_key, user=None):
+def check_connection(repo, api_key=None, user=None):
     # logger.error("check connection")
     connection_ok = False
     if repo == 'osf':
@@ -244,18 +299,29 @@ def check_connection(repo, api_key, user=None):
     if repo == "figshare":
         figshare = Figshare(api_key=api_key, api_address=figshare_api_url)
         connection_ok = figshare.check_token()
+    if repo == "data4tu":
+        data4tu = Figshare(api_key=api_key, api_address=data4tu_api_url)
+        connection_ok = data4tu.check_token()
     if repo == "zenodo":
         zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
         connection_ok = zenodo.check_token()
     if repo == "dataverse":
         dataverse = Dataverse(api_key=api_key, api_address=dataverse_api_url)
-        connection_ok = dataverse.check_token()   
+        connection_ok = dataverse.check_token()
+    if repo == "datastation":
+        datastation = Dataverse(api_key=api_key, api_address=datastation_api_url, datastation=True)
+        connection_ok = datastation.check_token()   
     if repo == "irods":
         irods = Irods(api_key=api_key, api_address=irods_api_url, user=user)
         connection_ok = irods.check_token()
+    if repo == "surfs3":
+        surfs3 = Surfs3(api_key=api_key, api_address=surfs3_api_url, user=user)
+        connection_ok = surfs3.check_token()
     if repo == "sharekit":
         sharekit = Sharekit(api_key=api_key, api_address=sharekit_api_url)
         connection_ok = sharekit.check_token()
+    if repo == 'datahugger':
+        connection_ok = True
     return connection_ok
 
 
@@ -371,12 +437,18 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             osf = osf = Osf(api_key=api_key, api_address=osf_api_url)
         if repo == 'figshare':
             figshare = Figshare(api_key=api_key, api_address=figshare_api_url)
+        if repo == 'data4tu':
+            data4tu = Figshare(api_key=api_key, api_address=data4tu_api_url)
         if repo == 'dataverse':
             dataverse = Dataverse(api_key=api_key, api_address=dataverse_api_url, dataverse_alias=dataverse_alias)
+        if repo == 'datastation':
+            datastation = Dataverse(api_key=api_key, api_address=datastation_api_url, dataverse_alias=dataverse_alias, datastation=True)
         if repo == 'zenodo':
             zenodo = Zenodo(api_key=api_key, api_address=zenodo_api_url)
         if repo == 'irods':
             irods = Irods(api_key=api_key, api_address=irods_api_url, user=repo_user)
+        if repo == 'surfs3':
+            surfs3 = Surfs3(api_key=api_key, api_address=surfs3_api_url, user=repo_user)
         if repo == 'sharekit':
             sharekit = Sharekit(api_key=api_key, api_address=sharekit_api_url)
 
@@ -403,13 +475,19 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
-        if repo == 'figshare':
+        if repo == 'figshare' or repo == 'data4tu':
             try:
-                result = figshare.create_new_article_internal(return_response=True)
+                if repo == 'data4tu':
+                    result = data4tu.create_new_article_internal(return_response=True)
+                else:
+                    result = figshare.create_new_article_internal(return_response=True)
                 project_id = None
                 if result.status_code == 201:
                     if 'entity_id' in result.json():
                         project_id = result.json()['entity_id']
+                if result.status_code == 200:
+                    if 'location' in result.json():
+                        project_id = result.json()['location'].split("/")[-1]
                 if project_id == None:
                     rtext = result.text
                     update_history(username=username, folder=complete_folder_path,
@@ -423,9 +501,12 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
-        if repo == 'dataverse':
+        if repo == 'dataverse' or repo == 'datastation':
             try:
-                r = dataverse.create_new_dataset(return_response=True)
+                if repo == 'dataverse':
+                    r = dataverse.create_new_dataset(return_response=True)
+                else:
+                    r = datastation.create_new_dataset(return_response=True)
                 project_id = None
                 if r.status_code <= 300:
                     try:
@@ -490,7 +571,26 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return
-
+        if repo == 'surfs3':
+            try:
+                project = surfs3.create_new_bucket(metadata=metadata)
+                if type(project) == 'dict':
+                    if  'message' in project:
+                        message = project['message']
+                        update_history(username=username, folder=complete_folder_path,
+                            url=repo, status=f'failed to create a project at {repo}: {message}')
+                        update_history(username=username, folder=complete_folder_path,
+                            url=repo, status=f'ready')
+                        return
+            except Exception as e:
+                update_history(username=username, folder=complete_folder_path,
+                    url=repo, status=f'failed to create a project at {repo}: {e}')
+                update_history(username=username, folder=complete_folder_path,
+                    url=repo, status=f'ready')
+                return                        
+        if project_id != None and project_id!= "":
+            set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
+            
     if not get_canceled(username):
         ### upload files ###
         # if user selected upload as zip to perserve folder structure there will be a zipfile
@@ -508,7 +608,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                         sharekit_files.append(repoItemID)
                         result = True
                 except Exception as e:
-                    message = f"failed to upload file {filepath}: {e}"
+                    message = f"failed to upload file 1 of 1: {tmpzip}: {e}"
                     logger.error(message)
                     update_history(username=username, folder=complete_folder_path, url=repo, status=message)
             if repo == 'osf':
@@ -516,23 +616,40 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             if repo == 'figshare':
                 result = figshare.upload_new_file_to_article_internal(
                                 article_id=project_id, path_to_file=tmpzip)
+            if repo == 'data4tu':
+                url = f'https://data.4tu.nl/v3/datasets/{project_id}/upload'
+                headers = {'Authorization': f"token {data4tu.api_key}"}
+                logger.error(headers)
+                payload = {}
+                file_name = tmpzip.split('/')[-1]
+                files = [
+                            ('file',(file_name, open(tmpzip,'rb')))
+                        ]
+                response = requests.request('POST', url, headers=headers, data=payload, files=files)
+                if response.status_code == 200:
+                    result = True
             if repo == 'dataverse':
                 result = dataverse.upload_new_file_to_dataset(
                         persistent_id=project_id, path_to_file=tmpzip)
+            if repo == 'datastation':
+                result = datastation.upload_new_file_to_dataset(
+                        persistent_id=project_id, path_to_file=tmpzip)
             if repo == 'zenodo':
                 r = zenodo.upload_new_file_to_deposition_internal(
-                    deposition_id=project_id, path_to_file=filepath, return_response=True)
+                    deposition_id=project_id, path_to_file=tmpzip, return_response=True)
                 if r.status_code == 201:
                     result = True
                 else:
                     result = r.text
             if repo == 'irods':
                 result = irods.upload_new_file_to_collection_internal(path=project_path, path_to_file=tmpzip)
+            if repo == 'surfs3':
+                result = surfs3.upload_new_file_to_bucket(bucket_name=metadata['s3archivename'], path_to_file=tmpzip)
             if result == True:
                 message = f"uploaded file: {tmpzip}"
                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
             else:
-                message = f"failed to upload file {filepath}: {result}"
+                message = f"failed to upload file 1 of 1: {tmpzip}: {result}"
                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
         # the unzipped folder will be uploaded
         else:
@@ -580,9 +697,25 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                             if repo == 'figshare':
                                 result = figshare.upload_new_file_to_article_internal(
                                     article_id=project_id, path_to_file=filepath)
+                            if repo == 'data4tu':
+                                url = f'https://data.4tu.nl/v3/datasets/{project_id}/upload'
+                                headers = {'Authorization': f"token {data4tu.api_key}"}
+                                logger.error(headers)
+                                payload = {}
+                                file_name = filepath.split('/')[-1]
+                                files = [
+                                            ('file',(file_name, open(filepath,'rb')))
+                                        ]
+                                response = requests.request('POST', url, headers=headers, data=payload, files=files)
+                                if response.status_code == 200:
+                                    result = True
                             if repo == 'dataverse':
                                 result = dataverse.upload_new_file_to_dataset(
                                     persistent_id=project_id, path_to_file=filepath)
+                            if repo == 'datastation':
+                                result = datastation.upload_new_file_to_dataset(
+                                    persistent_id=project_id, path_to_file=filepath)
+                                logger.error(result)
                             if repo == 'zenodo':
                                 r = zenodo.upload_new_file_to_deposition_internal(
                                     deposition_id=project_id, path_to_file=filepath, return_response=True)
@@ -592,15 +725,16 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                                     result = r.text
                             if repo == 'irods':
                                 result = irods.upload_new_file_to_collection_internal(path=project_path, path_to_file=filepath)
-
+                            if repo == 'surfs3':
+                                result = surfs3.upload_new_file_to_bucket(bucket_name=metadata['s3archivename'], path_to_file=filepath)
                             if result == True:
                                 message = f"uploaded file {n} of {totalfilescount}: {filepath}"
                                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                             else:
-                                message = f"failed to upload file {filepath}: {result}"
+                                message = f"failed to upload file {n} of {totalfilescount} - {filepath}: {result}"
                                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                         except Exception as e:
-                            message = f"failed to upload file {filepath} - {e}"
+                            message = f"failed to upload file {n} of {totalfilescount} - {filepath} - {e}"
                             logger.error(message)
                             update_history(username=username, folder=complete_folder_path, url=repo, status=message)
                         n += 1
@@ -673,6 +807,22 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             subject = metadata['subject']
         except:
             subject = "Other"
+        try:
+            dans_audience_uri = metadata['dans_audience_uri']
+        except:
+            dans_audience_uri = "https://www.narcis.nl/classification/E14000"
+        try:
+            dansRights_personal = metadata['dansRights_personal']
+        except:
+            dansRights_personal = "Unknown"
+        try:
+            dansRights_language = metadata['dansRights_language']
+        except:
+            dansRights_language = "Not applicable"
+        try:
+            dansRights_holder = metadata['dansRights_holder']
+        except:
+            dansRights_holder = "Not set"
 
         if repo == 'osf':
 
@@ -690,14 +840,19 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path,
                                 url=repo, status='failed to update metadata')                
 
-        if repo == 'figshare':
+        if repo == 'figshare' or repo == 'data4tu':
             data = {
                             'title': title,
                             'description': description,
                             'creators': [{'name': author, 'affiliation': affiliation}]
                         }
-            r = figshare.change_metadata_in_article_internal(
-                    article_id=project_id, metadata=data, return_response=True)
+            if repo == 'data4tu':
+                r = data4tu.change_metadata_in_article_internal(
+                            article_id=project_id, metadata=data, return_response=True)
+            else:
+                r = figshare.change_metadata_in_article_internal(
+                            article_id=project_id, metadata=data, return_response=True)
+
             if r.status_code != 205:
                 code = r.status_code
                 text = r.text
@@ -706,8 +861,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path,
                                 url=repo, status=message)
 
-        if repo == 'dataverse':
-            subject = "Other"
+        if repo == 'dataverse' or repo == 'datastation':
             data = {
                     "metadataBlocks": {
                         "citation": {
@@ -788,9 +942,54 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                         }
                     }
                 }
+            if repo == 'datastation':
+                data['metadataBlocks']['dansRights'] = {
+                        "displayName": "Rights Metadata",
+                        "name": "dansRights",
+                        "fields": [
+                            {
+                                "typeName": "dansRightsHolder",
+                                "multiple": True,
+                                "typeClass": "primitive",
+                                "value": [
+                                    dansRights_holder
+                                ]
+                            },
+                            {
+                                "typeName": "dansPersonalDataPresent",
+                                "multiple": False,
+                                "typeClass": "controlledVocabulary",
+                                "value": dansRights_personal
+                            },
+                            {
+                                "typeName": "dansMetadataLanguage",
+                                "multiple": True,
+                                "typeClass": "controlledVocabulary",
+                                "value": [
+                                    dansRights_language
+                                ]
+                            }
+                        ]
+                    }
+                data['metadataBlocks']['dansRelationMetadata'] = {
+                        "displayName": "Relation Metadata",
+                        "name": "dansRelationMetadata",
+                        "fields": [
+                            {
+                                "typeName": "dansAudience",
+                                "multiple": True,
+                                "typeClass": "primitive",
+                                "value": [dans_audience_uri]
+                            }
+                        ]
+                    }
 
-            r = dataverse.change_metadata_in_dataset_internal(
-                persistent_id=project_id, metadata=data, return_response=True)
+            if repo == 'dataverse':
+                r = dataverse.change_metadata_in_dataset_internal(
+                    persistent_id=project_id, metadata=data, return_response=True)
+            else:
+                r = datastation.change_metadata_in_dataset_internal(
+                    persistent_id=project_id, metadata=data, return_response=True)
             if r.status_code > 204:
                 code = r.status_code
                 text = r.text
