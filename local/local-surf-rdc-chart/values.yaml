@@ -103,7 +103,7 @@ env:
   - name: CLOUD_SERVICE
     value: owncloud
   - name: HIDDEN_SERVICES
-    value: 
+    value: sharekit,data4tu,datastation,surfs3,irods
   - name: OAUTH_SERVICES
     value: 
   - name: TOKEN_BASED_SERVICES
