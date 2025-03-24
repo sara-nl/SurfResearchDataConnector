@@ -65,7 +65,7 @@ multiprocess==0.70.15
 mypy-extensions==1.0.0
 natsort==8.4.0
 numpy==1.25.2
-osfclient @ git+https://github.com/davetromp/osfclient.git@9686201bbd79726722fd528c998a917111bcb16e
+osfclient #@ git+https://github.com/davetromp/osfclient.git
 packaging==23.1
 pactman==2.30.0
 pandas==2.0.3
