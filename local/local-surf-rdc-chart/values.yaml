@@ -96,8 +96,6 @@ affinity: {}
 
 # enviroment vars
 env:
-  - name: EMBED_APP_URL
-    value: https://acc-aperture.data.surfsara.nl/index.php/apps/external/1
   - name: DRIVE_URL
     value: https://acc-aperture.data.surfsara.nl
   - name: SRDC_URL
@@ -107,7 +105,7 @@ env:
   - name: HIDDEN_SERVICES
     value: 
   - name: OAUTH_SERVICES
-    value: figshare,zenodo,osf
+    value: 
   - name: TOKEN_BASED_SERVICES
     value: datastation,irods,figshare,zenodo,osf,sharekit,data4tu,dataverse,surfs3
   - name: USE_SQLITE

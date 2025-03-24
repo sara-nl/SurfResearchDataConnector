@@ -6,7 +6,7 @@
 # This script will help you setup a minikube 
 # for development of RDS ports
 #
-# The script will execute all nessecary steps
+# The script will execute all necessary steps
 # to get minikube running and deploy according
 # to the values.yaml in the local
 # folder.
@@ -29,7 +29,10 @@ minikube delete
 
 echo "#######################################"
 echo "Start up a new minikube cluster with kubernetes version 1.23.0"
-minikube start --driver=docker --kubernetes-version=v1.26.1 --memory=3g --mount-string="/home/dave/Projects/github/SurfResearchDataConnector:/RRDS" --mount
+minikube start --driver=docker --kubernetes-version=v1.26.1 --memory=3g 
+#--mount-string="/home/dave/Projects/github/SurfResearchDataConnector:/RRDS" --mount 
+# this will mount the local codebase of the app for easy development
+# also uncomment volumes and volumemounts sections in the deployment.yaml file
 
 echo "#######################################"
 echo "Enable the ingress addon"
@@ -73,7 +76,7 @@ cd ..
 
 echo "#######################################"
 echo "run helm install"
-helm install -n surf-rdc surfresearchdataconnector local-surf-rdc-chart/ --values local-surf-rdc-chart/values-aperture.yaml
+helm install -n surf-rdc surfresearchdataconnector local-surf-rdc-chart/ --values local-surf-rdc-chart/values.yaml
 
 echo "#######################################"
 echo "See cluster status"

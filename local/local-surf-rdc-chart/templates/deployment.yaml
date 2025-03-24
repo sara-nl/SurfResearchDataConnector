@@ -24,11 +24,11 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      volumes:
-        - name: surfresearchdataconnector-server-storage
-          hostPath: 
-            path: /RRDS
-            type: Directory
+      # volumes:
+      #   - name: surfresearchdataconnector-server-storage
+      #     hostPath: 
+      #       path: /RRDS
+      #       type: Directory
 
       serviceAccountName: {{ include "surfresearchdataconnector.serviceAccountName" . }}
       securityContext:
@@ -39,10 +39,10 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          volumeMounts:
-            - name: surfresearchdataconnector-server-storage
-              mountPath: /app
-              readOnly: false
+          # volumeMounts:
+          #   - name: surfresearchdataconnector-server-storage
+          #     mountPath: /app
+          #     readOnly: false
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
