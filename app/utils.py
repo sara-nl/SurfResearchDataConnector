@@ -20,6 +20,7 @@ from rocrate.rocrate import ROCrate
 from rocrate.model.person import Person
 from rocrate.model.dataset import Dataset
 from functools import lru_cache
+from functools import wraps
 import xml.etree.ElementTree as ET
 from authlib.integrations.requests_client import OAuth2Session
 
@@ -28,8 +29,13 @@ try:
     from app.globalvars import *
 except:
     # for testing this file locally
-    from models import app, db, History
+    try:
+        from models import app, db, History
+    except:
+        pass
     from globalvars import *
+    # cloud_service = "owncloud"
+    # drive_url = "https://acc-aperture.data.surfsara.nl"
     print("testing")
     # for v in all_vars:
     #     print(v)
@@ -37,6 +43,7 @@ except:
 from pprint import pprint
 
 logger = logging.getLogger()
+logging.getLogger().setLevel(logging.INFO)
 
 if cloud_service == "owncloud":
     cloud = owncloud.Client(drive_url)
@@ -60,6 +67,23 @@ query_projectname = {}
 
 global query_project_id
 query_project_id = {}
+
+global memo
+memo = {}
+def global_memoize(function):
+    """memoization decorator that uses a globally available storage.
+    So this should work between threads
+    """   
+    @wraps(function)
+    def wrapper(*args):
+        logger.error(args)
+        # add the new key to dict if it doesn't exist already  
+        if args not in memo:
+            logger.error("caching")
+            memo[args] = function(*args)
+        return memo[args]
+    return wrapper
+
 
 def make_connection(username=None, password=None):
     """This function  will test if the username and password
@@ -154,8 +178,6 @@ def get_data(url, folder, username=None,):
         update_history(username=username, folder=folder,
                        url=url, status=message)
 
-
-# @lru_cache(maxsize=1)
 def get_files_info(url):
     """Will get file info by datahugger
 
@@ -255,7 +277,6 @@ def get_query_status(username, folder, url):
         return query_status[(username, folder, url)]
     except:
         return None
-
 
 def set_query_status(username, folder, url, status):
     """will set the query status
@@ -363,7 +384,7 @@ def total_files_count(folder):
         logger.error(e, exc_info=True)
 
 
-def push_data(username, password, folder, url):
+def push_data(username, password, folder, url, repo=None):
     """Will push data from a local folder to a folder on an owncloud instance.
 
     Args:
@@ -371,17 +392,20 @@ def push_data(username, password, folder, url):
         password (str): application password for logging on to the owncloud instance.
         folder (str): folder path
     """
+    logger.info("Start push data via webdav to RD")
+
+
+    restorefolderpath = folder
+    if repo == "surfs3":
+        restorefolderpath = f"./RESTORE/{folder}/"
+
     message = None
     try:
         folder_exists = check_if_folder_exists(username, password, folder, url)
         if folder_exists:
-            message = "folder already exists."
+            message = f"folder {folder} already exists."
             update_history(username, folder, url, message)
-
-        # This does not seem to work
-        # cloud.put_directory("/", folder)
-        # So let's upload file by file
-        # And create sub directories as well
+            logger.info(message)
 
         # first login
         try:
@@ -392,55 +416,88 @@ def push_data(username, password, folder, url):
             update_history(username, folder, url, message)
 
         # calculate the total files count
-        totalfilescount = total_files_count(folder)
+        totalfilescount = total_files_count(restorefolderpath)
 
         # upload file by file to OC
         n = 1
-        for root, dirs, files in os.walk(folder):
+
+        ### Lets first create all the needed folders at RD ###
+        walkfolder = folder
+        if repo == "surfs3":
+            walkfolder = f"./RESTORE/{folder}/"
+
+        for folderpath, dirs, files in os.walk(walkfolder):
+            # make sure we do not create or upload to the temp folders: RESTORE, ARCHIVE and the files folder created by S3
+            if repo == "surfs3":
+                folderpath = folderpath.split("./RESTORE/")[-1]
+                folderpath = folderpath.split("/ARCHIVE/files")[-1]
+                folderpath = folderpath.split("/ARCHIVE")[-1]
+                folderpath = folderpath.replace("//", "/")
+            #If user did not cancel the import process
             if not get_canceled(username):
-                if not folder_exists:
+
+                # create the folder path at RD if it does not exist
+                if not check_if_folder_exists(username, password, folderpath, url):
+                    logger.info(f"folder {folderpath} does not exits, lets create it.")
                     try:
-                        cloud.mkdir(root)
+                        createdfolder = cloud.mkdir(folderpath)
+                        if createdfolder:
+                            logger.info(f"Succesfully created folder: {folderpath}")
+                        else:
+                            logger.info(f"Could not create folder: {folderpath} : {createdfolder}")
                     except Exception as e:
-                        # retry after making the connection again
+                        if str(e) == "HTTP error: 405":
+                            message = "Folder already exists"
+                            logger.info(message)
+                        else:
+                            logger.info(f"Could not create folder: {folderpath} : {e}")
+                            message = f"failed to create folder: {e}"
+                        update_history(username, folder, url, message)
+        ### end of generating all folders at RD ###
+
+        ### now let's start uploading all the files to the created folderpaths at RD ###
+        for folderpath, dirs, files in os.walk(walkfolder):
+            if not get_canceled(username):
+                for file in files:
+                    filepath = os.path.join(folderpath, file)
+                    logger.info(f"About to upload file {n} of {totalfilescount}: {filepath}")
+                    try:
+                        # make sure we do not create or upload to the temp folders: RESTORE, ARCHIVE and the files folder created by S3
+                        if repo == "surfs3":
+                            remotefilepath = filepath.split("./RESTORE/")[-1]
+                            remotefilepath = remotefilepath.split("/ARCHIVE/files")[-1]
+                            remotefilepath = remotefilepath.split("/ARCHIVE")[-1]
+                            remotefilepath = remotefilepath.replace("//", "/")
+                            cloud.put_file(remotefilepath, filepath)
+                            message = f"uploaded file {n} of {totalfilescount}: {remotefilepath}"
+                        else:
+                            cloud.put_file(filepath, filepath)
+                            message = f"uploaded file {n} of {totalfilescount}: {filepath}"
+                    except Exception as e:
                         try:
-                            if make_connection(username, password):
-                                cloud.mkdir(root)
-                            else:
-                                message = f"failed to create folder: {e}"
-                                update_history(username, folder, url, message)
-                        except Exception as ee:
-                            message = f"failed to create folder: {ee}"
+                            message = f"Retrying to upload file {n} of {totalfilescount}: {filepath} after exception: {e}"
                             update_history(username, folder, url, message)
-                for j in files:
-                    filepath = os.path.join(root, j)
-                    try:
-                        cloud.put_file(filepath, filepath)
-                        message = f"uploaded file {n} of {totalfilescount}: {filepath}"
-                    except Exception as e:
-                        try:
-                            if make_connection(username, password):
+                            # let's try to create the folder again
+                            if cloud.mkdir(folderpath):
                                 cloud.put_file(filepath, filepath)
-                                message = f"uploaded file {n} of {totalfilescount}: {filepath}"
-                            else:
-                                logger.error(e)
-                                message = f"failed to upload file {n} of {totalfilescount}: {filepath} - {e}"                               
+                                message = f"uploaded file {n} of {totalfilescount}: {filepath}"                             
                         except Exception as ee:
                             logger.error(ee)
                             message = f"failed to upload file {n} of {totalfilescount}: {filepath} - {ee}"
                     update_history(username, folder, url, message)
                     n += 1
-        
+        ### end of uploading files ###
+
         # remove the local folder with the data
         try:
-            shutil.rmtree(folder)
+            shutil.rmtree(walkfolder)
             update_history(username,folder, url, "removing temporary data")
         except Exception as e:
             logger.error(e, exc_info=True)
             update_history(username,folder, url, f"failed to remove temporary data: {e}")
     except Exception as eee:
         try:
-            shutil.rmtree(folder)
+            shutil.rmtree(walkfolder)
             update_history(username,folder, url, "removing temporary data")
         except Exception as ee:
             logger.error(ee, exc_info=True)
@@ -478,7 +535,6 @@ def check_permission(username, password, folderpath):
         logger.error(e, exc_info=True)
 
 
-# @lru_cache(maxsize=1)
 def get_folders(username, password, folder):
     """Will get the folders on an owncloud instance.
 
@@ -506,15 +562,15 @@ def get_folders(username, password, folder):
         message = "failed to list folders"
         logger.error(message)
         logger.error(e, exc_info=True)
+        return message
 
 
-@lru_cache(maxsize=1)
+@global_memoize
 def get_cached_folders(username, password, folder):
     return get_folders(username, password, folder)
 
 
-# @lru_cache(maxsize=1)
-def get_folder_content(username, password, folder):
+def get_folder_content(username, password, folder, files_only=False):
     """Will get a folder content on an owncloud instance.
 
     Args:
@@ -527,12 +583,22 @@ def get_folder_content(username, password, folder):
     """
     try:
         if make_connection(username, password):
-            result = cloud.list(folder, depth=100)
             paths = []
-            for item in result:
-                folder_path = item.path
-                if folder_path not in paths:
-                    paths.append(folder_path)
+            try:
+                result = cloud.list(folder, depth=100)
+            except:
+                result = []
+            if len(result) > 0:
+                for item in result:
+                    if files_only:
+                        if item.file_type == 'file':
+                            folder_path = item.path
+                            if folder_path not in paths:
+                                paths.append(folder_path)
+                    else:
+                        folder_path = item.path
+                        if folder_path not in paths:
+                            paths.append(folder_path)
             return paths
         else:
             logger.error("Failed to make connection.")
@@ -540,6 +606,37 @@ def get_folder_content(username, password, folder):
     except Exception as e:
         logger.error(e, exc_info=True)
         return []
+
+
+def get_folder_content_props(username, password, folder):
+    """Will get a folder content props on an cloud instance.
+
+    Args:
+        username (str): username for logging on to the cloud instance.
+        password (str): application password for logging on to the cloud instance.
+        folder (str): folder path
+
+    Returns:
+        list: list of available files and folder paths in the specified folder with all props 
+    """
+    try:
+        if make_connection(username, password):
+            result = []
+            FileInfoObject = cloud.list(folder, depth=100)
+            for object in FileInfoObject:
+                object_dict = {}
+                object_dict['path'] = object.path
+                object_dict['file_type'] = object.file_type
+                object_dict['attributes'] = object.attributes
+                result.append(object_dict)
+            return result
+        else:
+            logger.error("Failed to make connection.")
+            return []
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return []
+
 
 def refresh_cloud_token(data):
     """Will refresh the cloud token data.
@@ -701,7 +798,11 @@ def check_checksums(username, url, folder, files_info=None):
                 hash_match = (hash == newhash)
                 status = f"---> Checksum match: {hash_match} - {file}"
                 checksums[file] = hash_match
-                update_history(username, folder, url, status)
+                folderstripped = folder.split("./RESTORE/")[-1].replace("//", "/")
+                # remove trailing slash if any
+                if folderstripped[-1] == "/":
+                    folderstripped = folderstripped[:-1]
+                update_history(username, folderstripped, url, status)
         try:
             timestamp = str(time.time()).split('.')[0]
         except:
@@ -971,11 +1072,13 @@ def repo_content_can_be_processed(repo_content):
         # compare: we need twice the repo_content size as diskspace as we also download the content as a zip
         if free_bytes > total_file_size * 2.0:
             return True
+        else:
+            return False
 
     except Exception as e:
         logger.error("Exception at repo_content_can_be_processed")
         logger.error(e)
-        return None
+        return False
 
     return False
 
@@ -1014,7 +1117,6 @@ def folder_content_can_be_processed(username, password, folder):
     return result
 
 
-# @lru_cache(maxsize=1)
 def get_doi_metadata(url):
     """will pull metadata from the passed in url.
 
@@ -1213,7 +1315,6 @@ def parse_folder_structure(list_of_paths, folder_path):
         logger.error(e, exc_info=True)
 
 
-# @lru_cache(maxsize=1)
 def get_raw_folders(username, password, folder):
     try:
         list_of_paths = get_folder_content(username, password, folder)
@@ -1319,8 +1420,13 @@ def get_webdav_token_nc(poll_endpoint):
     except Exception as e:
         logger.error(e, exc_info=True)
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=None)
 def get_dans_audiences():
+    """will return the dans_audiences
+
+    Returns:
+        json: the response result of the dans_audiences endpoint
+    """
     results = []
     for i in list(string.ascii_lowercase):
         url = f'https://demo.vocabs.datastations.nl/rest/v1/search?unique=true&maxhits=2000&vocab=NARCIS&parent=&lang=en&&query=*{i}*'
@@ -1330,8 +1436,16 @@ def get_dans_audiences():
                 results.append(item)
     return results
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=None)
 def memoize(f):
+    """memoization function to wrap api requests that take long time to return, but whos responses do not change often.
+
+    Args:
+        f (obj): funtion call
+
+    Returns:
+        obj: return value of the function call
+    """
     return f
 
 
@@ -1352,4 +1466,5 @@ if __name__ == "__main__":
     # token = ""
     # print(get_user_info(username=user_id, password=password))
     # print(get_user_info_by_token(token))
-    print(get_dans_audiences())
+    # print(get_dans_audiences())
+    pass

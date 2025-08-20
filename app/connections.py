@@ -84,7 +84,7 @@ except:
 
 
 if 'token_based_services' not in all_vars:
-    token_based_services = ['figshare','zenodo','osf','dataverse', 'irods', 'sharekit', 'data4tu', 'datastation', 'surfs3']
+    token_based_services = ['figshare','zenodo','osf','dataverse', 'irods', 'sharekit', 'data4tu','datastation', 'surfs3']
 
 if 'oauth_services' not in all_vars:
     try:
@@ -109,4 +109,4 @@ registered_services = list(set(token_based_services + oauth_services))
 
 
 if __name__ == "__main__":
-    pass
+    pass 

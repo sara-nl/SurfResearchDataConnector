@@ -5,7 +5,7 @@ from app.repos.dataverse import Dataverse
 from app.repos.irods import Irods
 from app.repos.surfs3 import Surfs3
 from app.repos.sharekit import Sharekit
-from app.utils import update_history, create_generated_folder, total_files_count, get_canceled, cloud, make_connection
+from app.utils import update_history, create_generated_folder, total_files_count, get_canceled, cloud, make_connection, get_folder_content_props
 from app.utils import create_rocrate, check_checksums, push_data, get_query_status, get_status_from_history, set_project_id
 import logging
 import owncloud
@@ -13,6 +13,7 @@ import nextcloud_client
 import zipfile
 import shutil
 import os
+import json
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 import requests
@@ -110,6 +111,9 @@ def get_repocontent(repo, url, api_key, user=None):
         except:
             article_id = int(url.split('/')[-2])
         repo_content = sharekit.get_repo_content(article_id=article_id)
+    if repo == 'surfs3':
+        surfs3 = Surfs3(api_key=api_key, user=user, api_address=surfs3_api_url)
+        repo_content = surfs3.get_bucket_content(bucket_name=url)
     return repo_content
 
 
@@ -244,6 +248,9 @@ def get_private_files(repo, url, folder, api_key, user=None):
         except:
             article_id = int(url.split('/')[-2])
         private_files = sharekit.download_files(article_id=article_id, dest_folder=folder)
+    if repo == 'surfs3':
+        surfs3 = Surfs3(api_key=api_key, user=user, api_address=surfs3_api_url)
+        private_files = surfs3.download_files(bucket_name=url, dest_folder=folder)
     return private_files
 
 
@@ -255,11 +262,18 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
         password (str): password of the owncloud account
         folder (str): folder path of the data
         url (str): url of the location of the data
+        repo (str): name of the repo
+        api_key (str): access_token or api_key needed to connect to the repo
+        user(str | optional): user naem for connectionto the repo
     """
+    folderpath = folder
+    if repo == "surfs3":
+        folderpath = f"./RESTORE/{folder}/"
+
     update_history(username, folder, url, 'started')
     if not get_canceled(username):
         update_history(username, folder, url, 'getting file data')
-        result = get_private_files(repo, url, folder, api_key=api_key, user=user)
+        result = get_private_files(repo, url, folderpath, api_key=api_key, user=user)
         if result == True:
             update_history(username, folder, url, f'getting file data done {result}')
         else:
@@ -267,11 +281,11 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
 
     if not get_canceled(username):
         update_history(username, folder, url, 'start checking checksums')
-        files_info = get_repocontent(repo, url, api_key, user=None)
-        check_checksums(username, url, folder, files_info=files_info)
+        files_info = get_repocontent(repo, url, api_key, user=user)
+        check_checksums(username, url, folderpath, files_info=files_info)
         update_history(username, folder, url, 'created checksums')
 
-    if not get_canceled(username):
+    if not get_canceled(username) and repo != 'surfs3':
         update_history(username, folder, url,
                     'creating ro-crate-metadata.json file ')
         try:
@@ -284,14 +298,14 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
 
     if not get_canceled(username):
         update_history(username, folder, url, 'start pushing dataset to storage')
-        push_data(username, password, folder, url)
+        push_data(username, password, folder, url, repo=repo)
         
     update_history(username, folder, url, 'ready')
 
 
 
 def check_connection(repo, api_key=None, user=None):
-    # logger.error("check connection")
+    logger.error("check connection")
     connection_ok = False
     if repo == 'osf':
         osf = Osf(api_key=api_key, api_address=osf_api_url)
@@ -325,7 +339,7 @@ def check_connection(repo, api_key=None, user=None):
     return connection_ok
 
 
-def run_export(username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip=False, dataverse_alias=None):
+def run_export(username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip=False, generate_metadata=False, dataverse_alias=None, files_folders_selection=None):
 
     ### NOTE ###
     # let's first implement an on disk solution, as we have seen that the buffered solution is not working with ScieboRDS
@@ -333,13 +347,33 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
     # Let's first build something that works reliably and only then optimize for speed and prettyness
     # This will also allow reuse of code written for the retrieval of repos
 
-    # set the temporary storage path. This path will also show up in the repo
+    # setting a tmp folder path name that does not interfere with other projects or the SRDC code itself.
+    tmp_folder_path_name = complete_folder_path.split("/")[-1]
+    
+    if tmp_folder_path_name in ['', 'app', 'local', 'instance', 'migrations', 'surf-rdc-chart', 'tests', 'ansible', 'tempstorage']:
+        try:
+            if repo == "surfs3":
+                tmp_folder_path_name = "ARCHIVE"
+            elif tmp_folder_path_name == "" and 'title' in metadata:
+                tmp_folder_path_name = metadata['title'].replace(" ", "_")
+            elif 'title' in metadata:
+                tmp_folder_path_name = tmp_folder_path_name + "_" + metadata['title'].replace(" ", "_")
+            else:
+                tmp_folder_path_name = f"SRDC_{tmp_folder_path_name}"
+        except:
+            tmp_folder_path_name = f"SRDC_{tmp_folder_path_name}"
+
+
+    # set the base storage path. This path will also show up in the path of the files at most repos
     # so it is best to set it to root or to something descriptive like ./SRDC.
-    # setting it to root has the possibility that if the folder name is the same as
-    # a folder in root, that this already existing content will also be uploaded. 
-    tmp_storage = "./"
-    if not os.path.exists(tmp_storage):
-        os.mkdir(tmp_storage)
+    base_storage = "./"
+    if not os.path.exists(base_storage):
+        os.mkdir(base_storage)
+
+    # set the unzipped_folder to a specific base storage folder
+    # also note that the tmp_folder_path_name moust be set to a name that does not conflict with names of folders that are part of the app
+    unzipped_folder = base_storage + tmp_folder_path_name
+
 
     update_history(username=username, folder=complete_folder_path,
                    url=repo, status='started')
@@ -362,10 +396,15 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
         update_history(username=username, folder=complete_folder_path,
                     url=repo, status='start downloading project as zipfile')
         
-        tmpzip = tmp_folder_path_name + ".zip"
+        tmpzip = unzipped_folder + ".zip"
         try:
-            cloud.get_directory_as_zip(
-                remote_path=complete_folder_path, local_file=tmpzip)
+            if  cloud_service.lower() == 'nextcloud':
+                cloud.get_directory_as_zip(user_name=username,
+                    remote_path=complete_folder_path, local_file=tmpzip)
+            else:
+                cloud.get_directory_as_zip(
+                    remote_path=complete_folder_path, local_file=tmpzip)
+
             update_history(username=username, folder=complete_folder_path,
                         url=repo, status='done downloading project as zipfile')
         except Exception as e:
@@ -375,14 +414,59 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 url=repo, status=f'ready')
             return
     if not get_canceled(username):
-        # unzip the file to folder with name of last part of complete folder path.
+        # unzip the file to a temp folder and then move the content to a folder with name of last part of complete folder path.
+
         update_history(username=username, folder=complete_folder_path,
                     url=repo, status='unzipping the zipfile')
+               
+        tmp_loc = "./app/tempstorage"
+        try:
+            os.mkdir(tmp_loc)
+        except Exception as e:
+            mkdirmes = f"temporary storage location cannot be created or already exists: {e}"
+            logger.info(mkdirmes)
+            # update_history(username=username, folder=complete_folder_path,
+            #             url=repo, status=mkdirmes)
+        # we extract the zipfile to a temporary location
+        # ./tempstorages/zipfilemainfolder
+        try:
+            with zipfile.ZipFile(tmpzip, 'r') as zip_ref:
+                zip_ref.extractall(tmp_loc)
+        except Exception as e:
+            update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed extracting the zipfile: {e}')
+
         
-        # set the unzipped_folder to a specific temp storage folder
-        unzipped_folder = tmp_storage + tmp_folder_path_name
-        with zipfile.ZipFile(tmpzip, 'r') as zip_ref:
-            zip_ref.extractall(tmp_storage)
+
+        # now we set ./tempstorages/zipfilemainfolder as source for moving
+        try:
+            # if the complete_folder_path == "/" then the extrated file sturcture contains ./files/ ....
+            if complete_folder_path == "/":
+                src = tmp_loc + "/" + complete_folder_path.split("/")[-1] + "files"
+            else:
+                src = tmp_loc + "/" + complete_folder_path.split("/")[-1]
+            # the destination will be the unzipped folder
+            dest = unzipped_folder
+            # let's move it
+            logger.error(f"############### Moving from {src} to {dest}")
+            shutil.move(src, dest)
+        except Exception as e:
+            update_history(username=username, folder=complete_folder_path,
+                        url=repo, status=f'failed moving the zipfile content to process location: {e}')
+
+    if files_folders_selection:
+        for root, dirs, files in os.walk(unzipped_folder):
+            for j in files:
+                filepath = os.path.join(root, j)
+                if complete_folder_path == "/":
+                    filepath_for_comparison = (complete_folder_path + filepath.split(unzipped_folder)[-1].replace(unzipped_folder,"")).replace("//","/")
+                else:
+                    filepath_for_comparison = complete_folder_path + filepath.split(unzipped_folder)[-1]
+                logger.error(f"filepath_for_comparison: {filepath_for_comparison}")
+                if filepath_for_comparison not in files_folders_selection:
+                    os.remove(filepath)
+                    
+
 
     if not get_canceled(username):
         # remove the zip
@@ -391,7 +475,21 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
         os.remove(tmpzip)
 
 
-    if not get_canceled(username):
+    if not get_canceled(username) and repo == 'surfs3':
+    #     # generate a filelisitng file with all props
+        try:
+            update_history(username=username, folder=complete_folder_path,
+                            url=repo, status="creating filelisting file in 'generated' folder")
+            result = get_folder_content_props(username=username, password=password, folder=complete_folder_path)
+            create_generated_folder(unzipped_folder)
+            with open(f'{unzipped_folder}/generated/filelisting.json', 'w') as filelisting:
+                filelisting.write(json.dumps(result))
+        except Exception as e:
+            update_history(username=username, folder=complete_folder_path,
+                            url=repo, status=f"failed at creating filelisting file in 'generated' folder: {e}")
+
+
+    if not get_canceled(username) and generate_metadata:
         # write metadata in ro-crate file in 'generated' folder inside the unzipped folder
         update_history(username=username, folder=complete_folder_path,
                     url=repo, status="creating ro-crate file in 'generated' folder")
@@ -588,8 +686,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'ready')
                 return                        
-        if project_id != None and project_id!= "":
-            set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
+        
             
     if not get_canceled(username):
         ### upload files ###
@@ -653,8 +750,6 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
         # the unzipped folder will be uploaded
         else:
-            uploads = tmp_storage + tmp_folder_path_name
-
             # upload the unzipped folder to the project
             s = ''
             if repo != 'sharekit':
@@ -662,11 +757,11 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                             status=f'uploading the data to {repo}.')
 
             # calculate the total files count 
-            totalfilescount = total_files_count(uploads)
+            totalfilescount = total_files_count(unzipped_folder)
             
             # upload file by file to repo
             n = 1
-            for root, dirs, files in os.walk(uploads):
+            for root, dirs, files in os.walk(unzipped_folder):
                 for j in files:
                     if not get_canceled(username):
                         filepath = os.path.join(root, j)
@@ -727,6 +822,8 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
                                 result = irods.upload_new_file_to_collection_internal(path=project_path, path_to_file=filepath)
                             if repo == 'surfs3':
                                 result = surfs3.upload_new_file_to_bucket(bucket_name=metadata['s3archivename'], path_to_file=filepath)
+                                filepath = filepath.split("./ARCHIVE/files/")[-1]
+                                filepath = filepath.split("./ARCHIVE/")[-1]
                             if result == True:
                                 message = f"uploaded file {n} of {totalfilescount}: {filepath}"
                                 update_history(username=username, folder=complete_folder_path, url=repo, status=message)
@@ -1063,7 +1160,7 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
             try:
                 yodametadata = irods.create_yoda_metadata(path=project_path, metadata=metadata)
                 # write this data to yoda-metadata.json file
-                json_file_path = tmp_storage + tmp_folder_path_name + "/yoda-metadata.json"
+                json_file_path = unzipped_folder + "/yoda-metadata.json"
                 with open(json_file_path, 'w') as ff:
                     ff.write(yodametadata)
                 # upload the yoda-metadata.json file
@@ -1077,7 +1174,10 @@ def run_export(username, password, complete_folder_path, tmp_folder_path_name, r
     ### delete temp files ###
     update_history(username=username, folder=complete_folder_path,
                     url=repo, status='removing temporary files')
-    shutil.rmtree(unzipped_folder)
+    
+    if os.path.exists(unzipped_folder):
+        shutil.rmtree(unzipped_folder)
+
     # if user selected upload as zip to perserve folder structure
     if use_zip:
         os.remove(tmpzip)
