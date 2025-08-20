@@ -7,9 +7,24 @@ from sqlalchemy.sql import func
 from flask_session import Session
 import redis
 
+# FASTAPI imports
+from fastapi import FastAPI
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from a2wsgi import ASGIMiddleware
+
 logger = logging.getLogger()
 
 app = Flask(__name__)
+
+
+# Fast API mounting on flask
+# https://stackoverflow.com/questions/70506231/is-it-possible-to-mount-an-instance-of-fastapi-onto-a-flask-application
+fast_app = FastAPI()
+
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+    '/flask': app,
+    '/api': ASGIMiddleware(fast_app),
+})
 
 try:
     from app.globalvars import *
@@ -18,38 +33,33 @@ except:
     from globalvars import *
 
 # os.urandom(24)
-app.secret_key = b'SET YOUR OWN'
+app.secret_key = b'V\x8b\x100\xfa\x01)\xd6\xe4`\x10\x16\xef9\x1b\xba\x128N\xf6\xe3\xbb\x90\xec'
 
 try:
-    # check if redis host and port are configurered
-    if 'redis_host' in all_vars and 'redis_port' in all_vars:
-        # check if the configured redis server is available
-        redis_port = redis_port.split(':')[1]
-        # redis_host = "redis-helper-master"
-        logger.error(redis_host)
-        try:
-            r = redis.Redis(host=redis_host, port=redis_port, socket_connect_timeout=1)
-            r.ping()
-            redis_available = True
-            logger.error(f"1 - Redis server available for session storage.")
-        except Exception as e:
-            logger.error(f"Failed to connect to redis: {e}")
-            redis_available = False
+    redis_port = 6379
+    redis_host = "localhost"
+    logger.error(redis_host)
+    try:
+        r = redis.Redis(host=redis_host, port=redis_port, socket_connect_timeout=1)
+        r.ping()
+        redis_available = True
+        logger.error(f"1 - Redis server available for session storage.")
+    except Exception as e:
+        logger.error(f"Failed to connect to redis: {e}")
+        redis_available = False
 
-        if redis_available:
-            try:
-                # Configure Redis for storing the session data on the server-side
-                app.config['SESSION_TYPE'] = 'redis'
-                app.config['SESSION_REDIS'] = redis.Redis(host=redis_host, port=redis_port)
-                # Create and initialize the Flask-Session object AFTER `app` has been configured
-                server_session = Session()
-                server_session.init_app(app)               
-            except Exception as e:
-                logger.error(f"2 - Redis server cannot be configured for session storage. {e}")
-        else:
-            logger.error(f"3 - Redis server not available for session storage. Will use client side storage instead")
+    if redis_available:
+        try:
+            # Configure Redis for storing the session data on the server-side
+            app.config['SESSION_TYPE'] = 'redis'
+            app.config['SESSION_REDIS'] = redis.Redis(host=redis_host, port=redis_port)
+            # Create and initialize the Flask-Session object AFTER `app` has been configured
+            server_session = Session()
+            server_session.init_app(app)               
+        except Exception as e:
+            logger.error(f"2 - Redis server cannot be configured for session storage. {e}")
     else:
-        logger.error(f"4 - Redis host and port are not configured. Therefore redis server is not available for session storage. Will use client side storage instead")
+        logger.error(f"3 - Redis server not available for session storage. Will use client side storage instead")
 except:
     logger.error(f"5 - Redis host and port are not configured. Therefore redis server is not available for session storage. Will use client side storage instead")
 
@@ -75,11 +85,11 @@ class History(db.Model):
         db (SQLAlchemy): db object
     """
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(128))
-    projectname = db.Column(db.String(128))
-    folder = db.Column(db.String(128))
-    url = db.Column(db.String(128))
-    status = db.Column(db.String(128))
+    username = db.Column(db.String(256))
+    projectname = db.Column(db.String(256))
+    folder = db.Column(db.Text())
+    url = db.Column(db.String(256))
+    status = db.Column(db.String(256))
     time_created = db.Column(db.DateTime(
         timezone=True), server_default=func.now())
     time_updated = db.Column(db.DateTime(timezone=True), onupdate=func.now())
