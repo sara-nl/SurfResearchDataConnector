@@ -234,9 +234,9 @@ class Figshare(object):
         """Check the API-Token `api_key`.
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
-        log.error("Check token: Starts")
+        log.debug("Check token: Starts")
         r = self.get_article(return_response=True)
-        log.error(f"Check Token: Status Code: {r.status_code}")
+        log.debug(f"Check Token: Status Code: {r.status_code}")
 
         return r.status_code == 200
 

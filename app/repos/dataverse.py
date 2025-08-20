@@ -7,6 +7,9 @@ from flask import abort, request
 import functools
 import re
 import time
+from app.utils import memoize
+
+# dataverse_parent_dataverse = 'root'
 
 try:
     from app.globalvars import *
@@ -90,11 +93,11 @@ class Dataverse(object):
             if dataverse_create_user_dataverse.lower() == "ok":
                 user_dataverse = self.get_user_dataverse()
             response = self.create_new_dataset(return_response=True)
-            log.error("check_token")
-            log.error(response)
+            # log.error("check_token")
+            # log.error(response)
             persistent_id = response.json()['data']['persistentId']
             r = self.get_dataset(persistent_id=persistent_id, return_response=True)
-            log.error(f"Check Token: Status Code: {r.status_code}")
+            # log.error(f"Check Token: Status Code: {r.status_code}")
             # cleanup
             self.remove_dataset(persistent_id)
             return r.status_code == 200
@@ -262,6 +265,24 @@ class Dataverse(object):
                 dataverse_info['alias'] = req.json()['data']['alias']
         return dataverse_info
 
+    def get_alias_by_id(self, id):
+        """will get the dataverse alias based on the id
+
+        Args:
+            id (int): the dataverse id
+        """
+        url = f"{self.dataverse_api_address}/dataverses/{id}"
+        headers = {
+            'X-Dataverse-key': self.api_key,
+            'Content-Type': 'application/json'
+        }
+
+        if datastation_basicauth_token:
+            headers['X-Authorization'] = datastation_basicauth_token
+
+        req = requests.request("GET", url, headers=headers)
+        return req.json()['data']['alias']
+
 
     def get_sub_dataverses(self, root_dataverse=dataverse_parent_dataverse):
         subdataverses = []
@@ -281,21 +302,28 @@ class Dataverse(object):
                 if 'data' in rr.json():
                     for item in rr.json()['data']:
                         if item['type'] == 'dataverse':
-                            ID = item['id']
-                            url = f"{self.dataverse_api_address}/dataverses/{ID}"
-                            headers = {
-                                'X-Dataverse-key': self.api_key,
-                                'Content-Type': 'application/json'
-                            }
-
-                            if datastation_basicauth_token:
-                                headers['X-Authorization'] = datastation_basicauth_token
-
-                            req = requests.request("GET", url, headers=headers)
-                            item['alias'] = req.json()['data']['alias']
+                            item['alias'] = self.get_alias_by_id(item['id'])
+                            # log.error(item['alias'])
                             subdataverses.append(item)
         return subdataverses
 
+
+    def get_all_sub_dataverses(self, root_dataverse=dataverse_parent_dataverse):
+        subdataverses = self.get_sub_dataverses()
+        try:
+            for subdataverse in subdataverses:
+                try:
+                    higher_dataverse_name = subdataverse['title']
+                    sub_subdataverses = self.get_sub_dataverses(root_dataverse=subdataverse['alias'])
+                    for sub_subdataverse in sub_subdataverses:
+                        sub_subdataverse['title'] = f"{higher_dataverse_name} > {sub_subdataverse['title']}"
+                        subdataverses.append(sub_subdataverse)
+                except:
+                    pass
+        except:
+            pass
+        subdataverses = sorted(subdataverses, key=lambda item: item['title'])
+        return subdataverses
 
     def get_user_dataverse(self):
         """This method will return a dataverse name based on the userId.
@@ -502,7 +530,7 @@ class Dataverse(object):
         if datastation_basicauth_token:
             headers['X-Authorization'] = datastation_basicauth_token
 
-        log.error(headers)
+        # log.error(headers)
 
         # Create a dataset as part of the parent dataverse
         if dataverse_create_user_dataverse.lower() == "ok":
@@ -514,7 +542,7 @@ class Dataverse(object):
 
         url = f"{self.dataverse_api_address}/dataverses/{dataverse_alias}/datasets"
         
-        log.error(url)
+        # log.error(url)
 
         # use metadata here to set values of below variables els:
         
@@ -522,12 +550,12 @@ class Dataverse(object):
         metadata = { 'datasetVersion': metadata }
         payload = json.dumps(metadata)
 
-        log.error(payload)
+        # log.error(payload)
 
         r = requests.request("POST", url, headers=headers, data=payload)
 
-        log.error(
-            f"Create new datasets: Status Code: {r.json()}")
+        # log.error(
+        #     f"Create new datasets: Status Code: {r.json()}")
 
         return r.json() if not return_response else r
 
@@ -905,25 +933,25 @@ class DansDatastation(Dataverse):
 if __name__ == "__main__":
     """Below code will test the code that interfaces the uploads to dataverse
     """
-    import sys
-    import configparser
+    # import sys
+    # import configparser
     from prettyprinter import pprint
 
-    try:
-        config = configparser.ConfigParser()
-        config.read('../../env.ini')
-    except Exception as e:
-        config = None
-        log.error(str(e))
-    try:
-        api_key = os.getenv(
-            "DATAVERSE_API_KEY",
-            config.get('TESTS', 'DATAVERSE_API_KEY')
-        )
-    except Exception as e:
-        log.error(f"Could not get an api_key for testing: {str(e)}")
-        log.info("Halting tests")
-        sys.exit()
+    # try:
+    #     config = configparser.ConfigParser()
+    #     config.read('../../env.ini')
+    # except Exception as e:
+    #     config = None
+    #     log.error(str(e))
+    # try:
+    #     api_key = os.getenv(
+    #         "DATAVERSE_API_KEY",
+    #         config.get('TESTS', 'DATAVERSE_API_KEY')
+    #     )
+    # except Exception as e:
+    #     log.error(f"Could not get an api_key for testing: {str(e)}")
+    #     log.info("Halting tests")
+    #     sys.exit()
 
     api_address = os.getenv(
         "API_ADDRESS",
@@ -933,8 +961,8 @@ if __name__ == "__main__":
     api_address = "https://demo.dataverse.nl/api"
     dataverse = Dataverse(api_key=api_key, api_address=api_address)
 
-    # print("### check token ###")
-    # print(api_address)
+    print("### check token ###")
+    print(api_address)
     check = dataverse.check_token()
     # print(check)
     if check:
@@ -1016,3 +1044,7 @@ if __name__ == "__main__":
         # r = dataverse.remove_dataset(persistent_id=persistent_id, return_response=True)
         # print(r)
         # print(r.text)
+        print("### Get sub dataverses ###")
+        r = dataverse.get_all_sub_dataverses()
+        # r = sorted(r, key=lambda d: d['title'])
+        pprint(r)
