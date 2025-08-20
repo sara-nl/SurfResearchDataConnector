@@ -3,17 +3,17 @@
 
 {% if connection_ok %}
     {% if data.repo == 'data4tu' %}
-    <p>4TU.ResearchData: connection OK</p>
+    <p>4TU.ResearchData: {{ check_connection_ok | default("connection OK") | safe }}</p>
     {% else %}
-    <p>{{data.repo | upper}}: connection OK</p>
+    <p>{{data.repo | upper}}: {{ check_connection_ok | default("connection OK") | safe }}</p>
     {% endif %}
 {% else %}
 
-<p style='color: red;'>{{data.repo | upper}}: connection NOT OK</p>
+<p style='color: red;'>{{data.repo | upper}}: {{ check_connection_not_ok | default("connection NOT OK") | safe }}</p>
 
 <script>
-    // disable all secondary buttons, so user will not be able to proceed
-    $( ".btn-secondary" ).prop('disabled', true);
+    // disable all action buttons, so user will not be able to proceed
+    $( "#action-button" ).prop('disabled', true);
 </script>
 
 {% endif %}

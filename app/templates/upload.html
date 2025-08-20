@@ -14,12 +14,12 @@
 
 {% if data.query_status==None or data.query_status=='ready' and data.process==None%}
 <h1>Export</h1>
-<p>Export data from your Research Drive to your connected repositories. Your data is always only exported and never published. You can review your data on the repository platform and then decide to publish from within that platform.</p>
+<p>{{ upload_intro | default("Export data from your Research Drive to your connected repositories. Your data is always only exported and never published. You can review your data on the repository platform and then decide to publish from within that platform.") | safe }}</p>
 {% else %}
 
-<h1>Processing export</h1>
+<h1>{{ upload_h1_export | default("Processing export") | safe }}</h1>
 {% endif %}
-<p>Project name: <b>{{ data.projectname }}</b></p>
+<p>{{ upload_reference | default("Export reference") | safe }}: <b>{{ data.projectname }}</b></p>
 {% endif %}
 
 {% if data.connected==True %}
@@ -32,9 +32,9 @@
                 {% if not preview %}
                 <div id="show_dataverses"></div>
                 <div class="form-group mt-3 mb-3">
-                    <h2>Export Data Folder Path</h2>
+                    <h2>{{ upload_h2_export | default("Export Data Folder Path") | safe }}</h2>
                     <!-- async loading folder paths -->
-                    {{ load_async("folderpaths", "/folder-paths", 55000) }}
+                    {{ load_async("folderpaths", "/folder-paths/up", 55000) }}
                     <!-- end async -->
                 </div>
                 {% else %}
@@ -45,38 +45,38 @@
                 {% endif %}
                 
                 
-                <div id="show_meta">Please select a repository.</div>
+                <div id="show_meta">{{ upload_select | default("Please select a repository.") | safe }}</div>
                 
             </div>
             {% if not preview %}
 
                 <!-- ### BEGIN PREVIEW BUTTON -->
                 <input type="text" name="preview" value="true" hidden>
-                <button type="submit" class="btn btn-secondary">Preview Export</button>
+                <button type="submit" id="action-button" class="btn btn-secondary">{{ upload_preview | default("Preview Export") | safe }}</button>
                 <!-- ### END PREVIEW BUTTON -->
 
             {% else %}
 
                 <!-- ### BEGIN PREVIEW ### -->
-                <h1>Export - Preview</h1>
-                <p>Project name: <b>{{ data.projectname }}</b></p>
+                <h1>{{ upload_h1_preview | default("Export - Preview") | safe }}</h1>
+                <p>{{ upload_reference | default("Export reference") | safe }}: <b>{{ data.projectname }}</b></p>
                 
-                <h2>Repository</h2>
+                <h2>{{ upload_h2_repository | default("Repository") | safe }}</h2>
                 <!-- async loading check connection -->
                 {% set checkconnectionurl = '/check-connection/' + data.repo %}
                 {{ load_async("check_connection", checkconnectionurl) }}
                 <!-- end async -->
 
                 {% if data.repo == 'dataverse' %}
-                <div>Exporting to dataverse: {{data.dataverse.title}}</div>
+                <div>{{ upload_dataverse | default("Exporting to dataverse") | safe }}: {{data.dataverse.title}}</div>
                 {% endif %}
                 
                 
-                <h2>Data Folder to export</h2>
+                <h2>{{ upload_h2_data_folder | default("Data Folder to export") | safe }}</h2>
                 <!-- async loading folder content -->
                 {{ load_async("foldercontent", "/folder-content/up", 55000) }}
                 <!-- end async -->
-
+                {{data.selected_folder_content}}
                 
                 <!-- async loading metadata -->
                 {% if data.repo=='figshare' %}
@@ -110,23 +110,29 @@
 
                 <!-- ### END PREVIEW ### -->
 
-                <a href="/upload" class="btn btn-secondary">Back</a>
-                <button type="submit" class="btn btn-secondary">Start Export</button>
+                <a href="/upload" class="btn btn-secondary">{{ upload_back | default("Back") | safe}}</a>
+                <button type="submit" id="action-button" class="btn btn-secondary">{{ upload_start | default("Start Export") | safe }}</button>
                 {% if data.repo !='dataverse' and data.repo!='datastation' %}
                 <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" id="flexUploadZip" value="" name="use_zip">
                     <label class="form-check-label" for="flexUploadZip">
-                        Check to export all files as 1 zipfile.
+                        {{ upload_check_zip | default("Check to export all files as 1 zipfile.") | safe }}
                     </label>
                 </div>
                 {% endif %}
                 <div class="form-check mt-3 mb-3">
+                    <input class="form-check-input" type="checkbox" id="flexCheckGenerate" value="" name="generate_metadata">
+                    <label class="form-check-label" for="flexCheckGenerate">
+                        {{ upload_check_metadata | default("Check to generate a metadata file at generated/ro-crate.json (optional).") | safe }}
+                    </label>
+                </div> 
+                <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" id="flexCheckUpload" value="" name="start_upload" required>
                     <label class="form-check-label" for="flexCheckUpload">
-                        Check to confirm start of export.
+                        {{ upload_check_start | default("Check to confirm start of export.") | safe }}
                     </label>
                     <div class="invalid-feedback">
-                        Please check this box to confirm export!
+                        {{ upload_check_confirm | default("Please check this box to confirm export!") | safe }}
                     </div>
                 </div> 
             {% endif %}
@@ -136,11 +142,11 @@
         <form id="cancel_process" action="/cancel_upload" method="post">
             <input type="text" name="cancel" value="true" hidden>
             <input type="text" name="preview" value={{preview}} hidden>
-            <button type="submit" class="btn btn-secondary">Cancel Process</button>
+            <button type="submit" class="btn btn-secondary">{{ upload_cancel | default("Cancel Process") | safe }}</button>
             <div class="form-check mt-3 mb-3">
                 <input class="form-check-input" id="flexCheckCancel" type="checkbox" value="" name="checked" required>
                 <label class="form-check-label" for="flexCheckCancel">
-                    Check to confirm cancelation.
+                    {{ upload_check_cancel | default("Check to confirm cancelation.") | safe }}
                 </label>
             </div>
         </form>
@@ -166,8 +172,8 @@
 {% else %}
 
     <!-- BEGIN NOT CONNECTED -->
-    <p>Please connect first.</p>
-    <a href="/connect"><button class="btn btn-secondary">Connect</button></a>
+    <p>{{ upload_connect_first | default("Please connect first.") | safe }}</p>
+    <a href="/connect"><button class="btn btn-secondary">{{ upload_connect | default("Connect") | safe }}</button></a>
     <!-- END NOT CONNECTED -->
 
 {% endif %}

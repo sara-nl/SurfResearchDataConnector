@@ -14,7 +14,7 @@
         error: function(){
             let msg = "<p style='color: red;'>failed to load {{name}} within the timeout</p>"; 
             $("#{{name}}").html(msg);
-            $( ".btn-secondary" ).prop('disabled', true);
+            $( "#action-button" ).prop('disabled', true);
         },
         success: function(){
             $("#{{name}}").load("{{url | safe }}");

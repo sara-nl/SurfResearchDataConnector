@@ -1,19 +1,19 @@
 {% if direction == 'up' %}
-    <p>Folder size: {{folder_content_can_be_processed['total_size'] | convert_size}}</p>
+    <p>{{ folder_content_folder_size |default("Folder size") | safe }}: {{folder_content_can_be_processed['total_size'] | convert_size}}</p>
     {% if data['showall']==True%}
-        <p>Free diskspace for processing: {{folder_content_can_be_processed['free_bytes'] | convert_size}}</p>
+        <p>{{ folder_content_free_diskspace | default("Free diskspace for processing") | safe }}: {{folder_content_can_be_processed['free_bytes'] | convert_size}}</p>
     {% endif %}
 {% endif %}
 {% if folder_content | length > 0 %}
     {% if direction=='up' and folder_content_can_be_processed['can_be_processed']==False %}
-    <p style="color:red;">The total size of the folder content is to large to be processed.</p>
+    <p style="color:red;">{{ folder_content_to_large | default("The total size of the folder content is to large to be processed.") | safe }}</p>
     <script>
-        // disable all secondary buttons, so user will not be able to proceed
-        $( ".btn-secondary" ).prop('disabled', true);
+        // disable all action buttons, so user will not be able to proceed
+        $( "#action-button" ).prop('disabled', true);
     </script>
     {% endif %}
-    <p>Root folder: <b>{{ data.complete_folder_path }}</b></p>
-    <p>This is the content of the data folder you will be working with:</p>
+    <p>{{ folder_content_root_folder | default("Root folder") | safe }}: <b>{{ data.complete_folder_path }}</b></p>
+    <p>{{ folder_content_content | default("This is the content of the data folder you will be working with:") | safe }}</p>
     <ul>
         {% for item in folder_content %}
         <li>
@@ -24,19 +24,19 @@
 {% else %}
     {%if data.permission %}
         {% if data.folder and direction == 'down' %}
-        <p>A new folder will be created at <b>{{ data.complete_folder_path }}</b>.</p>
+        <p>{{ folder_content_new_folder | default("A new folder will be created at") | safe }} <b>{{ data.complete_folder_path }}</b>.</p>
         {% else %}
-        <p>There is no content in folder: <b>{{ data.complete_folder_path }}</b>.</p>
+        <p>{{ folder_content_no_content | default("There is no content in folder") | safe }}: <b>{{ data.complete_folder_path }}</b>.</p>
         <script>
-            // disable all secondary buttons, so user will not be able to proceed
-            $( ".btn-secondary" ).prop('disabled', true);
+            // disable all action buttons, so user will not be able to proceed
+            $( "#action-button" ).prop('disabled', true);
         </script>
         {% endif %}
     {% else %}
-        <p>Your account does not have permission to manage this folder: <b>{{ data.complete_folder_path }}</b>.</p>
+        <p>{{ folder_content_permission | default("Your account does not have permission to manage this folder") | safe }}: <b>{{ data.complete_folder_path }}</b>.</p>
         <script>
-            // disable all secondary buttons, so user will not be able to proceed
-            $( ".btn-secondary" ).prop('disabled', true);
+            // disable all action buttons, so user will not be able to proceed
+            $( "#action-button" ).prop('disabled', true);
         </script>
     {% endif%}
 {% endif %}

@@ -26,14 +26,14 @@
 <!-- END AUTOCONNECT -->
 
 <!-- BEGIN WELCOME -->
-<h1>Welcome to SURF Research Data Connector</h1>
-<h4>Your extension for connecting research data</h4>
+<h1>{{ home_title | default("Welcome to SURF Research Data Connector") | safe }}</h1>
+<h4>{{ home_subtitle | default("Your extension for connecting research data") | safe }}</h4>
 <p>
-    Surf Research Data Connector (SRDC) is an extension that will allow you to easily import data from and export data to different research data publication
-    service repositories. Some of the major repositories that are supported are: Dataverse, Zenodo, Figshare, and OSF.
+    {{ home_paragraph1 | default("Surf Research Data Connector (SRDC) is an extension that will allow you to easily import data from and export data to different research data publication
+    service repositories. Some of the major repositories that are supported are: Dataverse, Zenodo, Figshare, and OSF.") | safe }}
 </p>
 
-<p>The following repositories are available in your SRDC:</p>
+<p>{{ home_repos | default("The following repositories are available in your SRDC:") | safe }}</p>
 <ul>
     {% for service in data.registered_services %}
     {% if service not in data.hidden_services %}
@@ -47,26 +47,28 @@
 </ul>
 <p>
 
-<h4>Export to connected repositories</h4>
-<p>This extension enables you to export data to your connected repositories.</p>
+<h4>{{ home_h4_1 | default("Export to connected repositories") | safe }}</h4>
+<p>{{ home_paragraph2 | default("This extension enables you to export data to your connected repositories.") | safe }}</p>
 
-<h4>Import from connected private repositories</h4>
-<p>This extension also allows you to import data from your private repositories. This enables you to import your own data or data that has been shared with you on these repositories.</p>
+<h4>{{ home_h4_2 | default("Import from connected private repositories") | safe }}</h4>
+<p>{{ home_paragraph3 | default("This extension also allows you to import data from your private repositories. This enables you to import your own data or data that has been shared with you on these repositories.") | safe }}</p>
 
 <!-- BEGIN DATAHUGGER -->
 {% if 'datahugger' not in data.hidden_services or data.showall %}
-<h4>Import open data</h4>
-<p>
+<h4>{{ home_h4_3 | default("Import open data") }}</h4>
+<p>{{ home_paragraph4 | default('
     In the backend the SRDC uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>import open data</b>.
     To see which repositories are currently supported for importing open data, please check out: <a
         href="https://j535d165.github.io/datahugger/repositories/" target="new">the Datahugger Supported Repositories
-        page</a>.
+        page</a>.') | safe }}
 </p>
+{{ home_paragraph5 | default("
+<p>Search for open Research Data in most Datahugger supported repositories using <a href='https://cse.google.com/cse?cx=762961cffaa1c4546' target='_blank'>Google</a>.</p>
+<p>Search for open Research Data in most Datahugger supported dataverse repositories using <a href='https://www.re3data.org' target='_blank'>re3data</a>.</p>
+") | safe }}
 
-<p>Search for open Research Data in most Datahugger supported repositories using <a href="https://cse.google.com/cse?cx=762961cffaa1c4546" target="_blank">Google</a>.</p>
-<p>Search for open Research Data in most Datahugger supported dataverse repositories using <a href="https://www.re3data.org" target="_blank">re3data</a>.</p>
+<p><a href='/start?homeshow=True'><button class='btn btn-secondary'>{{ home_get_started | default("Get started here!") | safe }}</button></a></p>
 
-<p><a href="/start"> <button class="btn btn-secondary">Get started here!</button></a></p>
 {% endif %}
 <!-- END DATAHUGGER -->
 

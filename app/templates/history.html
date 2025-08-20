@@ -15,7 +15,7 @@
         <thead class="table-light">
             <tr>
             <th scope="col">Date</th>
-            <th scope="col">Project name</th>
+            <th scope="col">Reference</th>
             <th scope="col">Local (folder)</th>
             <th scope="col">Remote (url, doi, repo)</th>
             <th scope="col">Status</th>
@@ -42,7 +42,7 @@
                 {% if 'http' in item.url %}
                 <td><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.url | truncate(80,true,'') }}</td>
                 {% else %}
-                <td>Upload to {{ item.url }}</td>
+                <td>{{ item.url }}</td>
                 {% endif %}
                 <td>{{ item.status }}</a></td>
             </tr>

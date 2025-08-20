@@ -4,14 +4,17 @@ from app.utils import run_import, make_connection, get_webdav_token, get_webdav_
 from app.utils import get_user_info, set_query_status, set_canceled, get_cached_folders, repo_content_can_be_processed, folder_content_can_be_processed
 from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, get_query_status, get_status_from_history
 from app.utils import get_folders, get_folder_content, get_files_info, check_checksums, update_history, push_data, get_raw_folders
-from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission
+from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission, memo
 from app.utils import refresh_cloud_token, get_user_info, get_projectname, set_projectname, get_dans_audiences, memoize, get_project_id, set_project_id
 from app.repos import run_export, check_connection, get_private_metadata, get_repocontent, get_sharekit_token
 from app.repos.dataverse import Dataverse
 from app.repos.sharekit import Sharekit
-from threading import Thread, Event
+from threading import Thread
 from flask import request, session, flash, render_template, url_for, redirect, render_template_string
 from app.globalvars import *
+from app.api import *
+import datetime
+from functools import lru_cache
 import json
 import logging
 import math
@@ -25,7 +28,6 @@ import whois
 from time import time
 
 logger = logging.getLogger()
- 
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -41,10 +43,24 @@ def home():
         session['hidden_services'] = hidden_services
         session['registered_services'] = registered_services
         session['cloud_service'] = cloud_service
+        if 'lang' not in session:
+            session['lang'] = srdc_lang
+        if 'setlang' in request.args:
+            session['lang'] = request.args['setlang']
+            if request.args['setlang'] == 'en':
+                session['gtrans'] = False
+                flash(f"Changed language to English.")
+            if request.args['setlang'] == 'nl':
+                session['gtrans'] = False
+                flash(f"De taal is veranderd naar Nederlands.")
+        if 'gtrans' in request.args:
+            # if request.args['gtrans'] == True:
+            #     session['lang'] = 'en'
+            session['gtrans'] = request.args['gtrans']
     except Exception as e:
-        flash("something went wrong (1b)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (1b)")
         logger.error(e, exc_info=True)
-    return render_template('home.html', data=session, drive_url=drive_url)
+    return render_template('home.html', **languages[session['lang']], data=session, drive_url=drive_url)
 
  
 @app.route('/start', methods=['GET', 'POST'])
@@ -54,6 +70,9 @@ def start():
     Returns:
         str: html for the start page
     """
+    if 'username' not in session or 'password' not in session or not make_connection(username=session['username'], password=session['password']):
+        return redirect("/connect")
+
     startexport = False
     startimport = False
     try:
@@ -94,35 +113,99 @@ def start():
             session['process'] = None
             del session['projectname']
         elif request.method == "POST":
-            if 'projectname' in request.form:
-                session['projectname'] = request.form['projectname']
-            if 'clearprojectname' in request.form:
-                del session['projectname']
             if 'importexport' in request.form:
                 if request.form['importexport'] == 'startimport':
                     startimport = True
                 if request.form['importexport'] == 'startexport':
                     startexport = True
+            if 'projectname' in request.form:
+                if request.form['projectname'] != '':
+                    session['projectname'] = request.form['projectname']
+                else:
+                    dt = str(datetime.datetime.now())
+                    if startimport:
+                        session['projectname'] = f"Import_{dt}"
+                    if startexport:
+                        session['projectname'] = f"Export_{dt}"
+            else:
+                session['projectname'] = "test"
+            if 'clearprojectname' in request.form:
+                del session['projectname']
         session['persist'] = False
         session['code_version'] = code_version
         session['srdc_url'] = srdc_url
         session['hidden_services'] = hidden_services
         session['registered_services'] = registered_services
         session['cloud_service'] = cloud_service
+
+        ### get active and inactive repos ###
+        available_services = []
+        active_services = []
+        inactive_services = []
+        if registered_services != []:
+            for service in registered_services:
+                if service not in hidden_services:
+                    available_services.append(service)
+        # sort the repos here with the active ones first.
+        for service in available_services:
+            if f"{service}_access_token" in session and session[f"{service}_access_token"] != "" and session[f"{service}_access_token"] != None:
+                active_services.append(service)
+            else:
+                inactive_services.append(service)
+        ### end get active and inactive repos ###
+
         if request.method == "POST":
             if 'homestart' in request.form:
                 session['homestart'] = request.form['homestart']
-        else:
-            if 'homeshow' in request.args:
-                del session['homestart']
+        if request.method == "GET":
+            if 'homestart' in request.args:
+                session['homestart'] = request.args['homestart']
+        if 'homeshow' in request.args and 'homestart' in session:
+            del session['homestart']
     except Exception as e:
-        flash("something went wrong (1b2)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (1b2)")
         logger.error(e, exc_info=True)
     if startexport:
         return redirect("/upload")
     if startimport:
         return redirect("/download")
-    return render_template('start.html', data=session, drive_url=drive_url)
+    return render_template('start.html', **languages[session['lang']], data=session, drive_url=drive_url, active_services=active_services, inactive_services=inactive_services    )
+
+
+@app.route('/refresh-dataverses')
+def refresh_dataverses():
+    """Will refresh the cached dataverses and then redirect to the upload page.
+
+    Returns:
+        redirect
+    """
+    try:
+        data = session
+        memoized_dataverses.cache_clear()
+        logger.error(data['repo'])
+        if data['repo'] == 'datastation':
+            datastation = Dataverse(api_key=session['datastation_access_token'], api_address=datastation_api_url, datastation=True)
+            try:
+                dataverses = memoized_dataverses(api_key=session['datastation_access_token'], api_address=datastation_api_url, datastation=True)
+            except:
+                dataverses = []
+            parent_dataverse_info = datastation.get_dataverse_info(datastation_parent_dataverse)
+            if parent_dataverse_info not in dataverses:
+                dataverses.append(parent_dataverse_info)
+        else:
+            dataverse = Dataverse(api_key=session['dataverse_access_token'], api_address=dataverse_api_url)
+            try:
+                dataverses = memoized_dataverses(api_key=session['dataverse_access_token'], api_address=dataverse_api_url,datastation=False)
+            except:
+                dataverses = []
+            parent_dataverse_info = dataverse.get_dataverse_info(dataverse_parent_dataverse)
+            if parent_dataverse_info not in dataverses:
+                dataverses.append(parent_dataverse_info)
+        flash( languages[session['lang']].get('flash_dataverses_refreshed', 'Dataverses refreshed') )
+    except Exception as e:
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (22b)")
+        logger.error(e, exc_info=True)
+    return render_template('refresh-dataverses.html', **languages[session['lang']], data=session, drive_url=drive_url)
 
 
 @app.route('/refresh-folderpaths')
@@ -135,13 +218,13 @@ def refresh_folder_paths():
     try:
         data = session
         if data['connected']:
-            get_cached_folders.cache_clear()
-            get_cached_folders(username = session['username'], password = session['password'], folder = '/')
-            flash('Data Folder Paths refreshed')
+            del memo[(session['username'],session['password'], '/')]
+            get_cached_folders(session['username'],session['password'], '/')
+            flash( languages[session['lang']].get('flash_data_folders_refreshed', 'Data Folder Paths refreshed') )
     except Exception as e:
-        flash("something went wrong (22)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (22a)")
         logger.error(e, exc_info=True)
-    return render_template('refresh-folderpaths.html', data=session, drive_url=drive_url)
+    return render_template('refresh-folderpaths.html', **languages[session['lang']], data=session, drive_url=drive_url)
 
 
 @app.route('/refresh')
@@ -151,7 +234,7 @@ def refresh():
     Returns:
         str: html for the refresh page
     """
-    return render_template('refresh.html', data=session)
+    return render_template('refresh.html', **languages[session['lang']], data=session)
 
 @app.route('/faq')
 def faq():
@@ -164,9 +247,9 @@ def faq():
         with open('faq.json') as faq_file:
             faqitems = json.load(faq_file)
     except Exception as e:
-        flash("something went wrong (2)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (2)")
         logger.error(e, exc_info=True)
-    return render_template('faq.html', data=session, drive_url=drive_url , faqitems=faqitems)
+    return render_template('faq.html', **languages[session['lang']], data=session, drive_url=drive_url , faqitems=faqitems)
 
 
 @app.route('/messages')
@@ -180,9 +263,9 @@ def messages():
         with open('messages.json') as messages_file:
             messages = json.load(messages_file)
     except Exception as e:
-        flash("something went wrong (3)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (3)")
         logger.error(e, exc_info=True)
-    return render_template('messages.html', data=session, drive_url=drive_url, messages=messages)
+    return render_template('messages.html', **languages[session['lang']], data=session, drive_url=drive_url, messages=messages)
 
 
 @app.route('/history/<id>', methods=['GET'])
@@ -207,13 +290,15 @@ def history(id=None):
             if 'password' in session:
                 password = session['password']
         else:
-            if 'access_token' in session:
+            if 'password' in session:
+                password = session['password'] 
+            elif 'access_token' in session:
                 password = session['access_token']
         if not make_connection(username=username, password=password):
-            flash('Not connected. Please connect to see your history.')
+            flash( languages[session['lang']].get('flash_not_connected', 'Not connected. Please connect to see your history.') )
             return redirect('/connect')
     except Exception as e:
-        flash("something went wrong (15)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (15)")
         logger.error(e, exc_info=True)
     try:
         if 'username' in session:
@@ -245,9 +330,9 @@ def history(id=None):
                         latest_folder_url = [item.folder, item.url, item.projectname]
                 history = tmp_hist
     except Exception as e:
-        flash("something went wrong (4)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (4)")
         logger.error(e, exc_info=True)
-    return render_template('history.html', data=session, history=history, drive_url=drive_url)
+    return render_template('history.html', **languages[session['lang']], data=session, history=history, drive_url=drive_url)
 
 
 @app.route('/connect', methods=('GET', 'POST'))
@@ -257,16 +342,18 @@ def connect():
     Returns:
         str: html for the connect page
     """
+    get_dataverses = False
     if request.method == "GET" and 'oauth' in request.args:
         repo = request.args.get('oauth')
         if f'{repo}_access_token' in session:
             api_key = session[f'{repo}_access_token']
             if check_connection(repo, api_key):
-                flash(f'{repo} connected')
+                flash(f"{repo} {languages[session['lang']].get('flash_connected', 'connected')}")
+                flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
             else:
-                flash(f'failed to connect {repo}')
+                flash(f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect to')} {repo}")
         else:
-            flash(f'failed to connect {repo}')
+            flash(f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect to')} {repo}")
     try:
         session['hidden_services'] = hidden_services
         if 'username' in session and 'password' in session and make_connection(session['username'], session['password']):
@@ -274,14 +361,16 @@ def connect():
         else:
             session['connected'] = False
     except Exception as e:
-        flash("something went wrong (14)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (4)")
         logger.error(e, exc_info=True)
     try:
         if request.method == "POST":
             if 'disconnect' in request.form:
+                lng = session['lang']
                 session.clear()
                 session.pop('_flashes', None)
-                flash('research drive disconnected')
+                session['lang'] = lng
+                flash( languages[lng].get('flash_rd_disconnected', 'research drive disconnected') )
             elif 'username' in request.form and 'password' in request.form:
                 # test the connection
                 username = request.form['username']
@@ -291,9 +380,9 @@ def connect():
                     session['password'] = password
                     session['connected'] = True
                     session.pop('_flashes', None)
-                    flash('connected')
+                    flash( languages[session['lang']].get('flash_connected', 'connected') )
                 else:
-                    flash('failed to connect')
+                    flash( languages[session['lang']].get('flash_failed_connect', 'failed to connect') )
 
             ### BEGIN Oauth based service connections ###
             if 'figshare_disconnect' in request.form:
@@ -301,19 +390,19 @@ def connect():
                     del session['figshare_access_token']
                     if 'repo' in session and session['repo'] == 'figshare':
                         session['repo'] = None
-                    flash('figshare disconnected')
+                    flash( f"figshare {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             if 'zenodo_disconnect' in request.form:
                 if 'zenodo_access_token' in session:
                     del session['zenodo_access_token']
                     if 'repo' in session and session['repo'] == 'zenodo':
                         session['repo'] = None
-                    flash('zenodo disconnected')
+                    flash( f"zenodo {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             if 'osf_disconnect' in request.form:
                 if 'osf_access_token' in session:
                     del session['osf_access_token']
                     if 'repo' in session and session['repo'] == 'osf':
                         session['repo'] = None
-                    flash('osf disconnected')
+                    flash( f"osf {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             ### END Oauth based service connections ###
 
             ### BEGIN token based service connections ###
@@ -322,126 +411,154 @@ def connect():
                     del session['data4tu_access_token']
                     if 'repo' in session and session['repo'] == 'data4tu':
                         session['repo'] = None
-                    flash('data4tu disconnected')
+                    flash( f"data4tu {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'data4tu_access_token' in request.form:
                 if check_connection(repo='data4tu', api_key=request.form['data4tu_access_token']):
                     session['data4tu_access_token'] = request.form['data4tu_access_token']
-                    flash('4TU.ResearchData connected')
+                    flash( f"4TU.ResearchData {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to 4TU.ResearchData')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} 4TU.ResearchData" )
             if 'figshare_disconnect' in request.form:
                 if 'figshare_access_token' in session:
                     del session['figshare_access_token']
                     if 'repo' in session and session['repo'] == 'figshare':
                         session['repo'] = None
-                    flash('figshare disconnected')
+                    flash( f"figshare {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'figshare_access_token' in request.form:
                 if check_connection(repo='figshare', api_key=request.form['figshare_access_token']):
                     session['figshare_access_token'] = request.form['figshare_access_token']
-                    flash('figshare connected')
+                    flash( f"figshare {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to figshare')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} figshare" )
             if 'zenodo_disconnect' in request.form:
                 if 'zenodo_access_token' in session:
                     del session['zenodo_access_token']
                     if 'repo' in session and session['repo'] == 'zenodo':
                         session['repo'] = None
-                    flash('zenodo disconnected')
+                    flash( f"zenodo {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'zenodo_access_token' in request.form:
                 if check_connection(repo='zenodo', api_key=request.form['zenodo_access_token']):
                     session['zenodo_access_token'] = request.form['zenodo_access_token']
-                    flash('zenodo connected')
+                    flash( f"zenodo {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to zenodo')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} zenodo" )
             if 'osf_disconnect' in request.form:
                 if 'osf_access_token' in session:
                     del session['osf_access_token']
                     if 'repo' in session and session['repo'] == 'osf':
                         session['repo'] = None
-                    flash('osf disconnected')
+                    flash( f"osf {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'osf_access_token' in request.form:
                 if check_connection(repo='osf', api_key=request.form['osf_access_token']):
                     session['osf_access_token'] = request.form['osf_access_token']
-                    flash('osf connected')
+                    flash( f"osf {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to osf')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} osf" )
             if 'dataverse_disconnect' in request.form:
                 if 'dataverse_access_token' in session:
                     del session['dataverse_access_token']
                     if 'repo' in session and session['repo'] == 'dataverse':
                         session['repo'] = None
-                    flash('dataverse disconnected')
+                    flash( f"dataverse {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'dataverse_access_token' in request.form:
                 if check_connection(repo='dataverse', api_key=request.form['dataverse_access_token']):
                     session['dataverse_access_token'] = request.form['dataverse_access_token']
-                    flash('dataverse connected')
+                    flash( f"dataverse {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    try:
+                        memoized_dataverses.cache_clear()
+                        flash( languages[session['lang']].get('flash_deleted_dataverses', 'deleted previously cached dataverses') )
+                    except Exception as e:
+                        logger.error(f"failed to clear cache: {e}")
+                    get_dataverses = True
+                    flash( languages[session['lang']].get('flash_caching_dataverses', 'dataverses will be cached in background. reconnect to refresh') )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to dataverse')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} dataverse" )
             if 'datastation_disconnect' in request.form:
                 if 'datastation_access_token' in session:
                     del session['datastation_access_token']
                     if 'repo' in session and session['repo'] == 'datastation':
                         session['repo'] = None
-                    flash('datastation disconnected')
+                    flash( f"datastation {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'datastation_access_token' in request.form:
                 if check_connection(repo='datastation', api_key=request.form['datastation_access_token']):
                     session['datastation_access_token'] = request.form['datastation_access_token']
-                    flash('datastation connected')
+                    flash( f"datastation {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    try:
+                        memoized_dataverses.cache_clear()
+                        flash( languages[session['lang']].get('flash_deleted_dataverses', 'deleted previously cached dataverses') )
+                    except Exception as e:
+                        logger.error(f"failed to clear cache: {e}")
+                    get_dataverses = True
+                    flash( languages[session['lang']].get('flash_caching_dataverses', 'dataverses will be cached in background. reconnect to refresh') )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to datastation')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} datastation" )
             if 'irods_disconnect' in request.form:
                 if 'irods_access_token' in session:
                     del session['irods_access_token']
                     del session['irods_user']
                     if 'repo' in session and session['repo'] == 'irods':
                         session['repo'] = None
-                    flash('irods disconnected')
+                    flash( f"irods {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'irods_access_token' in request.form and 'irods_user' in request.form:
                 if check_connection(repo='irods', api_key=request.form['irods_access_token'], user=request.form['irods_user']):
                     session['irods_user'] = request.form['irods_user']
                     session['irods_access_token'] = request.form['irods_access_token']
-                    flash('irods connected')
+                    flash( f"irods {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to irods')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} irods" )
             if 'surfs3_disconnect' in request.form:
                 if 'surfs3_access_token' in session:
                     del session['surfs3_access_token']
                     del session['surfs3_user']
                     if 'repo' in session and session['repo'] == 'surfs3':
                         session['repo'] = None
-                    flash('surfs3 disconnected')
+                    flash( f"surfs3 {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'surfs3_access_token' in request.form and 'surfs3_user' in request.form:
                 if check_connection(repo='surfs3', api_key=request.form['surfs3_access_token'], user=request.form['surfs3_user']):
                     session['surfs3_user'] = request.form['surfs3_user']
                     session['surfs3_access_token'] = request.form['surfs3_access_token']
-                    flash('surfs3 connected')
+                    flash( f"surfs3 {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to surfs3')                
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} surfs3" )                
             if 'sharekit_disconnect' in request.form:
                 if 'sharekit_access_token' in session:
                     del session['sharekit_access_token']
                     if 'repo' in session and session['repo'] == 'sharekit':
                         session['repo'] = None
-                    flash('sharekit disconnected')
+                    flash( f"sharekit {languages[session['lang']].get('flash_disconnected', 'disconnected')}" )
             elif 'sharekit_connect' in request.form:
                 # get access token
                 sharekit_api_key = get_sharekit_token()
                 if check_connection(repo='sharekit', api_key = sharekit_api_key):
                     session['sharekit_access_token'] = sharekit_api_key
-                    flash('sharekit connected')
+                    flash( f"sharekit {languages[session['lang']].get('flash_connected', 'connected')}" )
+                    flash( languages[session['lang']].get('flash_now_start', "you can now <a href='/start?homeshow=True'>start an import/export</a>") )
                 else:
-                    flash('could not connect to sharekit')
+                    flash( f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} sharekit" )
             ### END token based service connections ###
     except Exception as e:
-        flash("something went wrong (5)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (5)")
         logger.error(e, exc_info=True)
     session['cloud_service'] = cloud_service
-    return render_template('connect.html',
+    # if session and 'lang' in session:
+    #     lng = session['lang']
+    # except:
+    #     lng = 'EN'
+    return render_template('connect.html', **languages[session['lang']],
                             data=session,
                             drive_url=drive_url,
                             oauth_services = oauth_services,
                             token_based_services = token_based_services,
-                            all_vars = all_vars)
+                            all_vars = all_vars,
+                            get_dataverses = get_dataverses)
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -464,7 +581,7 @@ def upload():
             if 'access_token' in session:
                 password = session['access_token']
         if not make_connection(username=session['username'], password=session['password']):
-            flash('Not connected')
+            flash( languages[session['lang']].get('flash_not_connected', 'Not connected'))
             return redirect('/connect')
         
         preview = None
@@ -473,7 +590,7 @@ def upload():
         if 'metadata' not in session:
             session['metadata'] = {}
     except Exception as e:
-        flash("something went wrong (16)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (16)")
         logger.error(e, exc_info=True)
 
     try:
@@ -532,11 +649,18 @@ def upload():
                     domain = email.split("@")[-1]
                     w = whois.whois(domain)
                     if w['domain_name'] == None:
-                        flash(f"email domain {domain} name does not exist")
-                        return render_template('upload.html',
+                        flash( f"{languages[session['lang']].get('flash_email_domain', 'email domain name does not exist')} : {domain}" )
+                        return render_template('upload.html', **languages[session['lang']],
                                                 data=session,
                                                 preview=preview,
                                                 drive_url=drive_url)
+
+                if 'selected_folder_content' in request.form:
+                    session['selected_folder_content'] = request.form['selected_folder_content']
+
+
+                if 'files-folders-selection' in request.form:
+                    session['files-folders-selection'] = request.form['files-folders-selection'].split(",")
 
                 if 'preview' in request.form:
                     preview = True
@@ -550,7 +674,7 @@ def upload():
                         # needed for getting the right statusses remote can either be the url or repo
                         session['remote'] = request.form['selected_repo']
                     else:
-                        flash('Please select a repository.')                
+                        flash( languages[session['lang']].get('flash_select_repo', 'Please select a repository.') )
                     # get the folder and set it to session folder
                     session['folder_path'] = request.form['folder_path']
                     session['complete_folder_path'] = request.form['folder_path']
@@ -591,13 +715,8 @@ def upload():
                     if 'use_zip' in request.form or repo == 'dataverse' or repo == 'datastation':
                         use_zip=True
                     # setting the canceled status to false for this user
-                    set_canceled(username, False)
+                    set_canceled(username, False)                  
 
-                    # setting a tmp folder path name that does not interfere with other projects or the SRDC code itself.
-                    tmp_folder_path_name = complete_folder_path.split("/")[-1]
-                    if tmp_folder_path_name in ['', 'app', 'local', 'instance', 'migrations', 'surf-rdc-chart', 'tests']:
-                        tmp_folder_path_name = tmp_folder_path_name + "_" + metadata['title'].replace(" ", "_")
-                    
                     if repo == "sharekit":
                         email = None
                         displayname = None
@@ -617,8 +736,14 @@ def upload():
                         metadata['matched_person'] = person['name'] + " (" + person['id'] + ")"
                         
                     set_projectname(username=session['username'],folder=session['complete_folder_path'],url=session['remote'],projectname=session['projectname'])
+                    generate_metadata = False
+                    if 'generate_metadata' in request.form:
+                        generate_metadata = True
+                    files_folders_selection = None
+                    if 'files-folders-selection' in session and len(session['files-folders-selection']) > 0:
+                        files_folders_selection = session['files-folders-selection']
                     t = Thread(target=run_export, args=(
-                        username, password, complete_folder_path, tmp_folder_path_name, repo, repo_user, api_key, metadata, use_zip, dataverse_alias))
+                        username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip, generate_metadata, dataverse_alias, files_folders_selection))
                     t.start()
                     session['query_status'] = 'started'
                     session['process'] = 'export'
@@ -626,9 +751,9 @@ def upload():
                 else:
                     preview = True
     except Exception as e:
-        flash("something went wrong (6)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (6)")
         logger.error(e, exc_info=True)    
-    return render_template('upload.html',
+    return render_template('upload.html', **languages[session['lang']],
                             data=session,
                             preview=preview,
                             drive_url=drive_url)
@@ -655,7 +780,7 @@ def retrieve():
             if 'access_token' in session:
                 password = session['access_token']
         if not make_connection(username=session['username'], password=session['password']):
-            flash('Not connected')
+            flash( languages[session['lang']].get('flash_not_connected', 'Not connected'))
             return redirect('/connect')
 
         check_accept_url_in_history_first = None
@@ -664,7 +789,7 @@ def retrieve():
         
         session['repo'] = None
     except Exception as e:
-        flash("something went wrong (17)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (17)")
         logger.error(e, exc_info=True)
     try:
         session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
@@ -742,9 +867,9 @@ def retrieve():
                         preview = True
                         # flash("Previewing data import.")
     except Exception as e:
-        flash("something went wrong (7)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (7)")
         logger.error(e, exc_info=True)
-    return render_template('retrieve.html',
+    return render_template('retrieve.html', **languages[session['lang']],
                             data=session,
                             preview=preview,
                             check_accept_folder_first=check_accept_folder_first,
@@ -772,7 +897,7 @@ def download():
             if 'access_token' in session:
                 password = session['access_token']
         if not make_connection(username=session['username'], password=session['password']):
-            flash('Not connected')
+            flash( languages[session['lang']].get('flash_not_connected', 'Not connected'))
             return redirect('/connect')
 
         check_accept_url_in_history_first = None
@@ -780,7 +905,7 @@ def download():
         preview = False
         # session['repo'] = None
     except Exception as e:
-        flash("something went wrong (18)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (18)")
         logger.error(e, exc_info=True)
     try:
         session['query_status'] = get_query_status(session['username'], session['complete_folder_path'], session['remote'])
@@ -876,9 +1001,9 @@ def download():
                         preview = True
                         # flash("Previewing data import.")
     except Exception as e:
-        flash("something went wrong (8)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (8)")
         logger.error(e, exc_info=True)
-    return render_template('download.html',
+    return render_template('download.html', **languages[session['lang']],
                                 data=session,
                                 preview=preview,
                                 check_accept_folder_first=check_accept_folder_first,
@@ -896,7 +1021,7 @@ def cancel_download():
             if 'cancel' in request.form:
                 status = get_query_status(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
                 if status == 'ready':
-                    flash('Process is ready. Will not cancel.')
+                    flash( languages[session['lang']].get('flash_process_ready', 'Process is ready. Will not cancel.') )
                 else:
                     set_projectname(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], projectname=session['projectname'])
                     update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
@@ -906,14 +1031,14 @@ def cancel_download():
                     preview = False
                     check_accept_folder_first=False
                     check_accept_url_in_history_first=False
-                    flash("Import was canceled by user.")
+                    flash( languages[session['lang']].get('flash_import_canceled', 'Import was canceled by user.') )
                     # do some clean up
                     tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
                     try:
                         if os.path.isfile(tmp_zip_file):
                             os.remove(tmp_zip_file)
                     except Exception as ee:
-                        flash(f"Failed to remove temporary file: {tmp_zip_file} - {ee}")
+                        flash( f"{languages[session['lang']].get('flash_fail_remove_file', 'Failed to remove temporary file')} : {tmp_zip_file} - {ee}")
                     
                     # remove the temp folder
                     tmp_unzipped_path = "/" + session['complete_folder_path'].split("/")[-1]
@@ -921,12 +1046,12 @@ def cancel_download():
                         if os.path.isdir(tmp_unzipped_path):
                             shutil.rmtree(tmp_unzipped_path)
                     except Exception as e:
-                        flash(f"Failed to remove temporary folder: {tmp_unzipped_path} - {e}")
+                        flash( f"{languages[session['lang']].get('flash_fail_remove_folder', 'Failed to remove temporary folder')} : {tmp_unzipped_path} - {e}")
     except Exception as e:
         preview = False
         check_accept_folder_first = False
         check_accept_url_in_history_first = False
-        flash("something went wrong (9)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (9)")
         logger.error(e, exc_info=True)
     return redirect("/download")
 
@@ -941,7 +1066,7 @@ def cancel_retrieval():
             if 'cancel' in request.form:
                 status = get_query_status(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
                 if status == 'ready':
-                    flash('Process is ready. Will not cancel.')
+                    flash( languages[session['lang']].get('flash_process_ready', 'Process is ready. Will not cancel.') )
                 else:
                     set_projectname(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], projectname=session['projectname'])
                     update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
@@ -951,14 +1076,14 @@ def cancel_retrieval():
                     preview = False
                     check_accept_folder_first=False
                     check_accept_url_in_history_first=False
-                    flash("Import was canceled by user.")
+                    flash( languages[session['lang']].get('flash_import_canceled', 'Import was canceled by user.') )
                     # do some clean up
                     tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
                     try:
                         if os.path.isfile(tmp_zip_file):
                             os.remove(tmp_zip_file)
                     except Exception as ee:
-                        flash(f"Failed to remove temporary file: {tmp_zip_file} - {ee}")
+                        flash( f"{languages[session['lang']].get('flash_fail_remove_file', 'Failed to remove temporary file')} : {tmp_zip_file} - {ee}")
                     
                     # remove the temp folder
                     tmp_unzipped_path = "/" + session['complete_folder_path'].split("/")[-1]
@@ -966,12 +1091,12 @@ def cancel_retrieval():
                         if os.path.isdir(tmp_unzipped_path):
                             shutil.rmtree(tmp_unzipped_path)
                     except Exception as e:
-                        flash(f"Failed to remove temporary folder: {tmp_unzipped_path} - {e}")
+                        flash( f"{languages[session['lang']].get('flash_fail_remove_folder', 'Failed to remove temporary folder')} : {tmp_unzipped_path} - {e}")
     except Exception as e:
         preview = None
         check_accept_folder_first = None
         check_accept_url_in_history_first = None
-        flash("something went wrong (10)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (10)")
         logger.error(e, exc_info=True)
     return redirect("/retrieve")
 
@@ -984,7 +1109,7 @@ def cancel_upload():
             if 'cancel' in request.form:
                 status = get_query_status(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
                 if status == 'ready':
-                    flash('Process is ready. Will not cancel.')
+                    flash( languages[session['lang']].get('flash_process_ready', 'Process is ready. Will not cancel.') )
                 else:
                     set_projectname(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], projectname=session['projectname'])
                     update_history(username=session['username'], folder=session['complete_folder_path'], url=session['remote'], status='canceled by user')
@@ -992,14 +1117,14 @@ def cancel_upload():
                     session['query_status'] = 'ready'
                     set_canceled(session['username'], True)
                     preview = False
-                    flash("Export was canceled by user.")
+                    flash( languages[session['lang']].get('flash_export_canceled', 'Export was canceled by user.') )
                     # do some clean up
                     tmp_zip_file = session['complete_folder_path'].split("/")[-1] + ".zip"
                     try:
                         if os.path.isfile(tmp_zip_file):
                             os.remove(tmp_zip_file)
                     except Exception as ee:
-                        flash(f"Failed to remove temporary file: {tmp_zip_file} - {ee}")
+                        flash( f"{languages[session['lang']].get('flash_fail_remove_file', 'Failed to remove temporary file')} : {tmp_zip_file} - {ee}")
                     
                     # remove the temp folder
                     tmp_unzipped_path = "/" + session['complete_folder_path'].split("/")[-1]
@@ -1007,10 +1132,10 @@ def cancel_upload():
                         if os.path.isdir(tmp_unzipped_path):
                             shutil.rmtree(tmp_unzipped_path)
                     except Exception as e:
-                        flash(f"Failed to remove temporary folder: {tmp_unzipped_path} - {e}")
+                        flash( f"{languages[session['lang']].get('flash_fail_remove_folder', 'Failed to remove temporary folder')} : {tmp_unzipped_path} - {e}")
     except Exception as e:
         preview = None
-        flash("something went wrong (11)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (11)")
         logger.error(e, exc_info=True)
     return redirect("/upload")
 
@@ -1022,14 +1147,14 @@ def debug():
         if 'showall' in request.args and request.args.get('showall').lower() == 'true':
             session['showall'] = True
     except Exception as e:
-        flash("something went wrong (12)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (12)")
         logger.error(e, exc_info=True)
     try:
         session['showversion'] = False
         if 'showversion' in request.args and request.args.get('showversion').lower() == 'true':
             flash("Release 20241125")
     except Exception as e:
-        flash("something went wrong (13)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (13)")
         logger.error(e, exc_info=True)
     try:
         session['showallvars'] = False
@@ -1039,9 +1164,9 @@ def debug():
             except:
                 flash("not showing all_vars")
     except Exception as e:
-        flash("something went wrong (13)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (13)")
         logger.error(e, exc_info=True)
-    return render_template('connect.html',
+    return render_template('connect.html', **languages[session['lang']],
                             data=session,drive_url=drive_url)
 
 
@@ -1060,7 +1185,7 @@ def convertsize(size_bytes):
     try:
         return convert_size(size_bytes)
     except Exception as e:
-        flash("something went wrong (19)")
+        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (19)")
         logger.error(e, exc_info=True)
 
 ### END FILTERS ###
@@ -1077,6 +1202,11 @@ def s3archive():
     # Load available
     return render_template('s3archive.html')
 
+@lru_cache(maxsize=None)
+def memoized_dataverses(api_key, api_address, datastation):
+    dv = Dataverse(api_key=api_key, api_address=api_address, datastation=datastation)
+    return dv.get_all_sub_dataverses(root_dataverse=dataverse_parent_dataverse)
+
 
 @app.route('/dataverses', methods=['GET'])
 def dataverses():
@@ -1087,22 +1217,32 @@ def dataverses():
     """
     try:
         if 'datastation' in request.args:
+            session['repo'] = 'datastation'
             datastation = Dataverse(api_key=session['datastation_access_token'], api_address=datastation_api_url, datastation=True)
-            dataverses = datastation.get_sub_dataverses()
+            try:
+                dataverses = memoized_dataverses(api_key=session['datastation_access_token'], api_address=datastation_api_url, datastation=True)
+            except:
+                dataverses = []
             parent_dataverse_info = datastation.get_dataverse_info(datastation_parent_dataverse)
-            dataverses.append(parent_dataverse_info)
+            if parent_dataverse_info not in dataverses:
+                dataverses.append(parent_dataverse_info)
         else:
+            session['repo'] = 'dataverse'
             dataverse = Dataverse(api_key=session['dataverse_access_token'], api_address=dataverse_api_url)
-            dataverses = dataverse.get_sub_dataverses()
+            try:
+                dataverses = memoized_dataverses(api_key=session['dataverse_access_token'], api_address=dataverse_api_url,datastation=False)
+            except:
+                dataverses = []
             parent_dataverse_info = dataverse.get_dataverse_info(dataverse_parent_dataverse)
-            dataverses.append(parent_dataverse_info)
-    except Exception as e:
+            if parent_dataverse_info not in dataverses:
+                dataverses.append(parent_dataverse_info)
+    except Exception as e: 
         logger.error(f"Failed at dataverses component view:")
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                    drive_url=drive_url,
                                    name="dataverses")
-    return render_template('dataverses.html',
+    return render_template('dataverses.html', **languages[session['lang']],
                             data=session,
                             drive_url=drive_url,
                             dataverses = dataverses)
@@ -1341,7 +1481,7 @@ def metadata():
 
             url = f"{datastation_api_url}/metadatablocks/dansRights"
             logger.error(url)
-            response = requests.get(url, headers=headers)
+            response = memoize(requests.get(url, headers=headers))
             logger.error(response)
             if response.status_code == 200:
                 dansRights_data = response.json()
@@ -1360,7 +1500,7 @@ def metadata():
                     dataverse_subjects = dataverse_citation_data['data']['fields']['subject']['controlledVocabularyValues']
         except:
             pass
-        return render_template('metadata.html',
+        return render_template('metadata.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 disabled=disabled,
@@ -1371,7 +1511,7 @@ def metadata():
                                 dansRelationMetadata_audiences=dansRelationMetadata_audiences)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     drive_url=drive_url,
                                     name="metadata")
 
@@ -1398,13 +1538,13 @@ def checkconnection(repo=None):
         except Exception as e:
             logger.info(e, exc_info=True)
             connection_ok = None
-        return render_template('check_connection.html',
+        return render_template('check_connection.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 connection_ok=connection_ok)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,             
                                     name="check connection")
@@ -1419,7 +1559,7 @@ def repo_selection():
     try:
         session['hidden_services'] = hidden_services
         if registered_services == []:
-            return render_template('component_load_failure.html',
+            return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="No repositories have been configured")
@@ -1429,7 +1569,7 @@ def repo_selection():
                 available_services.append(service)
         if available_services == []:
             session['repo'] = ''
-            return render_template('component_load_failure.html',
+            return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="No repositories have been configured")
@@ -1446,39 +1586,42 @@ def repo_selection():
         inactive_services = sorted(inactive_services, key=str.lower)
         sorted_services =  active_services + inactive_services
 
-        return render_template('repo_selection.html',
+        return render_template('repo_selection.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 registered_services = sorted_services,
                                 all_vars = all_vars)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     name="repo selection")
 
-@app.route('/folder-paths', methods=['GET'])
-def folder_paths():
+@app.route('/folder-paths/<direction>', methods=['GET'])
+def folder_paths(direction=None):
     """Will render the select_folder_path component
 
     Returns:
         str: html for the select_folder_path component
     """
     try:
+        if 'files-folders-selection' in session:
+            del session['files-folders-selection']
         if 'username' in session and 'password' in session:
-            folder_paths = get_cached_folders(username = session['username'], password = session['password'], folder = '/')
+            folder_paths = get_cached_folders(session['username'], session['password'], '/')
             if folder_paths == None or folder_paths == []:
-                return render_template('component_load_failure.html',
+                return render_template('component_load_failure.html', **languages[session['lang']],
                                         name="folder paths")
         else:
-            return render_template('component_load_failure.html',
+            return render_template('component_load_failure.html', **languages[session['lang']],
                                     name="folder paths")
-        return render_template('select_folder_path.html',
+        return render_template('select_folder_path.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
-                                folder_paths = folder_paths)
+                                folder_paths = folder_paths,
+                                direction=direction)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="folder paths")
@@ -1491,19 +1634,25 @@ def folder_content(direction=None):
         str: html for the folder_content component
     """
     try:
-        if 'username' in session and 'password' in session and 'complete_folder_path' in session:
+        if 'files-folders-selection' in session and len(session['files-folders-selection']) > 0:
+            folder_content = session['files-folders-selection']
+            if direction == 'up':
+                content_can_be_processed = folder_content_can_be_processed(session['username'], session['password'], session['complete_folder_path'])
+            else:
+                content_can_be_processed = {'can_be_processed': None, 'total_size': None, 'free_bytes': None}
+        elif 'username' in session and 'password' in session and 'complete_folder_path' in session:
             folder_content = get_folder_content(session['username'], session['password'], session['complete_folder_path'])
             if direction == 'up':
                 content_can_be_processed = folder_content_can_be_processed(session['username'], session['password'], session['complete_folder_path'])
             else:
                 content_can_be_processed = {'can_be_processed': None, 'total_size': None, 'free_bytes': None}
         else:
-            return render_template('component_load_failure.html',
+            return render_template('component_load_failure.html', **languages[session['lang']],
                                         data=session,
                                         drive_url=drive_url,
                                         name="folder content")
         
-        return render_template('folder_content.html',
+        return render_template('folder_content.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 folder_content = folder_content,
@@ -1511,10 +1660,41 @@ def folder_content(direction=None):
                                 direction = direction)
     except Exception as e:
         logger.error(e)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="folder content")
+
+
+
+@app.route('/select-folder-content', methods=['POST'])
+def select_folder_content():
+    """Will render the select_folder_content component
+
+    Returns:
+        str: html for the select_folder_content component
+    """
+    try:
+        if "complete_folder_path" in request.values:
+            session['complete_folder_path'] = request.values["complete_folder_path"]
+
+        if 'username' in session and 'password' in session and 'complete_folder_path' in session:
+            folder_content = get_folder_content(session['username'], session['password'], session['complete_folder_path'], files_only=True)
+        else:
+            return render_template('component_load_failure.html', **languages[session['lang']],
+                                        data=session,
+                                        drive_url=drive_url,
+                                        name="select folder content")
+
+        return render_template('select_folder_content.html', **languages[session['lang']],
+                                folder_content = folder_content)
+    except Exception as e:
+        logger.error(e)
+        return render_template('component_load_failure.html', **languages[session['lang']],
+                                    data=session,
+                                    drive_url=drive_url,
+                                    name="select folder content")
+
 
 @app.route('/repocontent', methods=['GET'])
 def repocontent():
@@ -1549,19 +1729,35 @@ def repocontent():
                     user = session['irods_user']
                 if repo == 'sharekit':
                     api_key = session['sharekit_access_token']
+                if repo == 'surfs3':
+                    user = session['surfs3_user']
+                    api_key = session['surfs3_access_token']
                 repo_content = get_repocontent(repo=repo, url=url, api_key=api_key, user=user)
         except Exception as e:
             logger.error(f'failed to get repo content (1): {e}')
             repo_content = [{'message' : f'failed to get repo content'}]
         try:
-            content_fits = repo_content_fits(repo_content, session['username'], session['password'], session['complete_folder_path'])
-            content_can_be_processed = repo_content_can_be_processed(repo_content)
-            permission = check_permission(session['username'], session['password'], session['complete_folder_path'])
+            if 'repo' in session and session['repo'] != 'surfs3':
+                content_fits = repo_content_fits(repo_content, session['username'], session['password'], session['complete_folder_path'])
+                content_can_be_processed = repo_content_can_be_processed(repo_content)
+                permission = check_permission(session['username'], session['password'], session['complete_folder_path'])
+            else:
+                content_fits = True
+                content_can_be_processed = True
+                permission = True
         except Exception as e:
             logger.error("Exception at repocontent")
             logger.error(e)
-            content_fits = None
-        return render_template('repocontent.html',
+            content_fits = False
+            content_can_be_processed = False
+            permission = False
+        if content_fits == False:
+            flash( languages[session['lang']].get('flash_content_not_fit', 'Content will not fit to your drive.') )
+        if content_can_be_processed == False:
+            flash( languages[session['lang']].get('flash_not_enough_resources', 'The SRDC does not have enough free resources to process the data.') )
+        if permission == False:
+            flash( languages[session['lang']].get('flash_no_write_permission', 'You do not have permission to write to the selected location.') )
+        return render_template('repocontent.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 repo_content = repo_content,
@@ -1569,7 +1765,7 @@ def repocontent():
                                 repo_content_can_be_processed = content_can_be_processed)
     except Exception as e:
         logger.error(f'failed to get repo content (2): {e}')
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     name="repo content")
 
 @app.route('/doi-metadata', methods=['GET'])
@@ -1581,17 +1777,20 @@ def doi_metadata():
     """
     try:
         try:
-            doi_metadata = get_doi_metadata(session['url'])
-            doi_metadata = parse_doi_metadata(doi_metadata)
+            if session['repo'] != 'surfs3':
+                doi_metadata = get_doi_metadata(session['url'])
+                doi_metadata = parse_doi_metadata(doi_metadata)
+            else:
+                doi_metadata = {}
         except:
             doi_metadata = {}
-        return render_template('doi_metadata.html',
+        return render_template('doi_metadata.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 doi_metadata = doi_metadata)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="doi metadata")
@@ -1625,17 +1824,19 @@ def private_metadata():
                 user = session['irods_user']
             if repo == 'sharekit':
                 api_key = session['sharekit_access_token']
+            if repo == 'surfs3':
+                api_key = session['surfs3_access_token']
             private_metadata = get_private_metadata(repo=repo, url=url, api_key=api_key, user=user)
         except Exception as e:
             logger.error(e, exc_info=True)
             private_metadata = {}
-        return render_template('private_metadata.html',
+        return render_template('private_metadata.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 private_metadata = private_metadata)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     name="private metadata")
 
 @app.route('/quota-text', methods=['GET'])
@@ -1651,10 +1852,10 @@ def quote_text():
         except Exception as e:
             logger.error(e, exc_info=True)
             quota_text = ""
-        return render_template('quota_text.html', quota_text = quota_text)
+        return render_template('quota_text.html', **languages[session['lang']], quota_text = quota_text)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="quote text")
@@ -1667,11 +1868,19 @@ def status():
         str: html for the status component
     """
     try:
+        query_status_history = {}
+        progress = 0
+        project_id = None
+        project_url = None
         try:
             username = session['username']
             complete_folder_path = session['complete_folder_path']
             remote = session['remote']
-            query_status_history = get_query_status_history(username, complete_folder_path, remote)
+            try:
+                query_status_history = get_query_status_history(username, complete_folder_path, remote)
+            except Exception as e:
+                logger.error(e, exc_info=True)
+                query_status_history = {}     
             
             # check where we are in the process and based on that send a percentage to the status.html
             # in the status.html add a progress bar showing the percentage.
@@ -1764,9 +1973,14 @@ def status():
                     progress = 0
                     logger.error(e)
 
-            #TODO: turn this into a url based on the repo and the url endpoint configured for it
             project_url = None
-            project_id = get_project_id(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
+
+            try:
+                project_id = get_project_id(username=session['username'], folder=session['complete_folder_path'], url=session['remote'])
+            except Exception as e:
+                logger.error(e, exc_info=True)
+                project_id = None
+
             if project_id:
                 if session['repo'] == 'dataverse':
                     project_url = f"{dataverse_website}/dataset.xhtml?persistentId={project_id}"
@@ -1786,8 +2000,7 @@ def status():
                     project_url = f"{sharekit_website}"
         except Exception as e:
             logger.error(e, exc_info=True)
-            query_status_history = {}
-        return render_template('status.html',
+        return render_template('status.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 query_status_history = query_status_history,
@@ -1796,7 +2009,7 @@ def status():
                                 project_url=project_url)
     except Exception as e:
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                     data=session,
                                     drive_url=drive_url,
                                     name="status")
@@ -1820,14 +2033,14 @@ def persistent_connection(persist=None):
                         session['password'] = password
                         session['persistent_connection'] = True
                         session['persist'] = False
-                        # return render_template('connect.html', data=session)
+                        # return render_template('connect.html', **languages[session['lang']], data=session)
                     else:
-                        flash('Failed to make connection to research drive persistent.')
+                        flash( languages[session['lang']].get('flash_fail_persist', 'Failed to make connection to research drive persistent.') )
             else:
                 session['poll_info'] = get_webdav_poll_info_nc(session['access_token'])
     except Exception as e:
         logger.error(e)
-    return render_template('persistent-connection.html',
+    return render_template('persistent-connection.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url )
 
@@ -1880,9 +2093,9 @@ def authorize(service=None):
                     username = None
                     password = access_token
                 if username is None:
-                    flash('failed to get user_id')
+                    flash( languages[session['lang']].get('flash_fail_userid', 'failed to get user_id') )
                 if password is None:
-                    flash('failed to get access_token')
+                    flash( languages[session['lang']].get('flash_fail_access_token', 'failed to get access_token') )
                 if username is not None and password is not None:
                     if make_connection(username, password):
                         session['cloud_token'] = oauth_token
@@ -1893,18 +2106,25 @@ def authorize(service=None):
                         session['connected'] = True
                         session['failed'] = False
                         session.pop('_flashes', None)
-                        flash('research drive connected')
+                        flash( f"research drive {languages[session['lang']].get('flash_connected', 'connected')}" )
+                        flash( languages[session['lang']].get('flash_now_connect', 'now <a href="/start?homeshow=True">get started</a> and connect to one ore more repositories') )
+                        # get_cached_folders async
+                        t = Thread(target = get_cached_folders,
+                           args = (session['username'], session['password'], '/'))
+                        t.start()
                     else:
-                        flash('failed to connect (1)')
+                        flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (1b)")
+                        flash(f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} (1)")
                         session['failed'] = True
                 else:
-                    flash('failed to connect (2)')
+                    flash(f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} (2)")
                     session['failed'] = True
             except Exception as e:
-                flash(f'failed to connect (3)')
+                flash(f"{languages[session['lang']].get('flash_failed_connect', 'failed to connect')} (3)")
                 flash(str(e))
                 session['failed'] = True
-            return redirect("/refresh")
+            # return home
+            return redirect("/")
         elif service in registered_services:
             try:
                 eval(f"oauth.{service}.authorize_access_token()")
@@ -1912,10 +2132,10 @@ def authorize(service=None):
 
                 access_token = oauth_token['access_token']
                 session[f'{service}_access_token'] = access_token
-                flash(f'{service} connected')
+                flash(f"{service} {languages[session['lang']].get('flash_connected', 'connected')}")                
             except Exception as e:
                 logger.error(f"failed at connecting {service}: {e}")
-                flash('failed to connect')            
+                flash( languages[session['lang']].get('flash_failed_connect', 'failed to connect') )
     except Exception as e:
         logger.error(e, exc_info=True)
     return render_template("close.html", data=session, drive_url=drive_url)
@@ -1940,14 +2160,28 @@ def refresh_token():
     except Exception as e:
         logger.error(f"Failed at refresh token component view:")
         logger.error(e, exc_info=True)
-        return render_template('component_load_failure.html',
+        return render_template('component_load_failure.html', **languages[session['lang']],
                                 data=session,
                                 drive_url=drive_url,
                                 name=str(e))
-    return render_template('refresh-token.html',
+    return render_template('refresh-token.html', **languages[session['lang']],
                             data=session,
                             drive_url=drive_url,
                             old_token=old_token,
                             new_token=new_token)
 
 ### END SERVICE CONNECTIONS ###
+
+### BEGIN CUSTOM TEMPLATE FILTERS ###
+
+@app.template_filter()
+def translate(text):
+    if 'lang' in session:
+        lang = session['lang']
+    else:
+        lang = 'EN'
+    # TODO implement auto translation maybe using libretranslate
+    return text
+
+
+### END CUSTOM TEMPLATE FILTERS ###

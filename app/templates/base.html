@@ -7,15 +7,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.12.1/font/bootstrap-icons.min.css">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
         crossorigin="anonymous"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script> -->
-    <script src="https://unpkg.com/vue@3.1.1/dist/vue.global.prod.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <title>{% block title %}{% endblock %} - Reversed ScieboRDS</title>
+    <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <title>{% block title %}{% endblock %} - Surf Research Data Connector</title>
     {% endblock %}
 </head>
 
@@ -45,18 +45,18 @@
                                 });
                             </script>
                             {% else %}
-                            <small><i>Your cloud connection is persistent.</i></small>
+                            <small><i>{{ base_connection_persistent | default("Your cloud connection is persistent.") | safe }}</i></small>
                             {% endif %}
                         {% endif %}
                         {% if data.showall %}<div class="m-1 text-danger">showing all</div>{% endif %}
                     </div>
                     <b class="username">{{data.username}}</b>
-                    <button class="btn btn-secondary"><a class="nav-link" href="/connect">Connect repositories</a></button>
+                    <button class="btn btn-secondary"><a class="nav-link" href="/connect"><i class="bi bi-globe"> {{ base_manage_connections | default("Manage connections") | safe }}</i></a></button>
                 </div>
                 {% else %}
                 <div class="m-1">
-                    <b class="username disconnected">You are not connected yet.</b>
-                    <button class="btn btn-secondary"><a class="nav-link" href="/connect">Connect</a></button>
+                    <b class="username disconnected">{{ base_not_connected | default("You are not connected yet.") | safe }}</b>
+                    <button class="btn btn-secondary"><a class="nav-link" href="/connect">{{ base_connect | default("Connect") | safe }}</a></button>
                 </div>
                 {% endif %}
             </nav>
@@ -73,20 +73,43 @@
                     <div class="collapse navbar-collapse" id="navbarContent">
                         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                             <li class="nav-item">
-                                <button class="btn btn-secondary"><a class="nav-link" href="/">Home</a></button>
+                                <button class="btn btn-secondary"><a class="nav-link" href="/"><i class="bi bi-house"> {{ base_home | default("Home") | safe }}</i></a></button>
                             </li>
+                            {% if data.connected==true and data.homestart %}
                             <li class="nav-item">
-                                <button class="btn btn-secondary"><a class="nav-link" href="/start">Project</a></button>
+                                <button class="btn btn-secondary"><a class="nav-link" href="/start"><i class="bi bi-arrow-down-up"> {{ base_import_export | default("Import/Export") | safe }}</i></a></button>
                             </li>
+                            {% endif %}
                         </ul>
                         <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                            {% if data.lang != "en" %}
                             <li class="nav-item">
-                                <button class="btn btn-secondary"><a href="/faq" class="nav-link">FAQ</a></button>
+                                <button class="btn btn-secondary"><a href="/?setlang=en" class="nav-link"><i class="bi bi-translate" title="Switch to English"> {{ base_en | default("EN") | safe }}</i></a></button>
+                            </li>
+                            {% endif %}
+                            {% if data.lang != "nl" %}
+                            <li class="nav-item">
+                                <button class="btn btn-secondary"><a href="/?setlang=nl" class="nav-link"><i class="bi bi-translate" title="Switch to Dutch"> {{ base_nl | default("NL") | safe }}</i></a></button>
+                            </li>
+                            {% endif %}
+                            
+                            {% if 'gtrans' in session and session.gtrans == "True"%}
+                            <li class="nav-item">
+                                <button class="btn btn-secondary"><a href="/?gtrans=False" class="nav-link"><i class="bi bi-translate" title="Auto translate off"> </i></a></button>
+                            </li>
+                            {% else %}
+                            <li class="nav-item">
+                                <button class="btn btn-secondary"><a href="/?gtrans=True" class="nav-link"><i class="bi bi-translate" title="Auto translate on"> </i></a></button>
+                            </li>
+                            {% endif %}
+                           
+                            <li class="nav-item">
+                                <button class="btn btn-secondary"><a href="/faq" class="nav-link"><i class="bi bi-question-lg"> FAQ</i></a></button>
                             </li>
                             {% if data.connected==true %}
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a href="/history"
-                                        class="nav-link">History</a></button>
+                                        class="nav-link"><i class="bi bi-calendar"> {{ base_history | default("History") | safe }}</i></a></button>
                             </li>
                             {% endif %}
                         </ul>
@@ -102,7 +125,7 @@
                 <div class="alert alert-secondary show" id="flashmessages">
                     <ul class="list-group">
                         {% for message in messages %}
-                        <li class="list-group-item">{{ message }}</li>
+                        <li class="list-group-item">{{ message | safe }}</li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -112,18 +135,69 @@
             </div>
         </div>
         <hr />
+        <div class="row stepper">
+            <!-- <div class="col-4"></div> -->
+            <div class="col-12 footer-text-right">
+                {% set repos_connected = [] %}
+                {% for service in data.registered_services %}
+                    {% set tmp_item = service + '_access_token'%}
+                    {% if data.get(tmp_item) %}
+                        <div hidden>{{ repos_connected.append(service) }}</div>
+                    {% endif %}
+                {% endfor %}
+                {% if data.connected and repos_connected | length > 0 %}
+                <big><i class="bi bi-1-circle"></i> {{ base_step1 | default("Connect to Research Drive") | safe }} <i class="bi bi-check"></i> <i class="bi bi-arrow-right"></i> <i class="bi bi-2-circle"> {{ start_connected_to | default("Connected to private repositories") | safe }}: {{repos_connected | length}} </i> <i class="bi bi-check"></i> <i class="bi bi-arrow-right"></i> <a href="/start?homeshow=True"><i class="bi bi-3-circle-fill"> {{ base_step3 | default("Start an import or export") | safe }}</i></a></big>
+                {% elif data.connected %} 
+                <big><i class="bi bi-1-circle"></i> {{ base_step1 | default("Connect to Research Drive") | safe }} <i class="bi bi-check"></i> <i class="bi bi-arrow-right"></i> <a href="/start?homeshow=True"><i class="bi bi-2-circle-fill"> {{ base_step2 | default("Connect to a private repository") | safe }}</i></a> <i class="bi bi-arrow-right"></i> <i class="bi bi-3-circle"> {{ base_step3 | default("Start an import or export") | safe }}</i></big>
+                {% else %}
+                <big><a href="/connect"><i class="bi bi-1-circle-fill"></i> {{ base_step1 | default("Connect to Research Drive") | safe }}</a> <i class="bi bi-arrow-right"></i> <i class="bi bi-2-circle"> {{ base_step2 | default("Connect to a private repository") | safe }}</i> <i class="bi bi-arrow-right"></i> <i class="bi bi-3-circle"> {{ base_step3 | default("Start an import or export") | safe }}</i></big>
+                {% endif %}
+            </div>
+        </div>
+
+        <hr />
         <div class="row footer-bar">
             <div class="col-4"></div>
             <div class="col-8 footer-text-right">
+                {% if data.cloud_service == 'owncloud' %}
                 SURF Research Data Connector | <a href="https://servicedesk.surf.nl/wiki/display/WIKI/Changelog"
-                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | Een dienst van <a
+                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | {{ base_service_by | default("A service by") | safe }} <a
                     href="https://www.surf.nl" class="underline hover:no-underline font-bold" target="_blank">SURF</a> |
                 SURF <a href="https://servicedesk.surf.nl/wiki/display/WIKI/"
                     class="underline hover:no-underline font-bold" target="_blank">wiki</a>
+                {% else %}
+                SURF Research Data Connector | <a href="https://servicedesk.surf.nl/wiki/display/WIKI/RD%3A+Changelog"
+                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | Een dienst van <a
+                    href="https://www.surf.nl" class="underline hover:no-underline font-bold" target="_blank">SURF</a> |
+                SURF <a href="https://servicedesk.surf.nl/wiki/display/WIKI/RD%3A+SURF+Research+Data+Connector"
+                    class="underline hover:no-underline font-bold" target="_blank">wiki</a>
+                {% endif %}
             </div>
         </div>
 </body>
+    <!-- begin google translate -->
+    <!-- <div id="google_translate_element"></div> -->
+    {% if data.gtrans=="True" and data.lang=="nl" %}
+    <script>
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+            // pageLanguage: 'en',
+            includedLanguages: 'nl',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
+        }
+    </script>
+    {% endif %}
+    {% if data.gtrans=="True" and data.lang != "nl" %}
+    <script>
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+            pageLanguage: 'en',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            }, 'google_translate_element');
+        }
+    </script>
+    {% endif %}
+    <!-- end google translate -->
 {% block script %}
 {% endblock %}
-
-</html>

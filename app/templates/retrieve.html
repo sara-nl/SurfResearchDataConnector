@@ -60,7 +60,7 @@
                 <div class="form-group mt-3 mb-3">
                     <h2>Import Data Folder Path</h2>
                     <!-- async loading folder paths -->
-                    {{ load_async("folderpaths", "/folder-paths", 55000) }}
+                    {{ load_async("folderpaths", "/folder-paths/down", 55000) }}
                     <!-- end async -->
 
                     <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder (optional)" pattern="[\--_-A-Za-z0-9]+" >
@@ -81,7 +81,7 @@
             {% if not preview %}
 
                 <!-- ### BEGIN PREVIEW BUTTON -->
-                <p><button type="submit" class="btn btn-secondary">Preview Import</button></p>
+                <p><button type="submit" id="action-button" class="btn btn-secondary">Preview Import</button></p>
                 <p><a href="/download"><small>I want to import a private dataset.</small></a></p>
                 <!-- ### END PREVIEW BUTTON -->
 

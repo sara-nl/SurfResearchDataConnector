@@ -1,39 +1,40 @@
 {% from "macros.html" import load_async with context %}
+<h2>{{ metadata_h2 | default("Metadata") | safe }}</h2>
 {% if data.repo == 'irods' %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
-<p>These are customized <b>required</b> metadata fields for <b>Irods</b>.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
+<p>{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }} <b>Irods</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" required {% if disabled %} disabled {% endif %}>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
@@ -71,9 +72,9 @@
         <small>Please select the value for this field in the Irods portal.</small>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="License">License</label>
-        <input type="text" class="form-control" placeholder="License of the project" disabled>
-        <small>Please select the value for this field in the Irods portal.</small>
+        <label for="License">{{ metadata_label_license | default("License") | safe}}</label>
+        <input type="text" class="form-control" placeholder="{{ metatdata_placeholder_license | default('License of the project') | safe }}" disabled>
+        <small>Please select the value for this field in the Irods portal.</sma{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }}ll>
     </div>
 </div>
 
@@ -86,34 +87,34 @@
 </div>
 
 {% elif data.repo == 'dataverse' or data.repo == 'datastation' %}
-<p>These are the metadata fields for <b>{{data.repo}}</b>.</p>
+<p>{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }} <b>{{data.repo}}</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title (required)</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author (required)</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation (optional)</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }} {{ metadata_optional | default("(optional)") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" {% if disabled %} disabled {% endif %}>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Subject">Subject (required)</label>
+        <label for="Subject">{{ metadata_label_subject | default("Subject") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
          <select class="form-select" name="subject" required {% if disabled %} disabled {% endif %}>
             <option value="{{data.metadata.subject}}">{{data.metadata.subject}}</option>
             {% for subject in dataverse_subjects %}
@@ -121,52 +122,52 @@
             {% endfor %}
          </select>
         <div class="invalid-feedback">
-            Please fill out the subject for your project.
+            {{ metadata_feedback_subject | default("Please fill out the subject for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description (required)</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Contact name">Contact name (required)</label>
-        <input type="text" class="form-control" name="contact_name" value="{{data.metadata.contact_name}}" placeholder="Name of the contact person of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Contact name">{{ metadata_label_contact | default("Contact name") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
+        <input type="text" class="form-control" name="contact_name" value="{{data.metadata.contact_name}}" placeholder="{{ metadata_placeholder_contact | default('Name of the contact person of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the name of the contact person for your project.
+            {{ metadata_feedback_contact | default("Please fill out the name of the contact person for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Contact email">Contact email (required)</label>
-        <input type="email" class="form-control" name="contact_email" value="{{data.metadata.contact_email}}" placeholder="Email of the contact person of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Contact email">{{ metadata_label_contactemail | default("Contact email") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
+        <input type="email" class="form-control" name="contact_email" value="{{data.metadata.contact_email}}" placeholder="{{ metadata_placeholder_contactemail | default('Email of the contact person of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the email of the contact person for your project.
+            {{ metadata_feedback_contactemail | default("Please fill out the email of the contact person for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <!-- DANS Relation -->
 {% if data.repo == 'datastation' %}
-<h3>Rights Metadata</h3>
+<h3>{{ metadata_h3_rights | default("Rights Metadata") | safe }}</h3>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Rights holder name">Rights holder (required)</label>
-        <input type="text" class="form-control" name="dansRights_holder" value="{{data.metadata.dansRights_holder}}" placeholder="Name of the rights holder of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Rights holder name">{{ metadata_label_rights | default("Rights holder") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
+        <input type="text" class="form-control" name="dansRights_holder" value="{{data.metadata.dansRights_holder}}" placeholder="{{ metadata_placeholder_rights | default('Name of the rights holder of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the name of the rights holder for your project.
+            {{ metadata_feedback_rights | default("Please fill out the name of the rights holder for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Language">Language (required)</label>
+        <label for="Language">{{ metadata_label_language | default("Language") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
          <select class="form-select" name="dansRights_language" required {% if disabled %} disabled {% endif %}>
             <option value="{{data.metadata.dansRights_language}}">{{data.metadata.dansRights_language}}</option>
             {% for language in dansRights_languages %}
@@ -174,11 +175,11 @@
             {% endfor %}
          </select>
         <div class="invalid-feedback">
-            Please fill out the metadata language for your project.
+            {{ metadata_feedback_language | default("Please fill out the metadata language for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="PersonalData">Personal data present? (required)</label>
+        <label for="PersonalData">{{ metadata_label_personal_data | default("Personal data present?") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
          <select class="form-select" name="dansRights_personal" required {% if disabled %} disabled {% endif %}>
             <option value="{{data.metadata.dansRights_personal}}">{{data.metadata.dansRights_personal}}</option>
             {% for personal in dansRights_personal_data %}
@@ -186,7 +187,7 @@
             {% endfor %}
          </select>
         <div class="invalid-feedback">
-            Please fill out the personal data present setting for your project.
+            {{ metadata_feedback_personal_data | default("Please fill out the personal data present setting for your project.") | safe }}
         </div>
     </div>
 </div>
@@ -197,24 +198,24 @@
 {% if data.repo == 'datastation' %}
     {% if disabled and data.metadata.dans_audience_uri %}
     <div class="row">
-        <h3>Relation Metadata</h3>
+        <h3>{{ metadata_h3_relation | default("Relation Metadata") | safe }}</h3>
         <div class="form-group col-6 mt-3 mb-3">
-            <label for="Audience">You selected the following audience</label>
+            <label for="Audience">{{ metadata_label_audience | default("You selected the following audience") | safe }}</label>
                 <a href="{{ data.metadata.dans_audience_uri }}" target="_new">{{ data.metadata.dans_audience_uri }}</a>
         </div>   
     </div>
     {% else %}
     <div class="row">
-        <h3>Relation Metadata</h3>
+        <h3>{{ metadata_h3_relation | default("Relation Metadata") | safe }}</h3>
         <div class="form-group col-6 mt-3 mb-3">
-            <label for="Lookup-audience">Lookup Audience (required)</label>
+            <label for="Lookup-audience">{{ metadata_lookup | default("Lookup Audience") | safe }} {{ metadata_required | default("(required)") | safe }}</label>
             <select class="form-select" name="dans_audience_uri" required>
                 {% for r in dansRelationMetadata_audiences %}
                 <option value={{r.uri}}>{{ r.prefLabel }}</option>
                 {% endfor %}
             </select>
             <div class="invalid-feedback">
-                Please select the audience for your project.
+                {{ metadata_feedback_audience | default("Please select the audience for your project.") | safe }}
             </div>
         </div>
     </div>
@@ -224,105 +225,105 @@
 <!-- END DANS Audience -->
 
 {% elif data.repo == 'osf' %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
-<p>These are customized <b>required</b> metadata fields for <b>Osf</b>.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
+<p>{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }} <b>Osf</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="" placeholder="Author of the project" disabled>
-        <small>Please fill out the author for your project in the OSF portal.</small>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" disabled>
+        <small>{{ metadata_small_portal_author | default("Please fill out the author for your project in the repo's portal.") |safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="" placeholder="Affiliation of the project" disabled>
-        <small>Please fill out the affiliation for your project in the OSF portal.</small>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" disabled>
+        <small>{{ metadata_small_portal_author | default("Please fill out the affiliation for your project in the repo's portal.") | safe }}</small>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>   
 </div>
 
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Tags">Tags</label>
-        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" required {% if disabled %} disabled {% endif %}>
-        <small>Seperate your tags by commas.</small>
+        <label for="Tags">{{ metadata_label_tags | default("Tags") | safe }}</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="{{ metadata_placeholder_tags | default('Tags of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
+        <small>{{ metadata_tags_seperate | default("Seperate your tags by commas.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the tags for your project.
+            {{ metadata_feedback_tags | default("Please fill out the tags for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Categories">Categories</label>
-        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled>
-        <small>Please fill out the category for your project in the OSF portal. Default will be 'project'.</small>
+        <label for="Categories">{{ metadata_label_categories | default("Categories") | safe }}</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="{{ metadata_placeholder_categories | default('Categories of the project') | safe }}" disabled>
+        <small>{{ metadata_small_categories | default("Please fill out the categories for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the categories for your project.
+            {{ metadata_feedback_categories | default("Please fill out the categories for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="License">License</label>
-        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="Licence of the project" disabled >
-        <small>Please fill out the license for your project in the OSF portal.</small>
+        <label for="License">{{ metadata_label_license | default("License") | safe}}</label>
+        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="{{ metatdata_placeholder_license | default('License of the project') | safe }}" disabled >
+        <small>{{ metadata_small_license | default("Please fill out the license for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the license for your project.
+            {{ metadata_feedback_license | default("Please fill out the license for your project.") | safe }}
         </div>
     </div>
 </div>
 
 {% elif data.repo == 'zenodo' %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
-<p>These are customized <b>required</b> metadata fields for <b>Zenodo</b>.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
+<p>{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }} <b>Zenodo</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" required {% if disabled %} disabled {% endif %}>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" required {% if disabled %} disabled {% endif %}>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>   
     <div class="form-group col-6 mt-3 mb-3">
@@ -337,212 +338,212 @@
 
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Tags">Tags</label>
-        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" disabled >
-        <small>Please fill out the tags for your project in the Zenodo portal.</small>
+        <label for="Tags">{{ metadata_label_tags | default("Tags") | safe }}</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="{{ metadata_placeholder_tags | default('Tags of the project') | safe }}" disabled >
+        <small>{{ metadata_small_project | default("Please fill out the tags for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the tags for your project.
+            {{ metadata_feedback_tags | default("Please fill out the tags for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Categories">Categories</label>
-        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled >
-        <small>Please fill out the categories for your project in the Zenodo portal.</small>
+        <label for="Categories">{{ metadata_label_categories | default("Categories") | safe }}</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="{{ metadata_placeholder_categories | default('Categories of the project') | safe }}" disabled >
+        <small>{{ metadata_small_categories | default("Please fill out the categories for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the categories for your project.
+            {{ metadata_feedback_categories | default("Please fill out the categories for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="License">License</label>
-        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="Licence of the project" disabled >
-        <small>Please fill out the license for your project in the Zenodo portal.</small>
+        <label for="License">{{ metadata_label_license | default("License") | safe}}</label>
+        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="{{ metatdata_placeholder_license | default('License of the project') | safe }}" disabled >
+        <small>{{ metadata_small_license | default("Please fill out the license for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the license for your project.
+            {{ metadata_feedback_license | default("Please fill out the license for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Publisher">Publisher</label>
-        <input type="text" class="form-control" name="publisher" value="{{data.metadata.publisher}}" placeholder="Publisher of the project" required {% if disabled %} disabled {% endif %} >
+        <label for="Publisher">{{ metadata_label_publisher | default("Publisher") | safe }}</label>
+        <input type="text" class="form-control" name="publisher" value="{{data.metadata.publisher}}" placeholder="{{ metadata_placeholder_publisher | default('Publisher of the project') | safe }}" required {% if disabled %} disabled {% endif %} >
         <div class="invalid-feedback">
-            Please fill out the publisher for your project.
+            {{ metadata_feedback_publisher | default("Please fill out the publisher for your project.") | safe }}
         </div>
     </div>
 </div>
 
 {% elif data.repo == 'data4tu' %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
-<p>These are customized <b>required</b> metadata fields for <b>4TU.ResearchData</b>.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
+<p>{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }} <b>4TU.ResearchData</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="" placeholder="Author of the project" disabled>
-        <small>Please fill out the author for your project in the 4TU.ResearchData portal.</small>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" disabled>
+        <small>{{ metadata_small_portal_author | default("Please fill out the author for your project in the repo's portal.") |safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="" placeholder="Affiliation of the project" disabled>
-        <small>Please fill out the affiliation for your project in the 4TU.ResearchData portal.</small>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" disabled>
+        <small>{{ metadata_small_portal_author | default("Please fill out the affiliation for your project in the repo's portal.") | safe }}</small>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>   
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Tags">Tags</label>
-        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" disabled>
-        <small>Please fill out the tags for your project in the 4TU.ResearchData portal.</small>
+        <label for="Tags">{{ metadata_label_tags | default("Tags") | safe }}</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="{{ metadata_placeholder_tags | default('Tags of the project') | safe }}" disabled>
+        <small>{{ metadata_small_project | default("Please fill out the tags for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the tags for your project.
+            {{ metadata_feedback_tags | default("Please fill out the tags for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Categories">Categories</label>
-        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled>
-        <small>Please fill out the categories for your project in the 4TU.ResearchData portal.</small>
+        <label for="Categories">{{ metadata_label_categories | default("Categories") | safe }}</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="{{ metadata_placeholder_categories | default('Categories of the project') | safe }}" disabled>
+        <small>{{ metadata_small_categories | default("Please fill out the categories for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the categories for your project.
+            {{ metadata_feedback_categories | default("Please fill out the categories for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Licence">Licence</label>
-        <input type="text" class="form-control" name="licence" value="{{data.metadata.licence}}" placeholder="Licence of the project" disabled>
-        <small>Please fill out the licence for your project in the 4TU.ResearchData portal.</small>
+        <label for="License">{{ metadata_label_license | default("License") | safe}}</label>
+        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="{{ metatdata_placeholder_license | default('License of the project') | safe }}" disabled>
+        <small>{{ metadata_small_license | default("Please fill out the license for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the licence for your project.
+            {{ metadata_feedback_license | default("Please fill out the license for your project.") | safe }}
         </div>
     </div>
 </div>
 
 {% elif data.repo == 'figshare' %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
-<p>These are customized <b>required</b> metadata fields for <b>Figshare</b>.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
+<p>{{ metadata_customized | default("These are customized <b>required</b> metadata fields for") | safe }} <b>Figshare</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="" placeholder="Author of the project" disabled>
-        <small>Please fill out the author for your project in the Figshare portal.</small>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" disabled>
+        <small>{{ metadata_small_portal_author | default("Please fill out the author for your project in the repo's portal.") |safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="" placeholder="Affiliation of the project" disabled>
-        <small>Please fill out the affiliation for your project in the Figshare portal.</small>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" disabled>
+        <small>{{ metadata_small_portal_author | default("Please fill out the affiliation for your project in the repo's portal.") | safe }}</small>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>   
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" required {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Tags">Tags</label>
-        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="Tags of the project" disabled>
-        <small>Please fill out the tags for your project in the Figshare portal.</small>
+        <label for="Tags">{{ metadata_label_tags | default("Tags") | safe }}</label>
+        <input type="text" class="form-control" name="tags" value="{{data.metadata.tags}}" placeholder="{{ metadata_placeholder_tags | default('Tags of the project') | safe }}" disabled>
+        <small>{{ metadata_small_project | default("Please fill out the tags for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the tags for your project.
+            {{ metadata_feedback_tags | default("Please fill out the tags for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Categories">Categories</label>
-        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="Categories of the project" disabled>
-        <small>Please fill out the categories for your project in the Figshare portal.</small>
+        <label for="Categories">{{ metadata_label_categories | default("Categories") | safe }}</label>
+        <input type="text" class="form-control" name="categories" value="{{data.metadata.categories}}" placeholder="{{ metadata_placeholder_categories | default('Categories of the project') | safe }}" disabled>
+        <small>{{ metadata_small_categories | default("Please fill out the categories for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the categories for your project.
+            {{ metadata_feedback_categories | default("Please fill out the categories for your project.") | safe }}
         </div>
     </div>
 </div>
 
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Licence">Licence</label>
-        <input type="text" class="form-control" name="licence" value="{{data.metadata.licence}}" placeholder="Licence of the project" disabled>
-        <small>Please fill out the licence for your project in the Figshare portal.</small>
+        <label for="License">{{ metadata_label_license | default("License") | safe}}</label>
+        <input type="text" class="form-control" name="license" value="{{data.metadata.license}}" placeholder="{{ metatdata_placeholder_license | default('License of the project') | safe }}" disabled>
+        <small>{{ metadata_small_license | default("Please fill out the license for your project in the repo's portal.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the licence for your project.
+            {{ metadata_feedback_license | default("Please fill out the license for your project.") | safe }}
         </div>
     </div>
 </div>
 
 
 {% elif data.repo == 'sharekit' %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
-<p>These are basic metadata fields for <b>Sharekit</b>.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
+<p>{{ metadata_basic_fields | default("These are basic metadata fields for") | safe }} <b>Sharekit</b>.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>
@@ -561,31 +562,31 @@
 </div>
 
 {% else %}
-<p>The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.</p>
+<p>{{ metadata_greyed_out | default("The greyed-out fields cannot be filled out here. Instead, default values will be sent. You can change these field values in the service portal.") | safe }}</p>
 <p>These are general fields. Fields specificly for <b>{{data.repo}}</b> still need to be implemented. Most of below fields will still work. So go ahead and fill some out.</p>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Title">Title</label>
-        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder="Title of the project" required {% if disabled %} disabled {% endif %}>
+        <label for="Title">{{ metadata_label_title | default("Title") | safe }}</label>
+        <input type="text" class="form-control" name="title" value="{{data.metadata.title}}" placeholder='{{ metadata_placeholder_title | default("Title of the project") | safe }}' required {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the title for your project.
+            {{ metadata_feedback_title | default("Please fill out the title for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Author">Author</label>
-        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="Author of the project" {% if disabled %} disabled {% endif %}>
+        <label for="Author">{{ metadata_label_author | default("Author") | safe }}</label>
+        <input type="text" class="form-control" name="author" value="{{data.metadata.author}}" placeholder="{{ metadata_placeholder_author | default('Author of the project') | safe }}" {% if disabled %} disabled {% endif %}>
         <div class="invalid-feedback">
-            Please fill out the author for your project.
+            {{ metadata_feedback_author | default("Please fill out the author for your project.") | safe }}
         </div>
     </div>
 </div>
 <div class="row">
     <div class="form-group col-6 mt-3 mb-3">
-        <label for="Affiliation">Affiliation</label>
-        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="Affiliation of the project" {% if disabled %} disabled {% endif %}>
-        <small>The affiliation can be used to formulate the citation, so consider the prominence of the role.</small>
+        <label for="Affiliation">{{ metadata_label_affiliation | default("Affiliation") | safe }}</label>
+        <input type="text" class="form-control" name="affiliation" value="{{data.metadata.affiliation}}" placeholder="{{ metadata_placeholder_affiliation | default('Affiliation of the project') | safe }}" {% if disabled %} disabled {% endif %}>
+        <small>{{ metadata_small_author | default("The affiliation can be used to formulate the citation, so consider the prominence of the role.") | safe }}</small>
         <div class="invalid-feedback">
-            Please fill out the affiliation for your project.
+            {{ metadata_feedback_affiliation | default("Please fill out the affiliation for your project.") | safe }}
         </div>
     </div>
     <div class="form-group col-6 mt-3 mb-3">
@@ -599,10 +600,10 @@
 </div>
 <div class="row">
     <div class="form-group col-12 mt-3 mb-3">
-        <label for="Description">Description</label>
-        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="Description of the project" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
+        <label for="Description">{{ metadata_label_description | default("Description") | safe }}</label>
+        <textarea class="form-control" name="description" value="{{data.metadata.description}}" placeholder="{{ metadata_placeholder_description | default('Description of the project') | safe }}" {% if disabled %} disabled {% endif %} >{{data.metadata.description}}</textarea>
         <div class="invalid-feedback">
-            Please fill out the description for your project.
+            {{ metadata_feedback_description | default("Please fill out the description for your project.") | safe }}
         </div>
     </div>
 </div>

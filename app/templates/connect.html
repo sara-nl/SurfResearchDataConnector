@@ -13,52 +13,55 @@
 {% set _ = glob.update({'token_based_services_set':False}) %}
 
 {% if data.connected==true %}
-<h1>Connections</h1>
-<p>Manage all your connections.</p>
+<h1>{{ connect_h1 | default("Connections") | safe }}</h1>
+<p>{{ connect_manage | default("Manage all your connections.") | safe }}</p>
 
 {% else %}
 <h1>Connect</h1>
-    {% if data.cloud_service | lower == 'owncloud' %}
-        <p>Connect to your Research Drive first.</p>
-    {% endif %}
-    {% if data.cloud_service | lower == 'nextcloud' %}
-        <p>Connect to your Nextcloud first.</p>
-    {% endif %}
+    <p>{{ connect_connect_first | default("Connect to your Research Drive first.") | safe }}</p>
 {% endif %}
 
-{% if data.cloud_service | lower == 'owncloud' %}
 <h2>Surf Research Drive</h2>
 <img src="{{ url_for('static', filename = '/img/surf.png' ) }}" alt="surf">
-{% endif %}
-{% if data.cloud_service | lower == 'nextcloud' %}
-<h2>Nextcloud</h2>
-{% endif %}
 
 {% if data.connected==true %}
     <div class="row mt-3 mb-3">
         <p>
-            You are connected as: <b>{{data.username}}</b>
+            {{ start_connected_to_rd | default("You are connected to Research Drive as") | safe }}: <b>{{data.username}}</b>
         </p>
     </div>
     
     <div class="row mt-3 mb-3">
         <form method="post" action="" class="needs-validation" novalidate>
             <input type="hidden" class="form-control" name="disconnect" value=True>
-            <button type="submit" class="btn btn-secondary">Disconnect</button>
+            <button type="submit" class="btn btn-secondary">{{ connect_disconnect | default("Disconnect") | safe }}</button>
         </form>
         {% if data.cloud_service | lower == 'nextcloud' %}
             {% if data.access_token == data.password %}
-                <p><small>Make connection to research drive <a href="/persistent-connection">persistent</a>.</small></p>
+                <p><small>{{ connect_make_persistent | default("Make connection to research drive <a href='/persistent-connection'>persistent</a>.") | safe }}</small></p>
             {% else %}
-                <p><small>Your connection is persistent.</small></p>
+                <p><small>{{ connect_persistent | default("Your connection is persistent.") | safe }}</small></p>
             {% endif %}
         {% endif %}
-        <p><small><a href="/refresh">Refresh</a> all data folder paths.</small></p>
+        <p><small>{{ connect_refresh | default("<a href='/refresh'>Refresh</a> all data folder paths.") | safe }}</small></p>
     </div>
     
-    <div>
+    <h2>{{ connect_h2_always | default("Always available connections") | safe }}</h2>
+    <div class="row mt-3 mb-3">
+        <div class="form-check-inline col-3 mt-3 mb-3">
+            <hr>
+            <h2>Datahugger</h2>
+            <img src="{{ url_for('static', filename = '/img/datahugger.png' ) }}" alt="datahugger">
+            <p><small>{{ connect_datahugger | default("Import open data with Datahugger") | safe }}</small></p>
+            <p><small>{{ connect_link_to | default("Link to") | safe }}: <a href="https://j535d165.github.io/datahugger/" target="_blank">Datahugger project</a></small></p>
+            <p><a href="/start?homestart=True"><button class="btn btn-secondary"><small>{{ start_with_datahugger | default("Start import of open data with Datahugger") | safe }}</small></button></a></p>
+        </div>
+    </div>
+    
+    
     <!-- BEGIN OAUTH SERVICES -->
-    <h2>Manage your connections to private repositories using Oauth</h2>
+    <h2>{{ connect_h2_manage_oauth | default("Manage your connections to private repositories using Oauth") | safe }}</h2>
+    <div class="row mt-3 mb-3">
     {% if oauth_services|length > 0 %}
         
     {% for service in oauth_services %}
@@ -75,48 +78,48 @@
         {% set service_description = service+'_description' %}
         {% set service_website = service+'_website' %}
         <p><small>{{ all_vars[service_description] }}</small></p>
-        <p><small><a href="{{ all_vars[service_website] }}" target="_blank">Go to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}</a></small></p>
+        <p><small>{{ connect_link_to | default("Link to") | safe }}: <a href="{{ all_vars[service_website] }}" target="_blank">{% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}</a></small></p>
             {% if data[service + '_access_token'] %}
                 <div class="row mt-3 mb-3">
                     <p>
-                        You are connected to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}. 
+                        {{ connect_connected_to | default("You are connected to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}. 
                     </p>
                 </div>
                 <div class="row mt-3 mb-3">
-                    <p>You can disconnect here.</p>
+                    <p>{{ connect_disconnect_here | default("You can disconnect here.") | safe }}</p>
                 </div>
                 
                 <div class="row mt-3 mb-3">
                     <form method="post" action="" class="needs-validation" novalidate>
                         <input type="hidden" class="form-control" name="{{service}}_disconnect" value=True>
-                        <button type="submit" class="btn btn-secondary">Disconnect</button>
+                        <button type="submit" class="btn btn-secondary">{{ connect_disconnect | default("Disconnect") | safe }}</button>
                     </form>    
                 </div>
             {% else %}
                 <div class="row mt-3 mb-3">
                     <p>
-                        Please, log in to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %} first.
+                        {{ connect_please | default("Please, first log in to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
                     </p>
                 </div>
                 <div class="row mt-3 mb-3">
-                    <p>Then connect by OAUTH.</p>
+                    <p>{{ connect_then_connect | default("Then connect by OAUTH.") | safe }}</p>
                 </div>
                 <div class="row mt-3 mb-3">
-                    <a href="/login/{{service}}" target="_blank" ><button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#{{service}}Modal">Connect by OAUTH</button></a>
+                    <a href="/login/{{service}}" target="_blank" ><button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#{{service}}Modal">{{ connect_connect_oath | default("Connect by OAUTH") |safe }}</button></a>
                 </div>
                 <!-- Modal -->
                 <div class="modal fade" id="{{service}}Modal" tabindex="-1" aria-labelledby="{{service}}ModalLabel" aria-hidden="true">
                     <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                        <h5 class="modal-title" id="{{service}}ModalLabel">Connecting by Oauth to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}</h5>
+                        <h5 class="modal-title" id="{{service}}ModalLabel">{{ connect_connecting_by_oauth | default("Connecting by Oauth to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            Close after connecting to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %} by Oauth.
+                            {{ connect_close_after | default("Close after connecting by Oauth to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
                         </div>
                         <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ connect_close | default("Close") | safe }}</button>
                         </div>
                     </div>
                     </div>
@@ -131,14 +134,15 @@
     
     {% if not glob.oauth_services_set %}
     <div class="form-check-inline mt-3 mb-3">
-        <p>No repositories are configured or made available by Oauth connection.</p>
+        <p>{{ connect_no_repos | default("No repositories are configured or made available by Oauth connection.") | safe }}</p>
     </div>   
     {% endif %}
 
     <!-- END OAUTH SERVICES -->
 
     <!-- BEGIN TOKEN SERVICES -->
-    <h2>Manage your connections to private repositories using Basic Auth</h2>
+    <h2>{{ connect_manage_basic | default("Manage your connections to private repositories using Basic Auth") | safe }}</h2>
+    <div class="row mt-3 mb-3">
     {% if token_based_services|length > 0 %}
         
         {% for service in token_based_services %}
@@ -155,28 +159,28 @@
             {% set service_description = service+'_description' %}
             {% set service_website = service+'_website' %}
             <p><small>{{ all_vars[service_description] }}</small></p>
-            <p><small><a href="{{ all_vars[service_website] }}" target="_blank">
-                Go to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}
+            <p><small>{{ connect_link_to | default("Link to") | safe }}: <a href="{{ all_vars[service_website] }}" target="_blank">
+                {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}
             </a></small></p>
             {% if data[service + '_access_token'] %}
                 <div class="row mt-3 mb-3">
                     <p>
-                        You are connected to {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
+                        {{ connect_connected_to | default("You are connected to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
                     </p>
                 </div>
                 <div class="row mt-3 mb-3">
                     <form method="post" action="" class="needs-validation" novalidate>
                         <input type="hidden" class="form-control" name="{{service}}_disconnect" value=True>
-                        <button type="submit" class="btn btn-secondary">Disconnect</button>
+                        <button type="submit" class="btn btn-secondary">{{ connect_disconnect | default("Disconnect") | safe }}</button>
                     </form>    
                 </div>
             {% else %}
                 <div class="row mt-3 mb-3">
                     <p>
                         {% if service =='sharekit' %}
-                        Connect to Sharekit
+                        {{ connect_to | default("Connect to") |safe }} Sharekit
                         {% else %}
-                        Get connection details at {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
+                        {{ connect_details | default("Get connection details at") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
                         {% endif %}
                     </p>
                 </div>
@@ -204,20 +208,21 @@
                             {% if service=='sharekit' %}
                             <div class="form-group">
                                 <input type="password" class="form-control rounded-right" name="sharekit_connect" hidden >
-                                <p>Just click connect to initiate the connection.</p>                
+                                <p>{{ connect_just_click | default("Just click connect to initiate the connection.") | safe }}</p>                
                             </div>
                             {% endif %}
                         {% endif %}
                         <div class="mt-3 mb-3">
-                            <button type="submit" class="btn btn-secondary">Connect</button>
+                            <button type="submit" class="btn btn-secondary">{{ connect_connect | default("Connect") | safe }}</button>
                         </div>
                     </form>
                 </div>
             {% endif %}
             </div>    
             {% endif %}
-        {% endfor %}   
+        {% endfor %}
     {% endif %}
+    </div>
     {% if not glob.token_based_services_set %}
     <div class="form-check-inline mt-3 mb-3">
         <p>No repositories are configured or made available by Basic Auth connection.</p>
@@ -234,7 +239,7 @@
 
 {% else %}
     <div class="row mt-3 mb-3">
-        <a href="/login"><button class="btn btn-secondary">Connect by OAUTH</button></a>
+        <a href="/login"><button class="btn btn-secondary">{{ connect_connect_oath | default("Connect by OAUTH") |safe }}</button></a>
     </div>
     <div class="row mtb-3">
         <form method="post" action="" class="needs-validation" novalidate>
@@ -261,7 +266,7 @@
                 <P>You can generate an application password <a href="{{drive_url}}/index.php/settings/user/security" target="_top">here</a>.</P>
                 {% endif %}
             </div>
-            <button type="submit" class="btn btn-secondary">Connect</button>
+            <button type="submit" class="btn btn-secondary">{{ connect_connect | default("Connect") | safe }}</button>
         </form>
     </div>
 {% endif %}
@@ -283,4 +288,30 @@
         window.location.replace("/connect?oauth=osf");
     })
 </script>
+
+
+{% if get_dataverses %}
+<script>
+    // prefetch all dataverse related components so the data will be cached and readilly available for the user
+     $(document).ready(function(){
+        $.ajax({
+                url: '/dataverses',
+                type: 'get',  
+        });
+        $.ajax({
+                url: '/dataverses?datastation=true',
+                type: 'get',  
+        });
+        $.ajax({
+                url: '/metadata?repo=dataverse',
+                type: 'get',
+        });
+        $.ajax({
+                url: '/metadata?repo=datastation',
+                type: 'get',
+        });
+    });
+</script>
+{% endif %}
+
 {% endblock %}

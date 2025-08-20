@@ -34,9 +34,9 @@
 {% if data.query_status==None or data.query_status=='ready' and data.process==None%}
 <h1>Import</h1>
 {% else %}
-<h1>Processing import</h1>
+<h1>{{ start_h1_processing_import | default("Processing import") | safe }}</h1>
 {% endif %}
-<p>Project name: <b>{{ data.projectname }}</b></p>
+<p>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{ data.projectname }}</b></p>
 {% endif %}
 
 {% if data.connected==True %}
@@ -50,9 +50,9 @@
         <div class="form-group mt-3 mb-3">
             <label for="Url">Url: </label>
             <input type="url" pattern="https://.*" class="form-control" name="url" value="{{data.url}}"
-                placeholder="A preview url" required>
+                placeholder='{{ download_preview_url | default("A preview url") | safe }}' required>
             <div class="invalid-feedback">
-                Please fill out a preview url to a research dataset.
+                {{ download_preview_url_feedback | default("Please fill out a preview url to a research dataset") | safe }}.
             </div>
         </div>
 
@@ -61,22 +61,22 @@
             <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {%
                 endif %} id="flexCheckUrl" name="accept_url_in_history" required>
             <label class="form-check-label" for="flexCheckUrl">
-                Check this to retrieve even if this url is in your history of imports.
+                {{ download_check_urlinhistory | default("Check this to retrieve even if this url is in your history of imports.") | safe }}
             </label>
         </div>
         {% endif %}
         <div class="form-group mt-3 mb-3">
 
-            <h2>Import Data Folder Path</h2>
+            <h2>{{ download_h2_import_folder | default("Import Data Folder Path") | safe }}</h2>
             <!-- async loading folder paths -->
-            {{ load_async("folderpaths", "/folder-paths", 55000) }}
+            {{ load_async("folderpaths", "/folder-paths/down", 55000) }}
             <!-- end async -->
 
-            <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder (optional)"
+            <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder='{{ download_placeholder | default("New Folder (optional)") | safe }}'
             pattern="[\--_-A-Za-z0-9]+" >
 
             <div class="invalid-feedback">
-                Please fill out the folder name where you want store the data.
+                {{ download_folder_feedback | default("Please fill out the folder name where you want store the data.") | safe }}
             </div>
 
         </div>
@@ -87,8 +87,7 @@
             <input class="form-check-input" type="checkbox" value="" {% if data.accept_folder_exist %} checked {% endif
                 %} id="flexCheckFolder" name="accept_folder_exist" required>
             <label class="form-check-label" for="flexCheckFolder">
-                Check this to retrieve even if this folder already exists on your drive. The data will be added to the
-                folder.
+                {{ download_check_folder_feedback | default("Check this to retrieve even if this folder already exists on your drive. The data will be added to the folder.") | safe }}
             </label>
         </div>
         {% endif %}
@@ -98,31 +97,31 @@
 
     <!-- ### BEGIN PREVIEW BUTTON -->
     <input type="text" name="preview" value="true" hidden>
-    <button type="submit" class="btn btn-secondary">Preview Import</button>
+    <button type="submit" id="action-button" class="btn btn-secondary">Preview Import</button>
     <!-- ### END PREVIEW BUTTON -->
 
     {% else %}
 
     <!-- ### BEGIN PREVIEW ### -->
     <h1>Import - Preview</h1>
-    <p>Project name: <b>{{ data.projectname }}</b></p>
+    <p>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{ data.projectname }}</b></p>
 
     <!-- async loading check connection -->
     {% set checkconnectionurl = '/check-connection/' + data.repo %}
     {{ load_async("check_connection", checkconnectionurl) }}
     <!-- end async -->
     
-    <h2>Drive Storage</h2>
+    <h2>{{ download_h2_drive_storage | default("Drive Storage") | safe }}</h2>
     <!-- async loading quote_text -->
     {{ load_async("quota_text", "/quota-text") }}
     <!-- end async -->
 
-    <h2>Data Folder</h2>
+    <h2>{{ download_h2_data_folder | default("Data Folder") | safe }}</h2>
     <!-- async loading folder content -->
     {{ load_async("foldercontent", "/folder-content/down", 55000) }}
     <!-- end async -->
 
-    <h2>Data Set</h2>
+    <h2>{{ download_h2_data_set | default("Data Set") | safe }}</h2>
 
     <!-- Needs specific implementation for the private repo choosen-->
 
@@ -156,11 +155,11 @@
     <input type="text" name="preview" value={{preview}} hidden>
     <input type="text" name="check_accept_folder_first" value={{check_accept_folder_first}} hidden>
     <input type="text" name="check_accept_url_in_history_first" value={{check_accept_url_in_history_first}} hidden>
-    <button type="submit" class="btn btn-secondary">Cancel Process</button>
+    <button type="submit" class="btn btn-secondary">{{ download_cancel_process | default("Cancel Process") | safe }}</button>
     <div class="form-check mt-3 mb-3">
         <input class="form-check-input" id="flexCheckCancel" type="checkbox" value="" name="checked" required>
         <label class="form-check-label" for="flexCheckCancel">
-            Check to confirm cancelation.
+            {{ download_check_cancel | default("Check to confirm cancelation.") | safe }}
         </label>
     </div>
 </form>
@@ -189,7 +188,7 @@
 
 <!-- BEGIN NOT CONNECTED -->
 <p>Please connect first.</p>
-<a href="/connect"><button class="btn btn-secondary">Connect</button></a>
+<a href="/connect"><button class="btn btn-secondary">{{ base_connect | default("Connect") | safe }}</button></a>
 <!-- END NOT CONNECTED -->
 
 {% endif %}

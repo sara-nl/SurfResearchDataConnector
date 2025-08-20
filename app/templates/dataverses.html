@@ -1,10 +1,39 @@
-Select the dataverse to upload to:
-<select name="dataverse" class="form-select" required>
-    <option></option>
-    {% for dataverse in dataverses %}
-        <option value="{{dataverse}}" selected='selected' >{{dataverse.title}}</option>
-    {% endfor %}
-</select>
-<div class="invalid-feedback">
-    Please select a dataverse!
+<h2>{{ dataverses_h2 | default("Dataverse to upload to") | safe }}</h2>    
+<div class="col-4">
+    <p>{{ dataverses_filter | default("Filter the dataverses (optional):") | safe }}</p>
+    <input class="form-control" id="myInput" type="text" placeholder='{{ dataverses_placeholder | default("Type to filter the dataverses in the dropdown list.") | safe }}'>
 </div>
+<div class="col-12">
+    <p>{{ dataverses_select | default("Select the dataverse to upload to:") | safe }}</p>
+    <select name="dataverse" class="form-select" id="myDataverses" required>
+        <option></option>
+        {% for dataverse in dataverses %}
+            <option value="{{dataverse}}" selected='selected' >{{dataverse.title}}</option>
+        {% endfor %}
+    </select>
+</div>
+<p>{{ dataverses_refresh | default("<a href='/refresh-dataverses'>Refresh</a> all dataverses.") | safe }}</p>
+<div class="invalid-feedback">
+    {{ dataverses_please | default("Please select a dataverse!") | safe }}
+</div>
+
+<script>
+    $(document).ready(function(){
+     $("#myInput").on("click",function(){
+        var se=$("#myDataverses");
+        se.show();
+        se[0].size=10;
+        });
+    $("#myDataverses").on("click",function(){
+        var se=$("#myDataverses");
+        se.show();
+        se[0].size=1;
+        });
+      $("#myInput").on("keyup", function() {
+        var value = $(this).val().toLowerCase();
+        $("#myDataverses option").filter(function() {
+          $(this).toggle($(this).val().toLowerCase().indexOf(value) > -1)
+        });
+      });
+    });
+</script>

@@ -1,5 +1,5 @@
 {% if repo_content and repo_content | length > 0  and 'message' not in repo_content[0] %}
-<p>Below table shows the content of the repository. The files will be downloaded and checksums will be verified according to the hash type.</p>
+<p>{{ repocontent_intro | default("Below table shows the content of the repository. The files will be downloaded and checksums will be verified according to the hash type.") | safe }}</p>
 <div class="table-responsive-sm mt-3 mb-3">
     <table class="table table-striped table-hover table-sm table-bordered">
         <thead class="table-light">
@@ -29,7 +29,7 @@
     </table>
 </div>
 {% else %}
-<p>The requested dataset could not be retrieved.</p>
+<p>{{ repocontent_request | default("The requested dataset could not be retrieved.") | safe }}</p>
     {% if repo_content and repo_content | length > 0 and 'message' in repo_content[0]%}
     <p>Message: {{ repo_content[0]['message'] }}</p>
     {% endif %}
@@ -37,44 +37,46 @@
 
 <!-- ### BEGIN RETRIEVAL BUTTON -->
 {% if repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
-        <p>It looks like there is enough storage space to host and resources to process the dataset.</p>
+        <p>{{ repocontent_enough_storage | default("It looks like there is enough storage space to host and resources to process the dataset.") | safe }}</p>
         {% if not data.permission %}
-        <p>Your account does not have permission to create this folder: <b>{{ data.complete_folder_path }}</b>.</p>
-        <a href="/download"><div class="btn btn-secondary">Go back</div></a>
+        <p>{{ repocontent_no_permission | default("Your account does not have permission to create this folder") | safe }}: <b>{{ data.complete_folder_path }}</b>.</p>
+        <a href="/download"><div class="btn btn-secondary">{{ repocontent_go_back | default("Go back") | safe }}</div></a>
         {% endif %}
 
 {% else %}
     
     {% if not repo_content_fits%}
     <p>
-        We could not determin if there is enough storage space.
+        {{ repocontent_determin | default("We could not determin if there is enough storage space.") | safe }}
         
         {% if quota_text == None %}
-        Please make sure you are connected, <a href="/connect">reconnect</a> and try again.
+        {{ repocontent_connected | default("Please make sure you are connected, <a href='/connect'>reconnect</a> and try again.") | safe }}
         {% else %}
+        {{ repocontent_reasons | default("
         <p>This can be because you:</p>
         <ul>
             <li>cannot preview the files to be downloaded.</li>
             <li>do not have write permission to the folder.</li>
             <li>fully used up the available storage.</li>
         </ul>
+        ") | safe }}
         {% endif %}
 
     </p>
     {% else %}
-    <p>There is enough storage space to host and resources to process the dataset.</p>
+    <p>{{ repocontent_enough | default("There is enough storage space to host and resources to process the dataset.") | safe }}</p>
     {% endif %}
 
-<a href="/download"><div class="btn btn-secondary">Go back</div></a>
+<a href="/download"><div class="btn btn-secondary">{{ repocontent_go_back | default("Go back") | safe }}</div></a>
 
 {% endif %}
 
 {% if data.permission and repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
-<button type="submit" class="btn btn-secondary" id="start_download">Start Import</button>
+<button type="submit" id="action-button" class="btn btn-secondary" id="start_download">{{ repocontent_start | default("Start Import") | safe }}</button>
 <div class="form-check mt-3 mb-3">
     <input class="form-check-input" type="checkbox" id="flexCheckRetrieval" value="" name="start_download" required>
     <label class="form-check-label" for="flexCheckRetrieval">
-        Check to confirm start of import.
+        {{ repocontent_check | default("Check to confirm start of import.") | safe }}
     </label>
 </div>
 {% endif %}

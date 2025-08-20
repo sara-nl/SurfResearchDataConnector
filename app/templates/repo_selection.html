@@ -19,28 +19,22 @@
         {% set service_website = service+'_website' %}
         
         {% if service == 'datahugger' %}
-        <p><small>Import open data with Datahugger</small></p>
+        <p><small>{{ repo_selection_datahugger_import | default("Import open data with Datahugger") | safe }}</small></p>
         {% else %}
         <p><small>{{ all_vars[service_description] }}</small></p>
         {% endif %}
         
-        {% if access_token_name in data %}
-
-        {% if service == 'data4tu' %}
-        <p><small><a href="{{ all_vars[service_website] }}" target="_blank" >Go to 4TU.ResearchData</a></small></p>
-        {% else %}
-        <p><small><a href="{{ all_vars[service_website] }}" target="_blank" >Go to {{ service }}</a></small></p>
-        {% endif %}
-
+        {% if access_token_name not in data %}
         
-        {% else %}
+        
+        
             {% if service == 'datahugger' %}
-            <p><small>Uses the <a href="https://j535d165.github.io/datahugger/" target="_blank">Datahugger project</a></small></p>
+            <p><small>{{ repo_selection_uses_datahugger | default("Uses the <a href='https://j535d165.github.io/datahugger/' target='_blank'>Datahugger project</a>") | safe }}</small></p>
             {% else %}
                 {% if service == 'data4tu' %}
-                <p><small>Go to <a href="/connect">your connections</a> to connect to 4TU.ResearchData</small></p>
+                <p><small>{{ repo_selection_go_to | default("Go to <a href='/connect'>your connections</a> to connect to") | safe }} 4TU.ResearchData</small></p>
                 {% else %}
-                <p><small>Go to <a href="/connect">your connections</a> to connect to {{ service }}</small></p>
+                <p><small>{{ repo_selection_go_to | default("Go to <a href='/connect'>your connections</a> to connect to") | safe }} {{ service }}</small></p>
                 {% endif %}
             {% endif %}
         {% endif %}
@@ -52,7 +46,7 @@
     <div class="form-check form-check-inline mt-3 mb-3 col-3">
         <input class="form-check-input" type="radio" name="selected_repo" id="radio-none" value="none" required hidden>
         <div class="invalid-feedback">
-            Please select a repository!
+            {{ repo_selection_select_repo | default("Please select a repository!") | safe }}
         </div>
     </div>
 </div>
@@ -61,48 +55,57 @@
     // This will load the correct metadata fields when the user changes the repo.
 $('input[type=radio][name=selected_repo]').change(function() {
     if (this.value == 'figshare') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=figshare");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'data4tu') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=data4tu");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'zenodo') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=zenodo");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'osf') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=osf");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'dataverse') {
-        $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+        $("#action-button").prop('disabled', false);
+        $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading dataverses</div>')
         $("#show_dataverses").load("/dataverses");
-        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status"></div>... loading metadatafields from dataverse</div>');
         $("#show_meta").load("/metadata?repo=dataverse");
     }
     else if (this.value == 'datastation') {
-        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
+        $("#action-button").prop('disabled', false);
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status"></div>... loading metadatafields from datastation</div>');
         $("#show_meta").load("/metadata?repo=datastation");
-        $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+        $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading dataverses</div>')
         $("#show_dataverses").load("/dataverses?datastation=true"); 
     }
     else if (this.value == 'irods') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=irods");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'sharekit') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=sharekit");
         $("#show_dataverses").empty();
     }
     else if (this.value == 'surfs3') {
+        $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=surfs3");
         $("#show_dataverses").empty();
@@ -113,8 +116,9 @@ $('input[type=radio][name=selected_repo]').change(function() {
 {% for service in registered_services %}
     {% if service == data.repo %}
     <script>
+        $("#action-button").prop('disabled', false);
         $('input[type=radio][name=selected_repo][value={{service}}]').attr('checked',true);
-        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
+        $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status"></div>... loading metadatafields</div>');
         $("#show_meta").load("/metadata?repo={{service}}");
     </script>
     {% endif %}
@@ -122,14 +126,16 @@ $('input[type=radio][name=selected_repo]').change(function() {
 
 {% if data.repo == 'dataverse' %}
 <script>
-    $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+    $("#action-button").prop('disabled', false);
+    $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading dataverses</div>')
     $("#show_dataverses").load("/dataverses"); 
 </script>
 {% endif %}
 
 {% if data.repo == 'datastation' %}
 <script>
-    $("#show_dataverses").html('<div id="show_dataverses" class="spinner-border text-secondary" role="status">')
+    $("#action-button").prop('disabled', false);
+    $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading dataverses</div>')
     $("#show_dataverses").load("/dataverses?datastation=true"); 
 </script>
 {% endif %}

@@ -1,13 +1,13 @@
 {% if query_status_history|length > 0 %}
     {% if query_status_history[0].status == 'canceled by user' or query_status_history[0].status == 'removing temporary files' and data.background != True %}
-        <div class="m-1"><a href="/start?background=true"><button class="btn btn-secondary">Run the cancelation process in the background</button></a></div>
+        <div class="m-1"><a href="/start?background=true"><button class="btn btn-secondary">{{ status_run_cancelation | default("Run the cancelation process in the background") | safe }}</button></a></div>
         <script>
             $(document).ready(function(){
                 $('#cancel_process').html('\
                     <div class="mt-3 mb-3">\
                     <div class="p-3 border border-dark">\
                     <p><b>{{query_status_history[0].status}}</b></p>\
-                    <p>You can find the processed data at the below locations.</p>\
+                    <p>{{ status_locations | default("You can find the processed data at the below locations.") | safe }}</p>\
                     <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
                     {% if project_id %}\
                     <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
@@ -20,79 +20,83 @@
             });
         </script>
     {% endif %}
-{% if progress %}
-    {% if progress == 100 %}
-        <div class="m-1"><a href="/start?process=done"><button class="btn btn-secondary">Start new project</button></a></div>
-        <div class="progress" style="height: 1.5rem">
-            {% if 'Completed with issues' in query_status_history[0].status %}
-            <div class="progress-bar bg-warning" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
+    {% if progress %}
+        {% if progress == 100 %}
+            <div class="m-1"><a href="/start?process=done"><button class="btn btn-secondary">{{ status_new | default("Start new project") | safe }}</button></a></div>
+            <div class="progress" style="height: 1.5rem">
+                {% if 'Completed with issues' in query_status_history[0].status %}
+                <div class="progress-bar bg-warning" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
+                {% else %}
+                <div class="progress-bar bg-success" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
+                {% endif %}
+            </div>
+            <div class="mt-1"/>
+            <div class="progress" style="height: 1.5rem">
+                <div class="progress-bar bg-success" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{ status_done | default("done") | safe }}</div>
+            </div>
+            {% if 'http' in query_status_history[0].url %}
+            <script>
+                $(document).ready(function(){
+                    $('#cancel_process').html('\
+                        <div class="mt-3 mb-3">\
+                        <div class="p-3 border border-dark">\
+                        <p><b>{{query_status_history[0].status}}</b></p>\
+                        <p>{{ status_locations | default("You can find the processed data at the below locations.") | safe }}</p>\
+                        <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
+                        {% if project_id %}\
+                        <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
+                        {% else %}\
+                        <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
+                        {% endif %}\
+                        </div>\
+                        </div>\
+                        ');
+                });
+            </script>
             {% else %}
-            <div class="progress-bar bg-success" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
+            <script>
+                $(document).ready(function(){
+                    $('#cancel_process').html('\
+                        <div class="mt-3 mb-3">\
+                        <div class="p-3 border border-dark">\
+                        <p><b>{{query_status_history[0].status}}</b></p>\
+                        <p>{{ status_locations | default("You can find the processed data at the below locations.") | safe }}</p>\
+                        <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
+                        {% if project_id %}\
+                        <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
+                        {% else %}\
+                        <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
+                        {% endif %}\
+                        </div>\
+                        </div>\
+                        ');
+                });
+            </script>
             {% endif %}
-        </div>
-        <div class="mt-1"/>
-        <div class="progress" style="height: 1.5rem">
-            <div class="progress-bar bg-success" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">done</div>
-        </div>
-        {% if 'http' in query_status_history[0].url %}
-        <script>
-            $(document).ready(function(){
-                $('#cancel_process').html('\
-                    <div class="mt-3 mb-3">\
-                    <div class="p-3 border border-dark">\
-                    <p><b>{{query_status_history[0].status}}</b></p>\
-                    <p>You can find the processed data at the below locations.</p>\
-                    <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
-                    {% if project_id %}\
-                    <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
-                    {% else %}\
-                    <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
-                    {% endif %}\
-                    </div>\
-                    </div>\
-                    ');
-            });
-        </script>
         {% else %}
-        <script>
-            $(document).ready(function(){
-                $('#cancel_process').html('\
-                    <div class="mt-3 mb-3">\
-                    <div class="p-3 border border-dark">\
-                    <p><b>{{query_status_history[0].status}}</b></p>\
-                    <p>You can find the processed data at the below locations.</p>\
-                    <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
-                    {% if project_id %}\
-                    <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
-                    {% else %}\
-                    <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
-                    {% endif %}\
-                    </div>\
-                    </div>\
-                    ');
-            });
-        </script>
+            <div class="progress" style="height: 1.5rem">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
+            </div>
+            <div class="mt-1"/>
+            <div class="progress" style="height: 1.5rem">
+                <div class="progress-bar" role="progressbar" aria-valuenow="{{progress}}" aria-valuemin="0" aria-valuemax="100" style="width: {{progress}}%;">{{progress}}%</div>
+            </div>
         {% endif %}
+
     {% else %}
         <div class="progress" style="height: 1.5rem">
             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
-        </div>
+        </div>  
         <div class="mt-1"/>
         <div class="progress" style="height: 1.5rem">
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{progress}}" aria-valuemin="0" aria-valuemax="100" style="width: {{progress}}%;">{{progress}}%</div>
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{ status_calc | default("calculating progress") | safe }}</div>
         </div>
     {% endif %}
-
-{% else %}
-    <div class="progress" style="height: 1.5rem">
-        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">{{query_status_history[0].status}}</div>
-    </div>  
-    <div class="mt-1"/>
-    <div class="progress" style="height: 1.5rem">
-        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">calculating progress</div>
-    </div>
-{% endif %}
 <p><small>Remote: <b>{{ query_status_history[0].url }}</b></small><br>
 <small>Local: <b>{{ query_status_history[0].folder }}</b></small><br>
-<small><a href="/history/{{ query_status_history[0].id }}">Check history for all status messages.</a></small></p>
+<small><a href="/history/{{ query_status_history[0].id }}">{{ status_check_history | default("Check history for all status messages.") | safe }}</a></small></p>
+{% else %}
+
+<p>{{ status_not_retrieved | default("Status could not be retrieved") | safe }}</p>
+
 {% endif %}

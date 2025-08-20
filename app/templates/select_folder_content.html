@@ -1,0 +1,37 @@
+{% if folder_content | length == 0 %}
+<p>Folder is empty.</p>
+{% else %}
+<input type="checkbox" id="select-all" > <label for="select-all">Select / Deselect all</label>
+
+<ul>
+{% for content in folder_content%}
+    <li class="chck">
+        <input type="checkbox" class="checklist" id="{{ content | safe }}" name="{{ content | safe }}" value="{{ content | safe }}" />
+        <label for="{{ content | safe }}">{{ content | safe }}</label>
+    </li>
+{% endfor %}
+</ul>
+
+<input type="text" name="files-folders-selection" id="files-folders-selection" value="" hidden>
+
+<script>
+    function updateChecklist(){
+        // also update the hidden input field that holds the selection of folderes and files
+        $('#files-folders-selection').val("")
+        let filesfolders = []
+        $( "li.chck" ).each(function() {
+            if( $('.checklist', this).prop('checked') === true ){
+                filesfolders.push($('.checklist', this).val());
+            }
+        });
+        $('#files-folders-selection').val(filesfolders)
+    }
+    $("#select-all").on('click', function(){
+        $('.checklist').prop('checked', this.checked);
+        updateChecklist();
+    });
+    $(".checklist").on('click', function(){
+        updateChecklist();
+    });
+</script>
+{% endif %}

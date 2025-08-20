@@ -11,7 +11,11 @@
 {% block content %}
 
 <p>Refreshing all data folder paths.</p>
-
+<p>This can take some time.</p>
+<p>The time it takes depends on the folder structure size in your account.</p>
+<p>This only needs to be done once.</p>
+<p>If you add new folders to your account later, you can refresh the folder structure.</p>
+<p>Thank you for your patience.</p>
 {{ load_async("refresh_folder_paths", "/refresh-folderpaths", 55000) }}
 
 {% endblock %}
