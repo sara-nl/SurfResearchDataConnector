@@ -1,0 +1,40 @@
+<h2>{{ irods_h2 | default("Irods subcollections to upload to") | safe }}</h2>
+
+<div class="col-4">
+    <p>{{ irods_subcollections_filter | default("Filter the irods subcollections (optional):") | safe }}</p>
+    <input class="form-control" id="myInput" type="text" placeholder='{{ irods_subcollections_placeholder | default("Type to filter the irods subcollections in the dropdown list.") | safe }}'>
+</div>
+<div class="col-12">
+    <p>{{ irods_subcollections_select | default("Select the irods subcollection to upload to:") | safe }}</p>
+    <select name="irods_subcollection" class="form-select" id="mySubcollections" required>
+        <option></option>
+        {% for irods_subcollection in subcollections %}
+            <option value="{{irods_subcollection}}" selected='selected' >{{irods_subcollection}}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="invalid-feedback">
+    {{ irods_subcollections_please | default("Please select a irods_subcollection!") | safe }}
+</div>
+
+<script>
+    $(document).ready(function(){
+     $("#myInput").on("click",function(){
+        var se=$("#mySubcollections");
+        se.show();
+        se[0].size=10;
+        });
+    $("#mySubcollections").on("click",function(){
+        var se=$("#mySubcollections");
+        se.show();
+        se[0].size=1;
+        });
+      $("#myInput").on("keyup", function() {
+        var value = $(this).val().toLowerCase();
+        $("#mySubcollections option").filter(function() {
+          $(this).toggle($(this).val().toLowerCase().indexOf(value) > -1)
+        });
+      });
+    });
+</script>

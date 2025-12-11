@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Stats{% endblock %}
+
+{% block head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<h1>{{ stats_h1 | default("Stats") | safe }}</h1>
+
+{% if session.connected==True %}
+<p>{{ stats_description | default("Below are general usage stats of this SRDC instance measured by analyzing the status logs for all imports and exports.") | safe }}</p>
+<h2>{{ stats_users | default("Users") | safe }}</h2>
+<p>{{ stats_users_description | default("Below table shows how many overall users there  where combined and how many performed at least one import or at least one export.") | safe }}</p>
+<table class="table table-striped table-hover table-sm table-bordered table-responsive-sm">
+    <thead class="table-light">
+        <tr>
+        <th scope="col">{{ stats_users_table_count_type | default("User count type") | safe }}</th>
+        <th scope="col">{{ stats_users_table_count | default("Count") | safe }}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key in users_action.keys() %}
+        <tr>
+            <th>{{key}}</th>
+            <th>{{users_action[key]}}</th>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>{{ stats_files_processed | default("Files processed") | safe }}</h2>
+<p>{{ stats_files_processed | default("Files processed") | safe }}: {{files_processed}}</p>
+<p>{{ stats_files_processed_failed | default("Files failed to process") | safe }}: {{failures}}</p>
+
+<h2>{{ stats_total_impex | default("Total imports and exports") | safe }}</h2>
+<p>{{ stats_total_impex | default("Total imports and exports") | safe }}: {{total_impex}}</p>
+<img src="static/img/mainstats.png" alt="Chart of the usage of the SRDC">
+
+
+<h2>{{ stats_h2_imports | default("Imports") | safe }}</h2>
+<p>{{ stats_total_imports | default("Total amount of imports") | safe }}: {{total_import}}</p>
+<img src="static/img/importstats.png" alt="Chart of the import by the SRDC">
+
+<h3>{{ stats_h3_imports | default("Imports per repository") | safe }}</h3>
+<table class="table table-striped table-hover table-sm table-bordered table-responsive-sm">
+    <thead class="table-light">
+        <tr>
+        <th scope="col">{{ stats_table_imports_repo | default("Repo") | safe }}</th>
+        <th scope="col">{{ stats_table_imports_count | default("Count") | safe }}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key in imports_repo.keys() %}
+        <tr>
+            <th>{{key}}</th>
+            <th>{{imports_repo[key]}}</th>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>{{ stats_h2_exports | default("Exports") | safe }}</h2>
+<p>{{ stats_total_exports | default("Total amount of exports") | safe }}: {{total_export}}</p>
+<img src="static/img/exportstats.png" alt="Chart of the export by the SRDC">
+
+<h3>{{ stats_h3_exports | default("Exports per repository") | safe }}</h3>
+<table class="table table-striped table-hover table-sm table-bordered table-responsive-sm">
+    <thead class="table-light">
+        <tr>
+        <th scope="col">{{ stats_table_exports_repo | default("Repo") | safe }}</th>
+        <th scope="col">{{ stats_table_exports_total | default("Total") | safe }}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key in exports_repo.keys() %}
+        <tr>
+            <th>{{key}}</th>
+            <th>{{exports_repo[key]}}</th>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+
+<p>{{ upload_connect_first | default("Please connect first.") | safe }}</p>
+<a href="/connect"><button class="btn btn-secondary">{{ upload_connect | default("Connect") | safe }}</button></a>
+
+{% endif %}
+{% endblock %}
+
+{% block script %}
+{% endblock %}

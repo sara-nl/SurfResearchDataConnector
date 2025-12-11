@@ -42,14 +42,19 @@ echo "#######################################"
 echo "create namespace surf-rdc in the cluster"
 kubectl create ns surf-rdc
 
-echo "#######################################"
-echo "Set docker environment to that of minikube, so we can build images directly available in minikube"
-eval $(minikube -p minikube docker-env)
+# echo "#######################################"
+# echo "Set docker environment to that of minikube, so we can build images directly available in minikube"
+# eval $(minikube -p minikube docker-env)
+
+# or
 
 echo "#######################################"
 echo "Build the surfresearchdataconnector image to local/surfresearchdataconnector"
 cd ..
 docker build -f dockerfile -t local/surfresearchdataconnector:latest .
+
+echo "Load the local/surfresearchdataconnector:latest image in minikube"
+minikube image load local/surfresearchdataconnector:latest
 cd local
 
 echo "#######################################"

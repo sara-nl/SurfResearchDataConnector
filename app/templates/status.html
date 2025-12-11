@@ -1,5 +1,5 @@
 {% if query_status_history|length > 0 %}
-    {% if query_status_history[0].status == 'canceled by user' or query_status_history[0].status == 'removing temporary files' and data.background != True %}
+    {% if query_status_history[0].status == 'canceled by user' or query_status_history[0].status == 'removing temporary files' and session.background != True %}
         <div class="m-1"><a href="/start?background=true"><button class="btn btn-secondary">{{ status_run_cancelation | default("Run the cancelation process in the background") | safe }}</button></a></div>
         <script>
             $(document).ready(function(){
@@ -11,6 +11,7 @@
                     <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
                     {% if project_id %}\
                     <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
+                    <div class="alert alert-danger"><b>Please visit the <a href="{{project_url}}" target="_blank">remote url</a> to complete the export.</b></div>\
                     {% else %}\
                     <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
                     {% endif %}\
@@ -45,6 +46,7 @@
                         <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
                         {% if project_id %}\
                         <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
+                        <div class="alert alert-danger"><b>Please visit the <a href="{{project_url}}" target="_blank">remote url</a> to complete the export.</b></div>\
                         {% else %}\
                         <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
                         {% endif %}\
@@ -64,6 +66,7 @@
                         <p>Local (folder): <a href="{{drive_url}}/index.php/apps/files?dir=//{{ query_status_history[0].folder }}" target="_top" rel="noopener noreferrer">{{ query_status_history[0].folder }}</a></p>\
                         {% if project_id %}\
                         <p>Remote (url): <a href="{{project_url}}" target="_blank">{{ project_url }}</a></p>\
+                        <div class="alert alert-danger"><b>Please visit the <a href="{{project_url}}" target="_blank">remote url</a> to complete the export.</b></div>\
                         {% else %}\
                         <p>Remote (url): <a href="{{ query_status_history[0].url }}" target="_blank">{{ query_status_history[0].url }}</a></p>\
                         {% endif %}\

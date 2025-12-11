@@ -38,8 +38,8 @@
 <!-- ### BEGIN RETRIEVAL BUTTON -->
 {% if repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
         <p>{{ repocontent_enough_storage | default("It looks like there is enough storage space to host and resources to process the dataset.") | safe }}</p>
-        {% if not data.permission %}
-        <p>{{ repocontent_no_permission | default("Your account does not have permission to create this folder") | safe }}: <b>{{ data.complete_folder_path }}</b>.</p>
+        {% if not session.permission %}
+        <p>{{ repocontent_no_permission | default("Your account does not have permission to create this folder") | safe }}: <b>{{ session.complete_folder_path }}</b>.</p>
         <a href="/download"><div class="btn btn-secondary">{{ repocontent_go_back | default("Go back") | safe }}</div></a>
         {% endif %}
 
@@ -71,7 +71,7 @@
 
 {% endif %}
 
-{% if data.permission and repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
+{% if session.permission and repo_content | length > 0 and 'message' not in repo_content[0] and repo_content_fits and repo_content_can_be_processed %}
 <button type="submit" id="action-button" class="btn btn-secondary" id="start_download">{{ repocontent_start | default("Start Import") | safe }}</button>
 <div class="form-check mt-3 mb-3">
     <input class="form-check-input" type="checkbox" id="flexCheckRetrieval" value="" name="start_download" required>

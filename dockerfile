@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.11
 
 # set the base installation, requirements are not changed often
 RUN pip install --upgrade pip setuptools wheel
@@ -13,7 +13,7 @@ RUN pip install -r requirements.txt
 
 # now add everything else, which changes often
 COPY ./app ./app
-# COPY ./migrations ./migrations
+COPY ./migrations ./migrations
 COPY env.ini env.ini
 COPY faq.json faq.json
 COPY messages.json messages.json

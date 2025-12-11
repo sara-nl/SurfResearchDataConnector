@@ -5,8 +5,7 @@ from app.repos.dataverse import Dataverse
 from app.repos.irods import Irods
 from app.repos.surfs3 import Surfs3
 from app.repos.sharekit import Sharekit
-from app.utils import update_history, create_generated_folder, total_files_count, get_canceled, cloud, make_connection, get_folder_content_props
-from app.utils import create_rocrate, check_checksums, push_data, get_query_status, get_status_from_history, set_project_id
+from app.utils import *
 import logging
 import owncloud
 import nextcloud_client
@@ -254,7 +253,7 @@ def get_private_files(repo, url, folder, api_key, user=None):
     return private_files
 
 
-def run_private_import(username, password, folder, url, repo, api_key, user=None):
+def run_private_import(username, password, folder, url, repo, api_key, user=None, metadata={}, repo_content=[]):
     """Execute steps for private imports and updates the history for every step.
 
     Args:
@@ -289,7 +288,7 @@ def run_private_import(username, password, folder, url, repo, api_key, user=None
         update_history(username, folder, url,
                     'creating ro-crate-metadata.json file ')
         try:
-            create_rocrate(url, folder)
+            create_rocrate(url, folder, metadata, repo_content)
             update_history(username, folder, url,
                     'created ro-crate-metadata.json file')
         except Exception as e:
@@ -339,7 +338,7 @@ def check_connection(repo, api_key=None, user=None):
     return connection_ok
 
 
-def run_export(username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip=False, generate_metadata=False, dataverse_alias=None, files_folders_selection=None):
+def run_export(username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip=False, generate_metadata=False, dataverse_alias=None, files_folders_selection=None, irods_subcollection=None):
 
     ### NOTE ###
     # let's first implement an on disk solution, as we have seen that the buffered solution is not working with ScieboRDS
@@ -448,7 +447,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
             # the destination will be the unzipped folder
             dest = unzipped_folder
             # let's move it
-            logger.error(f"############### Moving from {src} to {dest}")
+            # logger.error(f"############### Moving from {src} to {dest}")
             shutil.move(src, dest)
         except Exception as e:
             update_history(username=username, folder=complete_folder_path,
@@ -493,6 +492,39 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
         # write metadata in ro-crate file in 'generated' folder inside the unzipped folder
         update_history(username=username, folder=complete_folder_path,
                     url=repo, status="creating ro-crate file in 'generated' folder")
+        
+        ### BEGIN METAVOX ###
+        metavoxdata = []
+        metavoxfiles = []
+        metavoxfilesdata = {}
+
+        # get metavox data of a team group folder and add it to metadata
+        # get metavox data of the files in a team group folder and add it to metadata
+        try:
+            team_folders =  metavox_get_team_folders(user=username,token=password)
+            for groupfolder in team_folders['ocs']['data']:
+                if groupfolder['mount_point'] == complete_folder_path[1:]:
+                    groupfolderId = groupfolder['id']
+                    metavoxdata = metavox_get_folder_meatadata(user=username, token=password, groupfolderId=groupfolderId)['ocs']['data']
+                    metavoxfiles = get_folder_content_props(username=username, password=password, folder=complete_folder_path)
+                    for file_path in metavoxfiles:
+                        fileId = metavox_get_file_id(user=username, token=password, folder=file_path['path'])
+                        data = metavox_get_file_metadata(user=username, token=password, groupfolderId=groupfolderId, fileId=fileId)['ocs']['data']
+                        if data != []:
+                            metavoxfilesdata[file_path['path']]= data
+        except Exception as e:
+            logger.error(e)
+            
+        if len(metavoxdata) > 0:
+            metadata['metavoxdata'] = metavoxdata
+
+        if len(metavoxfilesdata) > 0:
+            metadata['metavoxfilesdata'] = metavoxfilesdata
+
+
+
+        ### END METAVOX ###
+
         try:
             create_rocrate(url=repo, folder=unzipped_folder, metadata=metadata)
             update_history(username=username, folder=complete_folder_path,
@@ -566,7 +598,8 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                         url=repo, status=f'ready')
                     return
                 else:
-                    project_id = result.id        
+                    project_id = result.id
+                    set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)     
             except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
                     url=repo, status=f'failed to create a project at {repo}: {e}')
@@ -583,9 +616,11 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 if result.status_code == 201:
                     if 'entity_id' in result.json():
                         project_id = result.json()['entity_id']
+                        set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
                 if result.status_code == 200:
                     if 'location' in result.json():
                         project_id = result.json()['location'].split("/")[-1]
+                        set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
                 if project_id == None:
                     rtext = result.text
                     update_history(username=username, folder=complete_folder_path,
@@ -609,6 +644,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 if r.status_code <= 300:
                     try:
                         project_id = r.json()['data']['persistentId']
+                        set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
                     except:
                         project_id = None
                 if project_id == None:
@@ -631,6 +667,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 if r.status_code == 201:
                     if 'id' in r.json():
                         project_id = r.json()['id']
+                        set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
                 if project_id == None:
                     try:
                         rtext = r.json()['message']
@@ -652,7 +689,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                 return
         if repo == 'irods':
             try:
-                project = irods.create_new_collection_internal(metadata=metadata)
+                project = irods.create_new_collection_internal(metadata=metadata, irods_subcollection=irods_subcollection)
                 if type(project) == 'dict':
                     if  'message' in project:
                         message = project['message']
@@ -662,6 +699,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                             url=repo, status=f'ready')
                         return
                 project_id = project['id']
+                set_project_id(username=username, folder=complete_folder_path, url=repo, project_id=project_id)
                 project_path = project['path']
             except Exception as e:
                 update_history(username=username, folder=complete_folder_path,
@@ -1015,7 +1053,7 @@ def run_export(username, password, complete_folder_path, repo, repo_user, api_ke
                                     "value": [
                                         {
                                             "dsDescriptionValue": {
-                                                "value": description,
+                                                "value": f"{description} (SRDC)",
                                                 "multiple": False,
                                                 "typeClass": "primitive",
                                                 "typeName": "dsDescriptionValue"

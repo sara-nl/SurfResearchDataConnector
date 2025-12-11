@@ -1,8 +1,6 @@
 # SurfResearchDataConnector
 
-The Research Data Connector App is a re-implementation of the [ScieboRDS](https://github.com/Sciebo-RDS/Sciebo-RDS) app. It allows Owncloud or Nextcloud users to connect to research  data repositories to upload their data to these repositories easily.
-
-For getting started quickly see the GETSTARTED.md document.
+The Research Data Connector App is a re-implementation of the [ScieboRDS](https://github.com/Sciebo-RDS/Sciebo-RDS) app. It allows Own Cloud users to connect to research  data repositories to upload their data to these repositories easily.
 
 <!-- TOC -->
 

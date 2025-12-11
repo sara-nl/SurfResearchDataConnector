@@ -1,4 +1,3 @@
-import logging
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -11,8 +10,6 @@ import redis
 from fastapi import FastAPI
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from a2wsgi import ASGIMiddleware
-
-logger = logging.getLogger()
 
 app = Flask(__name__)
 
@@ -28,9 +25,11 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
 
 try:
     from app.globalvars import *
+    from app.logs import *
 except:
     # for testing
     from globalvars import *
+    from logs import *
 
 # os.urandom(24)
 app.secret_key = b'V\x8b\x100\xfa\x01)\xd6\xe4`\x10\x16\xef9\x1b\xba\x128N\xf6\xe3\xbb\x90\xec'

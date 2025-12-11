@@ -8,7 +8,7 @@
 
 {% block content %}
 
-{% if  not data['homestart'] %}
+{% if  not session['homestart'] %}
 
     <!-- BEGIN Get started -->
     <h1>{{ start_h1_get_started | default("Get started") | safe }}</h1>
@@ -16,12 +16,12 @@
         <div class="row">
             <div class="col-3">
                 <!-- 1 - CONNECT RD -->
-                {% if not data.connected %}
+                {% if not session.connected %}
                 <big><i class="bi bi-1-circle-fill"></i> {{ base_step1 | default("Connect to Research Drive") | safe }}</big>
                 <p><a href="/connect">Connect</a> to your research drive.</p>
                 {% else %}
                 <big><i class="bi bi-1-circle"></i> {{ base_step1 | default("Connect to Research Drive") | safe }} <i class="bi bi-check"></i></big>
-                <p>{{ start_connected_to_rd | default("You are connected to Research Drive as") | safe }} <b>{{ data.username }}</b>.</p>
+                <p>{{ start_connected_to_rd | default("You are connected to Research Drive as") | safe }} <b>{{ session.username }}</b>.</p>
                 <p>{{ start_use_datahugger | default("You can import open data using the <b>Datahugger project</b>.") | safe }}</p>
             </div>
             <div class="col-6">
@@ -50,7 +50,7 @@
                         {% if active_services | length == 0%}            
                         <a href="/connect"><button class="btn btn-secondary">{{ start_connect | default("Connect to a repository") | safe }}</button></a>
                         <p><small><a href="/start?homestart=True">{{ start_with_datahugger | default("Start import of open data with Datahugger") | safe }}</a></small></p>
-                        <!-- <p><small>to be able to import and/or export private data.</small></p> -->
+                        <!-- <p><small>to be able to import and/or export private session.</small></p> -->
                         {% else %}
                         <a href="/connect">{{ start_connect_another | default("Connect to another repository") |safe }}</a>
                         <!-- <p><small>to be able to import and/or export private data to another repository than currently connected.</small></p> -->
@@ -61,7 +61,7 @@
             </div>
             <div class="col-3">
                 <!-- 3 - Start import or export -->
-                {% if data.connected and active_services | length > 0 %}
+                {% if session.connected and active_services | length > 0 %}
                 <big><i class="bi bi-3-circle-fill"></i> {{ base_step3 | default("Start an import or export") | safe }}</big>
                 {% else %}
                 <big><i class="bi bi-3-circle"></i> {{ base_step3 | default("Start an import or export") | safe }}</big>
@@ -69,7 +69,7 @@
                 {% endif %}
 
                 <!-- ### BEGIN START BUTTON -->
-                {% if data.connected and active_services | length > 0 %}
+                {% if session.connected and active_services | length > 0 %}
                 <form method="post" action="/start" class="needs-validation mt-3 mb-3" novalidate >
                     <input type="text" name="homestart" value="true" hidden>
                     <button type="submit" class="btn btn-secondary">Start import/export</button>
@@ -82,14 +82,14 @@
 
 {% else %}
 
-        {% if data.process == None or 'process' not in data %}
+        {% if session.process == None or 'process' not in session %}
             {% if active_services | length > 0%}
             <h1>Import/Export</h1>
             {% else %}
             <h1>{{ start_h1_import | default("Import open data") | safe }}</h1>
             <div>{{ start_open_data | default("You can only start an <b>Import of open data</b>. <a href='/connect'>Connect to other repositories</a> if you would like to import from or export to private repositories.") | safe }}</div>
             {% endif %}
-            {% if 'projectname' not in data or data.projectname == None %}
+            {% if 'projectname' not in session or session.projectname == None %}
             
             {% if active_services | length > 0%}
             <div>{{ start_reference1 | default("Set a reference for your import/export (optional).") | safe }}</div>
@@ -99,7 +99,7 @@
             
             <form method="post" class="needs-validation mt-3 mb-3" action="/start">
                 <div class=" col-5 form-group mt-3 mb-3">
-                    <input type="text" name="projectname" value="{{data.projectname}}" placeholder='{{ start_reference3 | default("Set a reference else one will be created.") | safe }}' class="form-control">
+                    <input type="text" name="projectname" value="{{session.projectname}}" placeholder='{{ start_reference3 | default("Set a reference else one will be created.") | safe }}' class="form-control">
                 </div>
                 {% if active_services | length > 0%}
                 <div>{{ start_select | default("Select if you want to start an <b>Import</b> or an <b>Export</b>.") | safe }}</div>
@@ -121,7 +121,7 @@
                 </div>
             </form>
             {% else %}
-            <div>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{data.projectname}}</b>.</div>
+            <div>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{session.projectname}}</b>.</div>
             <form method="post" class="mt-3 mb-3" action="/start">
                 <div class=" col-3 form-group mt-3 mb-3">
                     <input type="text" name="clearprojectname" value="" class="form-control" hidden>
@@ -132,10 +132,10 @@
             </form>
             {% endif %}
 
-            {% if 'projectname' in data %}
+            {% if 'projectname' in session %}
             <form method="post" class="needs-validation mt-3 mb-3" action="/start">
                 <div class=" col-3 form-group mt-3 mb-3">
-                    <input type="text" name="projectname" value="{{data.projectname}}" class="form-control" required hidden>
+                    <input type="text" name="projectname" value="{{session.projectname}}" class="form-control" required hidden>
                 </div>
                 {% if active_services | length > 0%}
                 <div>{{ start_select | default("Select if you want to start an <b>Import</b> or an <b>Export</b>.") | safe }}</div>
@@ -157,15 +157,15 @@
                 </div>
             </form>
             {% endif %}
-            {% if  data['homestart'] %}
+            {% if  session['homestart'] %}
                 <small><a href="/start?homeshow=true" type="submit" >{{ start_get_started_page | default("Go to the get started page") | safe }}</a></small>
             {% endif %}
 
         {% endif %}
 
-    {%if data.process == 'import' %}
+    {%if session.process == 'import' %}
         <h1>{{ start_h1_processing_import | default("Processing import") | safe }}</h1>
-        <p>{{ start_project_name | default("Project name") | safe }}: <b>{{ data.projectname }}</b></p>
+        <p>{{ start_project_name | default("Project name") | safe }}: <b>{{ session.projectname }}</b></p>
         <p>{{ start_import_running | default("There is an import process running.") | safe }}</p>
         <a href="/download"><button class="btn btn-secondary">{{ start_check_import | default("Check import status") | safe }}</button></a>
         <script>
@@ -173,9 +173,9 @@
         </script>
     {% endif %}
 
-    {%if data.process == 'export' %}
+    {%if session.process == 'export' %}
         <h1>{{ start_h1_processing_export | default("Processing export") | safe }}</h1>
-        <p>{{ start_project_name | default("Project name") | safe }}: <b>{{ data.projectname }}</b></p>
+        <p>{{ start_project_name | default("Project name") | safe }}: <b>{{ session.projectname }}</b></p>
         <p>{{ start_export_running | default("There is an export process running.") | safe }}</p>
         <a href="/upload"><button class="btn btn-secondary">{{ start_check_export | default("Check export status") | safe }}</button></a>
         <script>

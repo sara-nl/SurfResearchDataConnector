@@ -1,18 +1,19 @@
 import random
-import logging
 from threading import Thread
 from fastapi import Response, status
 from sqlalchemy import and_
 from pydantic import BaseModel
+import pandas as pd
+import matplotlib.pyplot as plt
+import json
 
 from app.models import fast_app, app, History
 from app.repos import run_export, run_private_import
 from app.utils import set_projectname, get_cached_folders, get_folders, get_query_status_history, make_connection
-from app.utils import folder_content_can_be_processed, repo_content_fits, update_history
+from app.utils import folder_content_can_be_processed, repo_content_fits, update_history, create_monthly
 from app.repos import check_connection, get_repocontent
 from app.globalvars import *
-
-logger = logging.getLogger()
+from app.logs import *
 
 ### defining the post request bodies using pydantic ###
 
@@ -62,7 +63,7 @@ class historyData(Data):
 
 @fast_app.get("/version", status_code=200)
 def fast_app_version(response: Response):
-    return {"version": "1"}
+    return {"version": f"{code_version}"}
 
 
 @fast_app.post("/folders", status_code=200)
@@ -332,3 +333,370 @@ def fast_app_history(data: historyData, response: Response):
     return {"status": r_status,
             "data": data,
             "result": result}
+
+
+@fast_app.get("/stats", status_code=200)
+def fast_app_stats(response: Response):
+    r_status = "OK"
+    result = {"images" : {}}
+    try:
+        with app.app_context():
+            ###############################
+
+            # BEGIN FILES PROCESSED STATS
+            
+            try:
+                processed = History.query.filter(History.status.like("%Files processed:%"))
+                processed = [u.__dict__ for u in processed.all()]
+                df = pd.DataFrame(processed)
+                df["files_processed"]=df["status"].apply(lambda x: int(x.split("Files processed:")[-1].split(".")[0].strip()))
+                result["files_processed"] = df["files_processed"].sum()
+            except:
+                result["files_processed"] = 0
+
+            try:
+                failures = History.query.filter(History.status.like("%Failures:%"))
+                failures = [u.__dict__ for u in failures.all()]
+                df = pd.DataFrame(failures)
+                df["failures"]=df["status"].apply(lambda x: int(x.split("Failures:")[-1].split(".")[0].strip()))
+                result["failures"] = df["failures"].sum()
+            except:
+                result["failures"] = 0
+            
+            # END FILES PROCESSED STATS
+
+            ###########################
+
+            started = History.query.filter_by(
+                            status="started"
+                            )
+            
+            ##########################
+
+            # BEGIN USERS STATS
+
+            users_action = {
+                "combined" : 0,
+                "import" : 0,
+                "export" : 0
+            }
+
+            try:
+                exports = History.query.filter(History.status.like("%creating a project at%"))
+                exports = [u.__dict__ for u in exports.all()]
+                df = pd.DataFrame(exports)
+                df = df.groupby(df["username"]).count()
+                users_action["export"] = len(df)
+            except:
+                users_action["export"] = 0
+
+            try:
+                imports = History.query.filter(History.status.like("%start pushing dataset to storage%"))
+                imports = [u.__dict__ for u in imports.all()]
+                df = pd.DataFrame(imports)
+                df = df.groupby(df["username"]).count()
+                users_action["import"] = len(df)
+            except:
+                users_action["import"] = 0
+
+            try:
+                impex = [u.__dict__ for u in started.all()]
+                df = pd.DataFrame(impex)
+                df = df.groupby(df["username"]).count()
+                users_action["combined"] = len(df)
+            except:
+                users_action["combined"] = 0
+
+            result["users_action"] = users_action
+
+            # END USERS STATS
+
+            ###########################
+
+            # BEGIN PROCESSING IMPORTS PER REPO
+
+            imports_repo = {
+                "datahugger" : 0,
+                "figshare" : 0,
+                "zenodo" : 0,
+                "osf" : 0,
+                "dataverse": 0,
+                "datastation" : 0,
+                "data4tu" : 0,
+                "sharekit" : 0,
+                "irods" : 0,
+                "surfs3" : 0
+            }
+            
+            exports_repo = {
+                "figshare" : 0,
+                "zenodo" : 0,
+                "osf" : 0,
+                "dataverse": 0,
+                "datastation" : 0,
+                "data4tu" : 0,
+                "sharekit" : 0,
+                "irods" : 0,
+                "surfs3" : 0
+            }
+
+            plt.close()
+
+            importrepokeys = []
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%doi.org%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('datahugger')
+                    imports_repo["datahugger"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["datahugger"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%figshare.com%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('figshare')
+                    imports_repo["figshare"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["figshare"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%zenodo.org%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('zenodo')
+                    imports_repo["zenodo"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["zenodo"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%osf.io%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('osf')
+                    imports_repo["osf"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["osf"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%dataverse.nl%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('dataverse')
+                    imports_repo["dataverse"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["dataverse"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%datastations.nl%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('datastation')
+                    imports_repo["datastation"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["datastation"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%4tu.nl%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('data4tu')
+                    imports_repo["data4tu"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["data4tu"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%surfsharekit.nl%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('sharekit')
+                    imports_repo["sharekit"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["sharekit"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%.irods.%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('irods')
+                    imports_repo["irods"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["irods"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.url.like("%Restoring_project%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    importrepokeys.append('surfs3')
+                    imports_repo["surfs3"] = xdata[1]["year-month"][-1]
+            except:
+                imports_repo["surfs3"] = 0
+
+            plt.legend(importrepokeys, loc="upper left", title="Repo import usage by the SRDC")
+            plt.xticks(rotation=35)
+            plt.savefig("app/static/img/importstats.png")
+            plt.close()
+            
+            result["images"]["importstats"] = "/static/img/importstats.png"
+
+            # END PROCESSING IMPORTS PER REPO
+
+            # BEGIN PROCESSING EXPORTS PER REPO
+            plt.close()
+
+            exportrepokeys = []
+
+            try:
+                xdata = create_monthly(started.filter_by(url="figshare"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('figshare')
+                    exports_repo["figshare"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["figshare"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="zenodo"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('zenodo')
+                    exports_repo["zenodo"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["zenodo"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="osf"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('osf')
+                    exports_repo["osf"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["osf"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="dataverse"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('dataverse')
+                    exports_repo["dataverse"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["dataverse"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="datastation"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('datastation')
+                    exports_repo["datastation"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["datastation"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="data4tu"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('data4tu')
+                    exports_repo["data4tu"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["data4tu"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="sharekit"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('sharekit')
+                    exports_repo["sharekit"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["sharekit"] = 0
+
+            try:
+                xdata = create_monthly(started.filter_by(url="irods"))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('irods')
+                    exports_repo["irods"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["irods"] = 0
+
+            try:
+                xdata = create_monthly(started.filter(History.projectname.like("%Archiving_project%")))
+                if xdata:
+                    plt.plot(xdata[1])
+                    exportrepokeys.append('surfs3')
+                    exports_repo["surfs3"] = xdata[1]["year-month"][-1]
+            except:
+                exports_repo["surfs3"] = 0
+
+            plt.legend(exportrepokeys, loc="upper left", title="Repo export usage by the SRDC")
+            plt.xticks(rotation=35)
+            plt.savefig("app/static/img/exportstats.png")
+            plt.close()
+            
+            result["images"]["exportstats"] = "/static/img/exportstats.png"
+            result["exports_repo"] = exports_repo
+            result["imports_repo"] = imports_repo
+
+
+            # END PROCESSING EXPORTS PER REPO
+
+            ###########################
+
+            # calculate totals based on values per repo
+            total_import = 0
+            try:
+                for key, value in imports_repo.items():
+                    if value:
+                        try:
+                            total_import += int(value)
+                        except:
+                            pass
+            except:
+                pass
+
+            total_export = 0 
+            try:
+                for key, value in exports_repo.items():
+                    if value:
+                        try:
+                            total_export += int(value)
+                        except:
+                            pass
+            except:
+                pass
+
+            result["total_import"] = total_import
+            result["total_export"] = total_export
+            result["total_impex"] = total_import + total_export
+
+
+            # prepare data for the chart
+            ready = History.query.filter_by(
+                            status="ready"
+                            )
+
+            xready = create_monthly(ready)
+            if xready:
+                monthly, cummulative = xready
+            else:
+                monthly, cummulative = 0, 0
+
+            # generate the main chart
+            plt.close()
+            plt.plot(cummulative)
+            plt.legend(["Total imports and exports"], loc="upper left", title="Usage of the SRDC")
+            plt.xticks(rotation=35)
+            plt.savefig("app/static/img/mainstats.png")
+            plt.close()
+
+            result["images"]["mainstats"] = "/static/img/mainstats.png"
+        result = json.loads(str(result).replace("'",'"'))
+    except Exception as e:
+        message = f"An exception occured: {e}"
+        logger.error(message)
+        r_status = "BAD_REQUEST"
+        result = message
+        response.status_code = status.HTTP_400_BAD_REQUEST
+
+    return {"status": r_status, "result": result}

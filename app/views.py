@@ -1,22 +1,18 @@
 from app.models import app, db, History
 from app.connections import oauth, registered_services, oauth_services, token_based_services
-from app.utils import run_import, make_connection, get_webdav_token, get_webdav_poll_info_nc, get_webdav_token_nc
-from app.utils import get_user_info, set_query_status, set_canceled, get_cached_folders, repo_content_can_be_processed, folder_content_can_be_processed
-from app.utils import check_if_folder_exists, check_if_url_in_history, get_query_status_history, get_query_status, get_status_from_history
-from app.utils import get_folders, get_folder_content, get_files_info, check_checksums, update_history, push_data, get_raw_folders
-from app.utils import get_quota_text, repo_content_fits, get_doi_metadata, parse_doi_metadata, convert_size, check_permission, memo
-from app.utils import refresh_cloud_token, get_user_info, get_projectname, set_projectname, get_dans_audiences, memoize, get_project_id, set_project_id
+from app.utils import *
 from app.repos import run_export, check_connection, get_private_metadata, get_repocontent, get_sharekit_token
 from app.repos.dataverse import Dataverse
+from app.repos.irods import Irods
 from app.repos.sharekit import Sharekit
 from threading import Thread
 from flask import request, session, flash, render_template, url_for, redirect, render_template_string
 from app.globalvars import *
+from app.logs import *
 from app.api import *
 import datetime
 from functools import lru_cache
 import json
-import logging
 import math
 import os
 import re
@@ -26,8 +22,9 @@ from sqlalchemy import and_
 from app.repos import run_private_import
 import whois
 from time import time
+import pandas as pd
+import matplotlib.pyplot as plt
 
-logger = logging.getLogger()
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -54,13 +51,11 @@ def home():
                 session['gtrans'] = False
                 flash(f"De taal is veranderd naar Nederlands.")
         if 'gtrans' in request.args:
-            # if request.args['gtrans'] == True:
-            #     session['lang'] = 'en'
             session['gtrans'] = request.args['gtrans']
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (1b)")
         logger.error(e, exc_info=True)
-    return render_template('home.html', **languages[session['lang']], data=session, drive_url=drive_url)
+    return render_template('home.html', **languages[session['lang']], drive_url=drive_url)
 
  
 @app.route('/start', methods=['GET', 'POST'])
@@ -169,7 +164,7 @@ def start():
         return redirect("/upload")
     if startimport:
         return redirect("/download")
-    return render_template('start.html', **languages[session['lang']], data=session, drive_url=drive_url, active_services=active_services, inactive_services=inactive_services    )
+    return render_template('start.html', **languages[session['lang']], drive_url=drive_url, active_services=active_services, inactive_services=inactive_services    )
 
 
 @app.route('/refresh-dataverses')
@@ -180,9 +175,7 @@ def refresh_dataverses():
         redirect
     """
     try:
-        data = session
         memoized_dataverses.cache_clear()
-        logger.error(data['repo'])
         if data['repo'] == 'datastation':
             datastation = Dataverse(api_key=session['datastation_access_token'], api_address=datastation_api_url, datastation=True)
             try:
@@ -205,7 +198,7 @@ def refresh_dataverses():
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (22b)")
         logger.error(e, exc_info=True)
-    return render_template('refresh-dataverses.html', **languages[session['lang']], data=session, drive_url=drive_url)
+    return render_template('refresh-dataverses.html', **languages[session['lang']], drive_url=drive_url)
 
 
 @app.route('/refresh-folderpaths')
@@ -216,15 +209,14 @@ def refresh_folder_paths():
         redirect
     """
     try:
-        data = session
-        if data['connected']:
+        if session['connected']:
             del memo[(session['username'],session['password'], '/')]
             get_cached_folders(session['username'],session['password'], '/')
             flash( languages[session['lang']].get('flash_data_folders_refreshed', 'Data Folder Paths refreshed') )
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (22a)")
         logger.error(e, exc_info=True)
-    return render_template('refresh-folderpaths.html', **languages[session['lang']], data=session, drive_url=drive_url)
+    return render_template('refresh-folderpaths.html', **languages[session['lang']], drive_url=drive_url)
 
 
 @app.route('/refresh')
@@ -234,7 +226,7 @@ def refresh():
     Returns:
         str: html for the refresh page
     """
-    return render_template('refresh.html', **languages[session['lang']], data=session)
+    return render_template('refresh.html', **languages[session['lang']])
 
 @app.route('/faq')
 def faq():
@@ -249,7 +241,7 @@ def faq():
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (2)")
         logger.error(e, exc_info=True)
-    return render_template('faq.html', **languages[session['lang']], data=session, drive_url=drive_url , faqitems=faqitems)
+    return render_template('faq.html', **languages[session['lang']], drive_url=drive_url , faqitems=faqitems)
 
 
 @app.route('/messages')
@@ -265,7 +257,7 @@ def messages():
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (3)")
         logger.error(e, exc_info=True)
-    return render_template('messages.html', **languages[session['lang']], data=session, drive_url=drive_url, messages=messages)
+    return render_template('messages.html', **languages[session['lang']], drive_url=drive_url, messages=messages)
 
 
 @app.route('/history/<id>', methods=['GET'])
@@ -332,7 +324,509 @@ def history(id=None):
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (4)")
         logger.error(e, exc_info=True)
-    return render_template('history.html', **languages[session['lang']], data=session, history=history, drive_url=drive_url)
+    return render_template('history.html', **languages[session['lang']], history=history, drive_url=drive_url)
+
+
+@app.route('/stats', methods=(['GET']))
+def stats():
+    """Will render the stats page
+
+    Returns:
+        str: html for the stats page
+    """
+
+    # BEGIN FILES PROCESSED STATS
+
+    try:
+        processed = History.query.filter(History.status.like('%Files processed:%'))
+        processed = [u.__dict__ for u in processed.all()]
+        df = pd.DataFrame(processed)
+        df['files_processed']=df['status'].apply(lambda x: int(x.split('Files processed:')[-1].split('.')[0].strip()))
+        files_processed = df['files_processed'].sum()
+    except:
+        files_processed = 0
+
+    try:
+        failures = History.query.filter(History.status.like('%Failures:%'))
+        failures = [u.__dict__ for u in failures.all()]
+        df = pd.DataFrame(failures)
+        df['failures']=df['status'].apply(lambda x: int(x.split('Failures:')[-1].split('.')[0].strip()))
+        failures = df['failures'].sum()
+    except:
+        failures = 0
+
+    # END FILES PROCESSED STATS
+
+    ###########################
+
+    started = History.query.filter_by(
+                    status='started'
+                    )
+    
+    ##########################
+
+    # BEGIN USERS STATS
+
+    users_action = {
+        'combined' : 0,
+        'import' : 0,
+        'export' : 0
+    }
+
+    try:
+        exports = History.query.filter(History.status.like("%creating a project at%"))
+        exports = [u.__dict__ for u in exports.all()]
+        df = pd.DataFrame(exports)
+        df = df.groupby(df["username"]).count()
+        users_action["export"] = len(df)
+    except:
+        users_action["export"] = 0
+
+    try:
+        imports = History.query.filter(History.status.like("%start pushing dataset to storage%"))
+        imports = [u.__dict__ for u in imports.all()]
+        df = pd.DataFrame(imports)
+        df = df.groupby(df["username"]).count()
+        users_action["import"] = len(df)
+    except:
+        users_action["import"] = 0
+
+    try:
+        impex = [u.__dict__ for u in started.all()]
+        df = pd.DataFrame(impex)
+        df = df.groupby(df["username"]).count()
+        users_action["combined"] = len(df)
+    except:
+        users_action["combined"] = 0
+    
+    # END USERS STATS
+
+    ###########################
+
+    # BEGIN PROCESSING IMPORTS PER REPO
+
+    imports_repo = {
+        'datahugger' : 0,
+        'figshare' : 0,
+        'zenodo' : 0,
+        'osf' : 0,
+        'dataverse': 0,
+        'datastation' : 0,
+        'data4tu' : 0,
+        'sharekit' : 0,
+        'irods' : 0
+    }
+    
+    exports_repo = {
+        'figshare' : 0,
+        'zenodo' : 0,
+        'osf' : 0,
+        'dataverse': 0,
+        'datastation' : 0,
+        'data4tu' : 0,
+        'sharekit' : 0,
+        'irods' : 0
+    }
+
+    plt.close()
+
+    importrepokeys = []
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%doi.org%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('datahugger')
+            imports_repo["datahugger"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["datahugger"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%figshare.com%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('figshare')
+            imports_repo["figshare"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["figshare"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%zenodo.org%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('zenodo')
+            imports_repo["zenodo"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["zenodo"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%osf.io%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('osf')
+            imports_repo["osf"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["osf"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%dataverse.nl%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('dataverse')
+            imports_repo["dataverse"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["dataverse"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%datastations.nl%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('datastation')
+            imports_repo["datastation"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["datastation"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%4tu.nl%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('data4tu')
+            imports_repo["data4tu"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["data4tu"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%surfsharekit.nl%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('sharekit')
+            imports_repo["sharekit"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["sharekit"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%.irods.%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('irods')
+            imports_repo["irods"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["irods"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.url.like("%Restoring_project%")))
+        if xdata:
+            plt.plot(xdata[1])
+            importrepokeys.append('surfs3')
+            imports_repo["surfs3"] = xdata[1]["year-month"][-1]
+    except:
+        imports_repo["surfs3"] = 0
+
+    plt.legend(importrepokeys, loc="upper left", title="Repo import usage by the SRDC")
+    plt.xticks(rotation=35)
+    plt.savefig('app/static/img/importstats.png')
+    plt.close()
+    
+    # END PROCESSING IMPORTS PER REPO
+
+    # BEGIN PROCESSING EXPORTS PER REPO
+    plt.close()
+
+    exportrepokeys = []
+
+    try:
+        xdata = create_monthly(started.filter_by(url="figshare"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('figshare')
+            exports_repo["figshare"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["figshare"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="zenodo"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('zenodo')
+            exports_repo["zenodo"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["zenodo"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="osf"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('osf')
+            exports_repo["osf"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["osf"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="dataverse"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('dataverse')
+            exports_repo["dataverse"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["dataverse"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="datastation"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('datastation')
+            exports_repo["datastation"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["datastation"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="data4tu"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('data4tu')
+            exports_repo["data4tu"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["data4tu"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="sharekit"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('sharekit')
+            exports_repo["sharekit"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["sharekit"] = 0
+
+    try:
+        xdata = create_monthly(started.filter_by(url="irods"))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('irods')
+            exports_repo["irods"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["irods"] = 0
+
+    try:
+        xdata = create_monthly(started.filter(History.projectname.like("%Archiving_project%")))
+        if xdata:
+            plt.plot(xdata[1])
+            exportrepokeys.append('surfs3')
+            exports_repo["surfs3"] = xdata[1]["year-month"][-1]
+    except:
+        exports_repo["surfs3"] = 0
+
+    plt.legend(exportrepokeys, loc="upper left", title="Repo export usage by the SRDC")
+    plt.xticks(rotation=35)
+    plt.savefig('app/static/img/exportstats.png')
+    plt.close()
+    
+    # END PROCESSING EXPORTS PER REPO
+
+    ###########################
+
+    # calculate totals based on values per repo
+    total_import = 0
+    try:
+        for key, value in imports_repo.items():
+            if value:
+                try:
+                    total_import += int(value)
+                except:
+                    pass
+    except:
+        pass
+
+    total_export = 0 
+    try:
+        logger.error(exports_repo.items())
+        for key, value in exports_repo.items():
+            if value:
+                try:
+                    total_export += int(value)
+                except:
+                    pass
+    except:
+        pass
+
+    total_impex = total_import + total_export
+
+
+    # prepare data for the chart
+    ready = History.query.filter_by(
+                    status='ready'
+                    )
+
+    xready = create_monthly(ready)
+    if xready:
+        monthly, cummulative = xready
+    else:
+        monthly, cummulative = 0, 0
+        
+    # generate the main chart
+    plt.close()
+    # plt.bar(monthly.index, monthly['year-month'], width=1)
+    plt.plot(cummulative)
+    plt.legend(['Total imports and exports'], loc="upper left", title="Usage of the SRDC")
+    plt.xticks(rotation=35)
+    plt.savefig('app/static/img/mainstats.png')
+    plt.close()
+
+    return render_template('stats.html',
+                            **languages[session['lang']],
+                            total_impex=total_impex,
+                            total_import=total_import,
+                            total_export=total_export,
+                            imports_repo=imports_repo,
+                            exports_repo=exports_repo,
+                            users_action=users_action,
+                            files_processed=files_processed,
+                            failures=failures)
+
+
+@app.route('/statsreport', methods=(['GET']))
+def statsreport():
+    """Will render the statsreport page
+
+    Returns:
+        str: html for the statsreport page
+    """
+
+    bcrypted_pw = b'$2b$12$TfIzIMj0ng/kLtbmWNXTEuwRUmKyJi7PIR6FoYVL4lRL5j5xH6yOS'
+    if 'pw' in request.args:
+        import bcrypt
+        pw = request.args['pw'].encode("utf-8")
+        if not bcrypt.checkpw(pw, bcrypted_pw):
+            return "not allowed, wrong password"
+    else:
+        return "not allowed, please provide a password"
+
+    clients = [
+        "aereshogeschool",
+        "algosoc",
+        "amsterdamumc",
+        # "aperture",
+        "avans",
+        "buas",
+        "che",
+        "cropxr",
+        "deltares",
+        # "demo",
+        "eur",
+        "fontys",
+        "han",
+        "hanze",
+        "has",
+        "hhs",
+        "hr",
+        "hsleiden",
+        "hu",
+        "hva",
+        "hzresearchdrive",
+        "inholland",
+        "knaw",
+        "knmi",
+        # "miskatonic",
+        "nhlstenden",
+        "nyenrode",
+        "ou",
+        "pbl",
+        "radiant",
+        "rce",
+        # "rdrive",
+        "rivm",
+        "rocvantwente",
+        "saxion",
+        "test",
+        "tilburguniversity",
+        "tue",
+        "um",
+        "umcg",
+        "universiteitleiden",
+        "uu",
+        "uva",
+        "vu",
+        "windesheim",
+        "zuyd"
+    ]
+
+    combined_result = {
+        "srdc_clients" : [],
+        "instance_results" : {},
+        "files_processed": 0,
+        "failures": 0,
+        "users_action": {
+            "combined": 0,
+            "import": 0,
+            "export": 0
+            },
+        "exports_repo": {
+            "figshare": 0,
+            "zenodo": 0,
+            "osf": 0,
+            "dataverse": 0,
+            "datastation": 0,
+            "data4tu": 0,
+            "sharekit": 0,
+            "irods": 0
+        },
+        "imports_repo": {
+            "datahugger": 0,
+            "figshare": 0,
+            "zenodo": 0,
+            "osf": 0,
+            "dataverse": 0,
+            "datastation": 0,
+            "data4tu": 0,
+            "sharekit": 0,
+            "irods": 0,
+        },
+        "total_import": 0,
+        "total_export": 0,
+        "total_impex": 0,
+    }
+
+
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json'
+        }
+
+    for client in clients:
+        try:
+            url =f"http://srdc-{client}-rd-app.data.surf.nl"
+            r = requests.get(url + "/api/stats", headers=headers, verify=True)
+            if r.status_code==200:
+                rr = r.text
+                logger.error(f"### {client}: {rr}")
+                instance_result = r.json()['result']
+                if instance_result['total_impex'] > 0:
+                    combined_result['instance_results'][client] = instance_result
+                    combined_result['srdc_clients'].append(client)
+                    for key in combined_result.keys():
+                        if key not in ["instance_results", "srdc_clients"]:
+                            try:
+                                combined_result[key] += instance_result[key]
+                            except:
+                                for subkey in combined_result[key]:
+                                    combined_result[key][subkey] += instance_result[key][subkey]
+            else:
+                flash(f"Failed to get data from {url}")
+                if r.status_code == 400:
+                    rr = r.json()
+                    logger.error(f"### {client}: {rr}")
+                else:
+                    r = requests.get(url + "/api/version", headers=headers, verify=True)
+                    if r.status_code==200:
+                        rr = r.json()
+                        logger.error(f"### {client}: {rr}")
+                    else:
+                        rr = r.text
+                        logger.error(f"### {client}: {rr}")
+
+        except Exception as e:
+            logger.error(e)
+
+    return render_template('statsreport.html', **languages[session['lang']], data=combined_result)
 
 
 @app.route('/connect', methods=('GET', 'POST'))
@@ -548,12 +1042,7 @@ def connect():
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (5)")
         logger.error(e, exc_info=True)
     session['cloud_service'] = cloud_service
-    # if session and 'lang' in session:
-    #     lng = session['lang']
-    # except:
-    #     lng = 'EN'
     return render_template('connect.html', **languages[session['lang']],
-                            data=session,
                             drive_url=drive_url,
                             oauth_services = oauth_services,
                             token_based_services = token_based_services,
@@ -599,6 +1088,9 @@ def upload():
         session['query_status'] = None
         logger.info(f"Failed to get query_status:")
         logger.info(e, exc_info=True)
+    
+    # set irods yoda retention to default to 10 years
+    # session['metadata']['yoda_retention'] = 10
 
     try:
         if request.method == "POST":
@@ -640,7 +1132,19 @@ def upload():
                     session['metadata']['dansRights_holder'] = request.form['dansRights_holder']
                 if 's3archivename' in request.form:
                     session['metadata']['s3archivename'] = request.form['s3archivename']
-                
+                # irods yoda specific form fields
+                if 'yoda_discipline' in request.form:
+                    session['metadata']['yoda_discipline'] = request.form['yoda_discipline']
+                if 'yoda_language' in request.form:
+                    session['metadata']['yoda_language'] = request.form['yoda_language']
+                if 'yoda_keywords' in request.form:
+                    session['metadata']['yoda_keywords'] = request.form['yoda_keywords']
+                if 'yoda_retention' in request.form:
+                    session['metadata']['yoda_retention'] = request.form['yoda_retention']
+                else:
+                    session['metadata']['yoda_retention'] = 10
+
+
                 # get the metadata fields
                 metadata = session['metadata']
 
@@ -651,7 +1155,6 @@ def upload():
                     if w['domain_name'] == None:
                         flash( f"{languages[session['lang']].get('flash_email_domain', 'email domain name does not exist')} : {domain}" )
                         return render_template('upload.html', **languages[session['lang']],
-                                                data=session,
                                                 preview=preview,
                                                 drive_url=drive_url)
 
@@ -685,6 +1188,12 @@ def upload():
                         dataverse = dataverse.replace("'", '"')
                         dataverse = json.loads(dataverse)
                         session['dataverse'] = dataverse
+                    
+                    irods_subcollection = None
+                    if 'irods_subcollection' in request.form:
+                        irods_subcollection = request.form['irods_subcollection']
+                        session['irods_subcollection'] = irods_subcollection
+                        flash("Exporting to: " + session['irods_subcollection'])
 
                 if 'start_upload' in request.form:
                     
@@ -704,8 +1213,11 @@ def upload():
                                 dataverse_alias = session['datastation']['alias']
 
                     repo_user = None
+                    irods_subcollection = None
                     if repo == "irods":
                         repo_user = session['irods_user']
+                        if 'irods_subcollection' in session:
+                            irods_subcollection = session['irods_subcollection']
                     if repo == "surfs3":
                         repo_user = session['surfs3_user']
                     
@@ -742,19 +1254,32 @@ def upload():
                     files_folders_selection = None
                     if 'files-folders-selection' in session and len(session['files-folders-selection']) > 0:
                         files_folders_selection = session['files-folders-selection']
-                    t = Thread(target=run_export, args=(
-                        username, password, complete_folder_path, repo, repo_user, api_key, metadata, use_zip, generate_metadata, dataverse_alias, files_folders_selection))
-                    t.start()
-                    session['query_status'] = 'started'
-                    session['process'] = 'export'
-                    del session['metadata']
+
+                    # check size of complete_folder_path and see if this can be processed in the POD.
+                    result = folder_content_can_be_processed(username, password, complete_folder_path)
+                    if result['can_be_processed'] == True:
+                        t = Thread(target=run_export, args=(
+                            username, password, complete_folder_path, repo, repo_user, api_key,
+                            metadata, use_zip, generate_metadata, dataverse_alias, files_folders_selection,
+                            irods_subcollection))
+                        t.start()
+                        session['query_status'] = 'started'
+                        session['process'] = 'export'
+                        del session['metadata']
+                    else:
+                        session['query_status'] = 'ready'
+                        flash(f"{languages[session['lang']].get('flash_data_process', 'The data is too large to be processed - dataset size / available for processing')} : {result['total_size']} / {result['free_bytes']}")
                 else:
-                    preview = True
+                    result = folder_content_can_be_processed(username, password, session['complete_folder_path'])
+                    if result['can_be_processed'] == False:
+                        flash(f"{languages[session['lang']].get('flash_data_process', 'The data is too large to be processed - dataset size / available for processing')} : {result['total_size']} / {result['free_bytes']}")
+                        preview = False
+                    else:
+                        preview = True
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (6)")
         logger.error(e, exc_info=True)    
     return render_template('upload.html', **languages[session['lang']],
-                            data=session,
                             preview=preview,
                             drive_url=drive_url)
 
@@ -870,7 +1395,6 @@ def retrieve():
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (7)")
         logger.error(e, exc_info=True)
     return render_template('retrieve.html', **languages[session['lang']],
-                            data=session,
                             preview=preview,
                             check_accept_folder_first=check_accept_folder_first,
                             check_accept_url_in_history_first=check_accept_url_in_history_first,
@@ -903,7 +1427,6 @@ def download():
         check_accept_url_in_history_first = None
         check_accept_folder_first = None
         preview = False
-        # session['repo'] = None
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (18)")
         logger.error(e, exc_info=True)
@@ -992,8 +1515,17 @@ def download():
                                 repo_user = session[f'{repo}_user']
                             api_key=session[f'{repo}_access_token']
                             set_canceled(session['username'], False)
+                            # get metadata from session
+                            metadata = {}
+                            if 'private_metadata' in session:
+                                metadata = session['private_metadata']
+                            elif 'doi_metadata' in session:
+                                metadata = session['doi_metadata']
+                            # get repo_content from session
+                            if 'repo_content' in session:
+                                repo_content = session['repo_content']
                             t = Thread(target=run_private_import, args=(
-                                        username, password, complete_folder_path, url, repo, api_key, repo_user))
+                                        username, password, complete_folder_path, url, repo, api_key, repo_user, metadata, repo_content))
                             t.start()
                         session['query_status'] = 'started'
                         session['process'] = 'import'
@@ -1004,7 +1536,6 @@ def download():
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (8)")
         logger.error(e, exc_info=True)
     return render_template('download.html', **languages[session['lang']],
-                                data=session,
                                 preview=preview,
                                 check_accept_folder_first=check_accept_folder_first,
                                 check_accept_url_in_history_first=check_accept_url_in_history_first,
@@ -1166,8 +1697,7 @@ def debug():
     except Exception as e:
         flash(f"{languages[session['lang']].get('flash_something_wrong', 'Something went wrong')} (13)")
         logger.error(e, exc_info=True)
-    return render_template('connect.html', **languages[session['lang']],
-                            data=session,drive_url=drive_url)
+    return render_template('connect.html', **languages[session['lang']],drive_url=drive_url)
 
 
 ### BEGIN FILTERS ###
@@ -1243,9 +1773,38 @@ def dataverses():
                                    drive_url=drive_url,
                                    name="dataverses")
     return render_template('dataverses.html', **languages[session['lang']],
-                            data=session,
                             drive_url=drive_url,
                             dataverses = dataverses)
+
+
+@app.route('/irods-subcollections', methods=['GET'])
+def irods_subcollections():
+    """Will render the irods-subcollections component
+
+    Returns:
+        str: html for the irods-subcollections component
+    """
+    try:
+        session['repo'] = 'irods'
+        irods = Irods(api_key=session['irods_access_token'], user=session['irods_user'], api_address=irods_api_url)
+        home = irods.settings['irods_home']
+        try:
+            subcollections = []
+            collections = irods.get_collection_internal(home)
+            for col in collections:
+                subcollections += col['subcollections']
+                subcollections += [col['path']]
+        except:
+            subcollections = []
+    except Exception as e: 
+        logger.error(f"Failed at irods-subcollections component view:")
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html', **languages[session['lang']],
+                                   drive_url=drive_url,
+                                   name="irods-subcollections")
+    return render_template('irods-subcollections.html', **languages[session['lang']],
+                            drive_url=drive_url,
+                            subcollections = subcollections)
 
 
 @app.route('/metadata', methods=['GET'])
@@ -1500,15 +2059,19 @@ def metadata():
                     dataverse_subjects = dataverse_citation_data['data']['fields']['subject']['controlledVocabularyValues']
         except:
             pass
+
+        schema_url = "https://yoda.uu.nl/schemas/default-3/metadata.json"
+        irods_schema = requests.get(schema_url).json()
+
         return render_template('metadata.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 disabled=disabled,
                                 repo=repo,
                                 dataverse_subjects=dataverse_subjects,
                                 dansRights_languages=dansRights_languages,
                                 dansRights_personal_data=dansRights_personal_data,
-                                dansRelationMetadata_audiences=dansRelationMetadata_audiences)
+                                dansRelationMetadata_audiences=dansRelationMetadata_audiences,
+                                irods_schema=irods_schema)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
@@ -1539,13 +2102,11 @@ def checkconnection(repo=None):
             logger.info(e, exc_info=True)
             connection_ok = None
         return render_template('check_connection.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 connection_ok=connection_ok)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,             
                                     name="check connection")
                                     
@@ -1560,7 +2121,6 @@ def repo_selection():
         session['hidden_services'] = hidden_services
         if registered_services == []:
             return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="No repositories have been configured")
         available_services = []
@@ -1570,7 +2130,6 @@ def repo_selection():
         if available_services == []:
             session['repo'] = ''
             return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="No repositories have been configured")
         # sort the repos here with the active ones first.
@@ -1587,7 +2146,6 @@ def repo_selection():
         sorted_services =  active_services + inactive_services
 
         return render_template('repo_selection.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 registered_services = sorted_services,
                                 all_vars = all_vars)
@@ -1615,14 +2173,12 @@ def folder_paths(direction=None):
             return render_template('component_load_failure.html', **languages[session['lang']],
                                     name="folder paths")
         return render_template('select_folder_path.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 folder_paths = folder_paths,
                                 direction=direction)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="folder paths")
 
@@ -1648,12 +2204,10 @@ def folder_content(direction=None):
                 content_can_be_processed = {'can_be_processed': None, 'total_size': None, 'free_bytes': None}
         else:
             return render_template('component_load_failure.html', **languages[session['lang']],
-                                        data=session,
                                         drive_url=drive_url,
                                         name="folder content")
         
         return render_template('folder_content.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 folder_content = folder_content,
                                 folder_content_can_be_processed = content_can_be_processed,
@@ -1661,7 +2215,6 @@ def folder_content(direction=None):
     except Exception as e:
         logger.error(e)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="folder content")
 
@@ -1682,7 +2235,6 @@ def select_folder_content():
             folder_content = get_folder_content(session['username'], session['password'], session['complete_folder_path'], files_only=True)
         else:
             return render_template('component_load_failure.html', **languages[session['lang']],
-                                        data=session,
                                         drive_url=drive_url,
                                         name="select folder content")
 
@@ -1691,7 +2243,6 @@ def select_folder_content():
     except Exception as e:
         logger.error(e)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="select folder content")
 
@@ -1704,7 +2255,6 @@ def repocontent():
         str: html for the repocontent component
     """
     try:
-        # currently just getting info from data hugger
         try:
             url = session['url']
             if 'repo' not in session or session['repo'] == 'datahugger' or session['repo'] == None:
@@ -1736,6 +2286,7 @@ def repocontent():
         except Exception as e:
             logger.error(f'failed to get repo content (1): {e}')
             repo_content = [{'message' : f'failed to get repo content'}]
+        session['repo_content'] = repo_content
         try:
             if 'repo' in session and session['repo'] != 'surfs3':
                 content_fits = repo_content_fits(repo_content, session['username'], session['password'], session['complete_folder_path'])
@@ -1758,7 +2309,6 @@ def repocontent():
         if permission == False:
             flash( languages[session['lang']].get('flash_no_write_permission', 'You do not have permission to write to the selected location.') )
         return render_template('repocontent.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 repo_content = repo_content,
                                 repo_content_fits = content_fits,
@@ -1776,22 +2326,22 @@ def doi_metadata():
         str: html for the doi-metadata component
     """
     try:
+        doi_metadata = {}
+        if 'doi_metadata' in session:
+            del session['doi_metadata']
         try:
             if session['repo'] != 'surfs3':
                 doi_metadata = get_doi_metadata(session['url'])
                 doi_metadata = parse_doi_metadata(doi_metadata)
-            else:
-                doi_metadata = {}
-        except:
-            doi_metadata = {}
+        except Exception as e:
+            logger.error(e, exc_info=True)    
+        session['doi_metadata'] = doi_metadata
         return render_template('doi_metadata.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 doi_metadata = doi_metadata)
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="doi metadata")
 
@@ -1803,6 +2353,9 @@ def private_metadata():
         str: html for the private-metadata component
     """
     try:
+        private_metadata = {}
+        if 'private_metadata' in session:
+            del session['private_metadata']
         try:
             repo = session['repo']
             url = session['url']
@@ -1829,9 +2382,8 @@ def private_metadata():
             private_metadata = get_private_metadata(repo=repo, url=url, api_key=api_key, user=user)
         except Exception as e:
             logger.error(e, exc_info=True)
-            private_metadata = {}
+        session['private_metadata'] = private_metadata
         return render_template('private_metadata.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 private_metadata = private_metadata)
     except Exception as e:
@@ -1856,7 +2408,6 @@ def quote_text():
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="quote text")
 
@@ -2001,7 +2552,6 @@ def status():
         except Exception as e:
             logger.error(e, exc_info=True)
         return render_template('status.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 query_status_history = query_status_history,
                                 progress = progress,
@@ -2010,9 +2560,75 @@ def status():
     except Exception as e:
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                    data=session,
                                     drive_url=drive_url,
                                     name="status")
+
+
+@app.route('/metavox', methods=['GET'])
+def metavox(folder=None):
+    """Will render the metavox component
+
+    Returns:
+        str: html for the metavox component
+    """
+    try:
+        metavoxdata = []
+        metavoxfiles = []
+        metavoxfilesdata = {}
+        folder = None
+        try:
+            if 'folder' in request.args:
+                folder = request.args['folder']
+                mount_point = folder[1:]
+                team_folders = metavox_get_team_folders(user=session['username'],token=session['password'])
+                for groupfolder in team_folders['ocs']['data']:
+                    if groupfolder['mount_point'] == mount_point:
+                        groupfolderId = groupfolder['id']
+                        metavoxdata = metavox_get_folder_meatadata(user=session['username'],token=session['password'], groupfolderId=groupfolderId)['ocs']['data']
+                        metavoxfiles = get_folder_content_props(username=session['username'], password=session['password'], folder=folder, properties=['nc:fileid'])
+                        for file_path in metavoxfiles:
+                            fileId = metavox_get_file_id(user=session['username'], token=session['password'], folder=file_path['path'])
+                            data = metavox_get_file_metadata(user=session['username'], token=session['password'], groupfolderId=groupfolderId, fileId=fileId)['ocs']['data']
+                            if data != []:
+                                metavoxfilesdata[file_path['path']]= data
+        except Exception as e:
+            logger.error(e)
+        return render_template('metavox.html', **languages[session['lang']], metavoxdata = metavoxdata, folder=folder, metavoxfilesdata=metavoxfilesdata)
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return render_template('component_load_failure.html', **languages[session['lang']],
+                                    drive_url=drive_url,
+                                    name="metavox") 
+
+# @app.route("/logs", methods=('GET', 'POST'))
+# def logs():
+#     loglines = []
+#     count = None
+#     logtype = None
+#     if 'count' in request.args:
+#         count = int(request.args['count'])
+#     if 'type' in request.args:
+#         logtype = request.args['type']
+#     try:
+#         with open('flask_app.log', 'r') as file:
+#             loglines = file.readlines()
+#     except:
+#         flash("No logs file is found. A new one will be created.")
+#         with open('flask_app.log', 'w') as file:
+#             file.write("")
+#     if logtype:
+#         lines = []
+#         for logline in loglines:
+#             if logline.find(logtype.upper()) != -1:
+#                 lines.append(logline)
+#         if count:
+#             lines = lines[-count:]
+#         return render_template('logs.html', loglines=lines)        
+#     if count:
+#         loglines = loglines[-count:]
+
+#     return render_template('logs.html', loglines=loglines)
+
 
 ### END COMPONENTS ###
 
@@ -2033,7 +2649,7 @@ def persistent_connection(persist=None):
                         session['password'] = password
                         session['persistent_connection'] = True
                         session['persist'] = False
-                        # return render_template('connect.html', **languages[session['lang']], data=session)
+                        # return render_template('connect.html', **languages[session['lang']])
                     else:
                         flash( languages[session['lang']].get('flash_fail_persist', 'Failed to make connection to research drive persistent.') )
             else:
@@ -2041,7 +2657,6 @@ def persistent_connection(persist=None):
     except Exception as e:
         logger.error(e)
     return render_template('persistent-connection.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url )
 
 @app.route('/login/<service>', methods=['GET'])
@@ -2138,7 +2753,7 @@ def authorize(service=None):
                 flash( languages[session['lang']].get('flash_failed_connect', 'failed to connect') )
     except Exception as e:
         logger.error(e, exc_info=True)
-    return render_template("close.html", data=session, drive_url=drive_url)
+    return render_template("close.html", drive_url=drive_url)
 
 @app.route('/refresh-token', methods=['GET'])
 def refresh_token():
@@ -2152,20 +2767,18 @@ def refresh_token():
         if session['password'] == None or session['password'] == "" or session['password'] == session['access_token']:
             # only refresh the token when it is about to expire
             if time() + 600 > session['cloud_token']['expires_at']:
-                data = refresh_cloud_token(session['cloud_token'])
-                if data:
-                    session['cloud_token'] = data
-                    new_token = session['password'] = session['access_token'] = data['access_token']
-                    session['refresh_token'] = data['refresh_token']
+                token_data = refresh_cloud_token(session['cloud_token'])
+                if token_data:
+                    session['cloud_token'] = token_data
+                    new_token = session['password'] = session['access_token'] = token_data['access_token']
+                    session['refresh_token'] = token_data['refresh_token']
     except Exception as e:
         logger.error(f"Failed at refresh token component view:")
         logger.error(e, exc_info=True)
         return render_template('component_load_failure.html', **languages[session['lang']],
-                                data=session,
                                 drive_url=drive_url,
                                 name=str(e))
     return render_template('refresh-token.html', **languages[session['lang']],
-                            data=session,
                             drive_url=drive_url,
                             old_token=old_token,
                             new_token=new_token)

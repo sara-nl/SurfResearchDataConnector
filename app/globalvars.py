@@ -1,11 +1,8 @@
-import logging
 import os
 import sys
 import configparser
 import json
 import glob
-
-logger = logging.getLogger()
 
 datastation_basicauth_token = None
 code_version = None

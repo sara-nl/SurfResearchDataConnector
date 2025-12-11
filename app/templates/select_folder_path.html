@@ -1,3 +1,4 @@
+{% from "macros.html" import load_async with context %}
 <div class="row">
     <div class="col-4">
         <p>{{ select_folder_path_filter | default("Filter the Data Folder Paths (optional):") | safe }}</p>
@@ -8,7 +9,7 @@
         <select name="folder_path" class="form-select" id="myList" required>
             <option></option>
             {% for folder_path in folder_paths %}
-                {% if folder_path == data.folder_path %}
+                {% if folder_path == session.folder_path %}
                 <option title="{{folder_path}}" value="{{folder_path}}" selected='selected'>{% if folder_path | length > 150 %}...{% endif %}{{ folder_path[-150:] }}</option>
                 {% else %}
                     <option title="{{folder_path}}" value="{{folder_path}}">{% if folder_path | length > 150 %}...{% endif %}{{ folder_path[-150:] }}</option>
@@ -27,6 +28,22 @@
     {{ select_folder_path_select_files | default("Select files (optional)") | safe }}
 </label>
 <div id="folder-content"></div>
+
+
+<div id="metavox"/>
+<script>
+      $( document ).ready(function() {
+          let folder = $("#myList").val()
+          let url = '/metavox?folder=' + encodeURIComponent(folder)
+          $("#metavox").load( url );
+      });
+    $("#myList").on("change",function(){
+          let folder = $("#myList").val()
+          let url = '/metavox?folder=' + encodeURIComponent(folder)
+          $("#metavox").load( url );
+      });
+</script>
+
 <script>
     $("#myList").on("change",function(){
           $("#select-folders-files").prop('checked', false);

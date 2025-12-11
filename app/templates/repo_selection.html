@@ -4,17 +4,17 @@
 <div class="form-group mt-3 mb-3">
     <h2>Repository</h2>
     {% for service in registered_services %}
-    {% if service not in data.temp_hidden_services %}
+    {% if service not in session.temp_hidden_services %}
     {% if service != 'owncloud' %}
-    {% if ('showall' in data and data.showall) or (service not in data.hidden_services)%}
+    {% if ('showall' in session and session.showall) or (service not in session.hidden_services)%}
     {% set imgfilepath = '/img/'+service+'.png' %}
     {% set access_token_name = service +'_access_token' %}
     <div class="form-check form-check-inline mt-3 mb-3 col-3">
         <input class="form-check-input" type="radio" name="selected_repo" id="radio-{{service}}" value="{{service}}"
-            {% if service == data.repo %} checked {% endif %}
-            {% if access_token_name not in data and service!="datahugger" %}disabled{% endif %} required >
+            {% if service == session.repo %} checked {% endif %}
+            {% if access_token_name not in session and service!="datahugger" %}disabled{% endif %} required >
         <label for="radio-{{service}}"><img src="{{ url_for('static', filename = imgfilepath) }}"
-                alt="{{service}}" {% if access_token_name not in data and service!="datahugger" %}style="-webkit-filter: grayscale(100%); filter: grayscale(100%); opacity: 0.4;"{% endif %}></label>
+                alt="{{service}}" {% if access_token_name not in session and service!="datahugger" %}style="-webkit-filter: grayscale(100%); filter: grayscale(100%); opacity: 0.4;"{% endif %}></label>
         {% set service_description = service+'_description' %}
         {% set service_website = service+'_website' %}
         
@@ -24,7 +24,7 @@
         <p><small>{{ all_vars[service_description] }}</small></p>
         {% endif %}
         
-        {% if access_token_name not in data %}
+        {% if access_token_name not in session %}
         
         
         
@@ -96,7 +96,9 @@ $('input[type=radio][name=selected_repo]').change(function() {
         $("#action-button").prop('disabled', false);
         $("#show_meta").html('<div id="show_meta" class="spinner-border text-secondary" role="status">');
         $("#show_meta").load("/metadata?repo=irods");
-        $("#show_dataverses").empty();
+        $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading irods subcollections</div>')
+        $("#show_dataverses").load("/irods-subcollections"); 
+        
     }
     else if (this.value == 'sharekit') {
         $("#action-button").prop('disabled', false);
@@ -114,7 +116,7 @@ $('input[type=radio][name=selected_repo]').change(function() {
 });
 </script>
 {% for service in registered_services %}
-    {% if service == data.repo %}
+    {% if service == session.repo %}
     <script>
         $("#action-button").prop('disabled', false);
         $('input[type=radio][name=selected_repo][value={{service}}]').attr('checked',true);
@@ -124,7 +126,7 @@ $('input[type=radio][name=selected_repo]').change(function() {
     {% endif %}
 {% endfor %}
 
-{% if data.repo == 'dataverse' %}
+{% if session.repo == 'dataverse' %}
 <script>
     $("#action-button").prop('disabled', false);
     $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading dataverses</div>')
@@ -132,10 +134,18 @@ $('input[type=radio][name=selected_repo]').change(function() {
 </script>
 {% endif %}
 
-{% if data.repo == 'datastation' %}
+{% if session.repo == 'datastation' %}
 <script>
     $("#action-button").prop('disabled', false);
     $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading dataverses</div>')
     $("#show_dataverses").load("/dataverses?datastation=true"); 
+</script>
+{% endif %}
+
+{% if session.repo == 'irods' %}
+<script>
+    $("#action-button").prop('disabled', false);
+    $("#show_dataverses").html('<div id="show_dataverses"><div class="spinner-border text-secondary" role="status"></div>... loading irods subcollections</div>')
+    $("#show_dataverses").load("/irods-subcollections"); 
 </script>
 {% endif %}

@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "surfresearchdataconnector.labels" . | nindent 4 }}
 spec:
+  strategy:
+    type: {{ .Values.updateStrategy.type | default "RollingUpdate" }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
@@ -52,6 +54,13 @@ spec:
             - name: {{ .name }}
               value: {{ .value }}
             {{- end }}
+          volumeMounts:
+          - mountPath: "/var/sessions/"
+            name: srdc-sessions
+      volumes:
+      - name: srdc-sessions
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistentVolumeClaim.name }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

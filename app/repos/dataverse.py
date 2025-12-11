@@ -93,16 +93,13 @@ class Dataverse(object):
             if dataverse_create_user_dataverse.lower() == "ok":
                 user_dataverse = self.get_user_dataverse()
             response = self.create_new_dataset(return_response=True)
-            # log.error("check_token")
-            # log.error(response)
             persistent_id = response.json()['data']['persistentId']
             r = self.get_dataset(persistent_id=persistent_id, return_response=True)
-            # log.error(f"Check Token: Status Code: {r.status_code}")
             # cleanup
             self.remove_dataset(persistent_id)
             return r.status_code == 200
         except Exception as e:
-            logger.error(e)
+            log.error(e)
             return False
 
     def set_metadata(self, metadata=None):
@@ -151,6 +148,29 @@ class Dataverse(object):
                                     "multiple": True,
                                     "typeName": "author"
                                 },
+
+                                {
+                                    "value": [
+                                        {
+                                            "producerName": {
+                                                "value": authorName,
+                                                "typeClass": "primitive",
+                                                "multiple": False,
+                                                "typeName": "producerName"
+                                            },
+                                            "producerAffiliation": {
+                                                "value": authorAffiliation,
+                                                "typeClass": "primitive",
+                                                "multiple": False,
+                                                "typeName": "producerAffiliation"
+                                            }
+                                        }
+                                    ],
+                                    "typeClass": "compound",
+                                    "multiple": True,
+                                    "typeName": "producer"
+                                },
+
                                 {
                                     "value": [
                                         {

@@ -11,8 +11,8 @@
 {% block content %}
 
 <!-- ### BEGIN HELPER LOGIC ### -->
-{% if data.connected==True %}
-    {% if data.query_status==None or data.query_status=='ready' %}
+{% if session.connected==True %}
+    {% if session.query_status==None or session.query_status=='ready' %}
         {% set vars = {'folder_exists_message' : False, 'url_exists_message' : False} %}
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -31,16 +31,16 @@
 <!-- END BEGIN HELPER LOGIC ### -->
 
 {% if not preview %}
-{% if data.query_status==None or data.query_status=='ready' and data.process==None%}
+{% if session.query_status==None or session.query_status=='ready' and session.process==None%}
 <h1>Import</h1>
 {% else %}
 <h1>{{ start_h1_processing_import | default("Processing import") | safe }}</h1>
 {% endif %}
-<p>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{ data.projectname }}</b></p>
+<p>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{ session.projectname }}</b></p>
 {% endif %}
 
-{% if data.connected==True %}
-{% if data.query_status==None or data.query_status=='ready' and data.process==None %}
+{% if session.connected==True %}
+{% if session.query_status==None or session.query_status=='ready' and session.process==None %}
 <form method="post" action="/download" class="needs-validation mt-3 mb-3" novalidate>
     <div {% if preview %} hidden {% endif %}>
         <!-- async loading repo selection -->
@@ -49,16 +49,16 @@
         
         <div class="form-group mt-3 mb-3">
             <label for="Url">Url: </label>
-            <input type="url" pattern="https://.*" class="form-control" name="url" value="{{data.url}}"
+            <input type="url" pattern="https://.*" class="form-control" name="url" value="{{session.url}}"
                 placeholder='{{ download_preview_url | default("A preview url") | safe }}' required>
             <div class="invalid-feedback">
                 {{ download_preview_url_feedback | default("Please fill out a preview url to a research dataset") | safe }}.
             </div>
         </div>
 
-        {% if (vars.url_exists_message==True or data.accept_url_in_history==True) and check_accept_url_in_history_first!=None %}
+        {% if (vars.url_exists_message==True or session.accept_url_in_history==True) and check_accept_url_in_history_first!=None %}
         <div class="form-check mt-3 mb-3">
-            <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {%
+            <input class="form-check-input" type="checkbox" value="" {% if session.accept_url_in_history %} checked {%
                 endif %} id="flexCheckUrl" name="accept_url_in_history" required>
             <label class="form-check-label" for="flexCheckUrl">
                 {{ download_check_urlinhistory | default("Check this to retrieve even if this url is in your history of imports.") | safe }}
@@ -72,19 +72,19 @@
             {{ load_async("folderpaths", "/folder-paths/down", 55000) }}
             <!-- end async -->
 
-            <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder='{{ download_placeholder | default("New Folder (optional)") | safe }}'
+            <input type="text" class="form-control" name="folder" value="{{session.folder}}" placeholder='{{ download_placeholder | default("New Folder (optional)") | safe }}'
             pattern="[\--_-A-Za-z0-9]+" >
 
             <div class="invalid-feedback">
-                {{ download_folder_feedback | default("Please fill out the folder name where you want store the data.") | safe }}
+                {{ download_folder_feedback | default("Please fill out the folder name where you want store the session.") | safe }}
             </div>
 
         </div>
 
-        {% if (vars.folder_exists_message==True or data.accept_folder_exist==True) and check_accept_folder_first!=None
+        {% if (vars.folder_exists_message==True or session.accept_folder_exist==True) and check_accept_folder_first!=None
         %}
         <div class="form-check mt-3 mb-3">
-            <input class="form-check-input" type="checkbox" value="" {% if data.accept_folder_exist %} checked {% endif
+            <input class="form-check-input" type="checkbox" value="" {% if session.accept_folder_exist %} checked {% endif
                 %} id="flexCheckFolder" name="accept_folder_exist" required>
             <label class="form-check-label" for="flexCheckFolder">
                 {{ download_check_folder_feedback | default("Check this to retrieve even if this folder already exists on your drive. The data will be added to the folder.") | safe }}
@@ -104,10 +104,10 @@
 
     <!-- ### BEGIN PREVIEW ### -->
     <h1>Import - Preview</h1>
-    <p>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{ data.projectname }}</b></p>
+    <p>{{ start_reference4 | default("You have set / been assigned the following reference") | safe }}: <b>{{ session.projectname }}</b></p>
 
     <!-- async loading check connection -->
-    {% set checkconnectionurl = '/check-connection/' + data.repo %}
+    {% set checkconnectionurl = '/check-connection/' + session.repo %}
     {{ load_async("check_connection", checkconnectionurl) }}
     <!-- end async -->
     
@@ -125,7 +125,7 @@
 
     <!-- Needs specific implementation for the private repo choosen-->
 
-    {% if data.repo == 'datahugger' %}
+    {% if session.repo == 'datahugger' %}
 
     <!-- async loading metadata -->
     {{ load_async("doi_metadata", "/doi-metadata") }}

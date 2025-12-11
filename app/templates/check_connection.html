@@ -1,15 +1,15 @@
-{% set imgfilepath = '/img/' + data.repo + '.png' %}
-<img src="{{ url_for('static', filename = imgfilepath) }}" alt="{{data.repo}}"/>
+{% set imgfilepath = '/img/' + session.repo + '.png' %}
+<img src="{{ url_for('static', filename = imgfilepath) }}" alt="{{session.repo}}"/>
 
 {% if connection_ok %}
-    {% if data.repo == 'data4tu' %}
+    {% if session.repo == 'data4tu' %}
     <p>4TU.ResearchData: {{ check_connection_ok | default("connection OK") | safe }}</p>
     {% else %}
-    <p>{{data.repo | upper}}: {{ check_connection_ok | default("connection OK") | safe }}</p>
+    <p>{{session.repo | upper}}: {{ check_connection_ok | default("connection OK") | safe }}</p>
     {% endif %}
 {% else %}
 
-<p style='color: red;'>{{data.repo | upper}}: {{ check_connection_not_ok | default("connection NOT OK") | safe }}</p>
+<p style='color: red;'>{{session.repo | upper}}: {{ check_connection_not_ok | default("connection NOT OK") | safe }}</p>
 
 <script>
     // disable all action buttons, so user will not be able to proceed

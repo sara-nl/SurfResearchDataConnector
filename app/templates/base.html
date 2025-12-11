@@ -29,11 +29,11 @@
                     <img alt="" class="logo" src="{{drive_url}}/dashboard/images/logo.png">
                     <a class="navbar-brand m-2" href="/">SRDC</a>
                 </div>
-                {% if data.connected==true %}
+                {% if session.connected==true %}
                 <div class="m-3">
                     <div class="notification-message">
-                        {% if data.cloud_service | lower == 'nextcloud' %}
-                            {% if 'password' not in data or data.password == '' or data.password == data.access_token %}
+                        {% if session.cloud_service | lower == 'nextcloud' %}
+                            {% if 'password' not in session or session.password == '' or session.password == session.access_token %}
                             <span id="refresh-token">
                                 {{ load_async("refresh-token", "/refresh-token") }}
                             </span>
@@ -48,9 +48,9 @@
                             <small><i>{{ base_connection_persistent | default("Your cloud connection is persistent.") | safe }}</i></small>
                             {% endif %}
                         {% endif %}
-                        {% if data.showall %}<div class="m-1 text-danger">showing all</div>{% endif %}
+                        {% if session.showall %}<div class="m-1 text-danger">showing all</div>{% endif %}
                     </div>
-                    <b class="username">{{data.username}}</b>
+                    <b class="username">{{session.username}}</b>
                     <button class="btn btn-secondary"><a class="nav-link" href="/connect"><i class="bi bi-globe"> {{ base_manage_connections | default("Manage connections") | safe }}</i></a></button>
                 </div>
                 {% else %}
@@ -75,19 +75,19 @@
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a class="nav-link" href="/"><i class="bi bi-house"> {{ base_home | default("Home") | safe }}</i></a></button>
                             </li>
-                            {% if data.connected==true and data.homestart %}
+                            {% if session.connected==true and session.homestart %}
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a class="nav-link" href="/start"><i class="bi bi-arrow-down-up"> {{ base_import_export | default("Import/Export") | safe }}</i></a></button>
                             </li>
                             {% endif %}
                         </ul>
                         <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                            {% if data.lang != "en" %}
+                            {% if session.lang != "en" %}
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a href="/?setlang=en" class="nav-link"><i class="bi bi-translate" title="Switch to English"> {{ base_en | default("EN") | safe }}</i></a></button>
                             </li>
                             {% endif %}
-                            {% if data.lang != "nl" %}
+                            {% if session.lang != "nl" %}
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a href="/?setlang=nl" class="nav-link"><i class="bi bi-translate" title="Switch to Dutch"> {{ base_nl | default("NL") | safe }}</i></a></button>
                             </li>
@@ -106,7 +106,7 @@
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a href="/faq" class="nav-link"><i class="bi bi-question-lg"> FAQ</i></a></button>
                             </li>
-                            {% if data.connected==true %}
+                            {% if session.connected==true %}
                             <li class="nav-item">
                                 <button class="btn btn-secondary"><a href="/history"
                                         class="nav-link"><i class="bi bi-calendar"> {{ base_history | default("History") | safe }}</i></a></button>
@@ -139,15 +139,15 @@
             <!-- <div class="col-4"></div> -->
             <div class="col-12 footer-text-right">
                 {% set repos_connected = [] %}
-                {% for service in data.registered_services %}
+                {% for service in session.registered_services %}
                     {% set tmp_item = service + '_access_token'%}
-                    {% if data.get(tmp_item) %}
+                    {% if session.get(tmp_item) %}
                         <div hidden>{{ repos_connected.append(service) }}</div>
                     {% endif %}
                 {% endfor %}
-                {% if data.connected and repos_connected | length > 0 %}
+                {% if session.connected and repos_connected | length > 0 %}
                 <big><i class="bi bi-1-circle"></i> {{ base_step1 | default("Connect to Research Drive") | safe }} <i class="bi bi-check"></i> <i class="bi bi-arrow-right"></i> <i class="bi bi-2-circle"> {{ start_connected_to | default("Connected to private repositories") | safe }}: {{repos_connected | length}} </i> <i class="bi bi-check"></i> <i class="bi bi-arrow-right"></i> <a href="/start?homeshow=True"><i class="bi bi-3-circle-fill"> {{ base_step3 | default("Start an import or export") | safe }}</i></a></big>
-                {% elif data.connected %} 
+                {% elif session.connected %} 
                 <big><i class="bi bi-1-circle"></i> {{ base_step1 | default("Connect to Research Drive") | safe }} <i class="bi bi-check"></i> <i class="bi bi-arrow-right"></i> <a href="/start?homeshow=True"><i class="bi bi-2-circle-fill"> {{ base_step2 | default("Connect to a private repository") | safe }}</i></a> <i class="bi bi-arrow-right"></i> <i class="bi bi-3-circle"> {{ base_step3 | default("Start an import or export") | safe }}</i></big>
                 {% else %}
                 <big><a href="/connect"><i class="bi bi-1-circle-fill"></i> {{ base_step1 | default("Connect to Research Drive") | safe }}</a> <i class="bi bi-arrow-right"></i> <i class="bi bi-2-circle"> {{ base_step2 | default("Connect to a private repository") | safe }}</i> <i class="bi bi-arrow-right"></i> <i class="bi bi-3-circle"> {{ base_step3 | default("Start an import or export") | safe }}</i></big>
@@ -159,15 +159,15 @@
         <div class="row footer-bar">
             <div class="col-4"></div>
             <div class="col-8 footer-text-right">
-                {% if data.cloud_service == 'owncloud' %}
+                {% if session.cloud_service == 'owncloud' %}
                 SURF Research Data Connector | <a href="https://servicedesk.surf.nl/wiki/display/WIKI/Changelog"
-                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | {{ base_service_by | default("A service by") | safe }} <a
+                    target="_blank">{{ session.code_version | default('Unknown') }}</a> | {{ base_service_by | default("A service by") | safe }} <a
                     href="https://www.surf.nl" class="underline hover:no-underline font-bold" target="_blank">SURF</a> |
                 SURF <a href="https://servicedesk.surf.nl/wiki/display/WIKI/"
                     class="underline hover:no-underline font-bold" target="_blank">wiki</a>
                 {% else %}
                 SURF Research Data Connector | <a href="https://servicedesk.surf.nl/wiki/display/WIKI/RD%3A+Changelog"
-                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | Een dienst van <a
+                    target="_blank">{{ session.code_version | default('Unknown') }}</a> | Een dienst van <a
                     href="https://www.surf.nl" class="underline hover:no-underline font-bold" target="_blank">SURF</a> |
                 SURF <a href="https://servicedesk.surf.nl/wiki/display/WIKI/RD%3A+SURF+Research+Data+Connector"
                     class="underline hover:no-underline font-bold" target="_blank">wiki</a>
@@ -177,7 +177,7 @@
 </body>
     <!-- begin google translate -->
     <!-- <div id="google_translate_element"></div> -->
-    {% if data.gtrans=="True" and data.lang=="nl" %}
+    {% if session.gtrans=="True" and session.lang=="nl" %}
     <script>
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({
@@ -188,7 +188,7 @@
         }
     </script>
     {% endif %}
-    {% if data.gtrans=="True" and data.lang != "nl" %}
+    {% if session.gtrans=="True" and session.lang != "nl" %}
     <script>
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({

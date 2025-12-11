@@ -5,7 +5,6 @@ from flask import session
 import datahugger
 import owncloud
 import nextcloud_client
-import logging
 import requests
 import pandas as pd
 import hashlib
@@ -16,6 +15,7 @@ import time
 import glob
 import datetime
 import string
+import re
 from rocrate.rocrate import ROCrate
 from rocrate.model.person import Person
 from rocrate.model.dataset import Dataset
@@ -23,10 +23,12 @@ from functools import lru_cache
 from functools import wraps
 import xml.etree.ElementTree as ET
 from authlib.integrations.requests_client import OAuth2Session
+import pandas as pd
 
 try:
     from app.models import app, db, History
     from app.globalvars import *
+    from app.logs import *
 except:
     # for testing this file locally
     try:
@@ -34,24 +36,21 @@ except:
     except:
         pass
     from globalvars import *
-    # cloud_service = "owncloud"
-    # drive_url = "https://acc-aperture.data.surfsara.nl"
+    from logs import *
+    cloud_service = 'nextcloud'
+    drive_url = 'https://tst-miskatonic.data.surfsara.nl'
     print("testing")
-    # for v in all_vars:
-    #     print(v)
+
 
 from pprint import pprint
-
-logger = logging.getLogger()
-logging.getLogger().setLevel(logging.INFO)
 
 if cloud_service == "owncloud":
     cloud = owncloud.Client(drive_url)
 elif cloud_service == "nextcloud":
     cloud = nextcloud_client.Client(drive_url)
 else:
-    # defaulting to the owncloud lib in case cloud_service is not configured
-    cloud = owncloud.Client(drive_url)
+    # defaulting to the nextcloud lib in case cloud_service is not configured
+    cloud = nextcloud.Client(drive_url)
 
 global query_status
 query_status = {}
@@ -191,6 +190,7 @@ def get_files_info(url):
         result = datahugger.info(url)
         return result.files
     except ValueError as e:
+        logger.error(str(e))
         return [{'message': str(e)}]
 
 
@@ -608,7 +608,7 @@ def get_folder_content(username, password, folder, files_only=False):
         return []
 
 
-def get_folder_content_props(username, password, folder):
+def get_folder_content_props(username, password, folder, properties=None):
     """Will get a folder content props on an cloud instance.
 
     Args:
@@ -622,7 +622,7 @@ def get_folder_content_props(username, password, folder):
     try:
         if make_connection(username, password):
             result = []
-            FileInfoObject = cloud.list(folder, depth=100)
+            FileInfoObject = cloud.list(folder, depth=100, properties=properties)
             for object in FileInfoObject:
                 object_dict = {}
                 object_dict['path'] = object.path
@@ -1170,7 +1170,7 @@ def create_generated_folder(folder):
         logger.error(e, exc_info=True)
 
 
-def create_rocrate(url, folder, metadata = None):
+def create_rocrate(url, folder, metadata = None, repo_content=None):
     """will create a rocrate file in the folder based on the metadata
     that will be retrieved from the url.
 
@@ -1184,12 +1184,13 @@ def create_rocrate(url, folder, metadata = None):
         dataset = crate.add(Dataset(crate, dest_path="./"))
 
         # get metadata from doi url if available
-        if url.find('http') != -1:
+        if url.find('http') != -1 and metadata == {} or metadata == None:
             metadata = get_doi_metadata(url)
-        
-        # if we have mata data use this
+            if metadata != {} and metadata != None:
+                metadata = parse_doi_metadata(metadata)
+
+        # if we have metadata use this
         if metadata != {} and metadata != None:
-            metadata = parse_doi_metadata(metadata)
             if 'author' in metadata:
                 authors = []
                 if type(metadata['author']) == 'list':
@@ -1213,9 +1214,15 @@ def create_rocrate(url, folder, metadata = None):
                     # TODO: check if this works for adding metadata
                     logger.info("no valid rocrate data to add")
 
-        # add the files
-        files_info = get_files_info(url)
-        dataset['files'] = files_info
+        # add the files (datahugger)
+        try:
+            if repo_content:
+                dataset['files'] = repo_content
+            else:
+                dataset['files'] = get_files_info(url)
+        except:
+            dataset['files'] = ['not available']
+        
 
         # timestamp the ro-crate file
         dataset["timestamp"] = str(datetime.datetime.now())
@@ -1449,22 +1456,126 @@ def memoize(f):
     return f
 
 
+def create_monthly(sqlquery):
+    """Will take a sqlalchemy query and wrangle it into a pandas dataframe.
+
+    Returns:
+        tuple: two dataframes. one with monthly and one with cummulative data 
+    """
+    try:
+        data = [u.__dict__ for u in sqlquery.all()]
+        df = pd.DataFrame(data)
+        df['year'] = df["time_created"].dt.year
+        df['month'] = df["time_created"].dt.month
+        df['year-month'] = df['year'].astype(str) + "-" + df["month"].astype(str)
+        df['year-month']=pd.to_datetime(df['year-month'])
+        monthly = df[["year-month"]].groupby(df["year-month"]).count()
+        cummulative = df[["year-month"]].groupby(df["year-month"]).count().cumsum()
+    except Exception as e:
+        logger.error(str(e))
+        return None
+    return monthly, cummulative
+
+def metavox_get_team_folders(user,token):
+    """Does a get call to the Metavox API endpoint: /groupfolders.
+    Returns all the available metavox team folders
+
+    Args:
+        user (str): the username of the connected nextcloud instance
+        token (str): the (app) password for the users account
+
+    Returns:
+        json: _description_
+    """
+    try:
+        endpoint = "/groupfolders"
+        ocs_api = "/ocs/v2.php/apps/metavox/api/v1"
+        url = drive_url + ocs_api + endpoint
+        headers = {
+                "Authorization": "sanitized",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "OCS-APIRequest": "true"
+                }
+        response = requests.request("GET", url, auth=(user, token), headers=headers)
+        return response.json()
+    except Exception as e:
+        logger.error(e)
+
+def metavox_get_files(user,token, groupfolderId):
+    try:
+        endpoint = f"/groupfolders/{groupfolderId}/files"
+        ocs_api = "/ocs/v2.php/apps/metavox/api/v1"
+        url = drive_url + ocs_api + endpoint
+        headers = {
+                "Authorization": "sanitized",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "OCS-APIRequest": "true"
+                }
+        response = requests.request("GET", url, auth=(user, token), headers=headers)
+        return response.json()
+    except Exception as e:
+        logger.error(e)
+
+def metavox_get_folder_meatadata(user,token, groupfolderId):
+    try:
+        endpoint = f"/groupfolders/{groupfolderId}/metadata"
+        ocs_api = "/ocs/v2.php/apps/metavox/api/v1"
+        url = drive_url + ocs_api + endpoint
+        headers = {
+                "Authorization": "sanitized",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "OCS-APIRequest": "true"
+                }
+        response = requests.request("GET", url, auth=(user, token), headers=headers)
+        return response.json()
+    except Exception as e:
+        logger.error(e)
+
+def metavox_get_file_metadata(user,token, groupfolderId, fileId):
+    try:
+        endpoint = f"/groupfolders/{groupfolderId}/files/{fileId}/metadata"
+        ocs_api = "/ocs/v2.php/apps/metavox/api/v1"
+        url = drive_url + ocs_api + endpoint
+        headers = {
+                "Authorization": "sanitized",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "OCS-APIRequest": "true"
+                }
+        response = requests.request("GET", url, auth=(user, token), headers=headers)
+        return response.json()
+    except Exception as e:
+        logger.error(e)
+
+def metavox_get_file_id(user,token, folder):
+    try:
+        endpoint = f"/files/{user}{folder}"
+        dav_api = "/remote.php/dav"
+        url = drive_url + dav_api + endpoint
+        headers = {}
+        data = """
+        <d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+            <d:prop>
+                    <oc:fileid />
+            </d:prop>
+        </d:propfind>
+        """
+        response = requests.request("PROPFIND", url, auth=(user, token), data=data, headers=headers)
+        result = re.findall(r'<oc:fileid>(.*?)</oc:fileid>', response.text)[0]
+        return result
+    except Exception as e:
+        logger.error(e)
+
 if __name__ == "__main__":
-    # token = ""
-
-    # poll_info = get_webdav_poll_info_nc(token)
-    # print(poll_info['poll_login'])
-
-    # input('continue?')
-    
-    # poll_endpoint = poll_info['poll_endpoint']
-    # result = get_webdav_token_nc(poll_endpoint)
-
-    # print(result)
-    # user_id = ""
-    # password = ""
-    # token = ""
-    # print(get_user_info(username=user_id, password=password))
-    # print(get_user_info_by_token(token))
-    # print(get_dans_audiences())
-    pass
+    user = 'dashboardadmin1'
+    # token = 'AbdZW-mdEfs-e3yLT-zZSsj-w3sw6'
+    token = "Nr6NJ-qECkz-MacMY-8CATz-EWajb"
+    # pprint(metavox_get_team_folders(user, token))
+    # pprint(metavox_get_folder_meatadata(user, token, 1))
+    folder = "/Demo metavox/MetaVox_Testing_Folder/Nieuw document.docx"
+    result = metavox_get_file_id(user,token, folder)
+    print(result)
+    # print(dir(result))

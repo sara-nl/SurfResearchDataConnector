@@ -12,7 +12,7 @@
 {% set _ = glob.update({'oauth_services_set':False}) %}
 {% set _ = glob.update({'token_based_services_set':False}) %}
 
-{% if data.connected==true %}
+{% if session.connected==true %}
 <h1>{{ connect_h1 | default("Connections") | safe }}</h1>
 <p>{{ connect_manage | default("Manage all your connections.") | safe }}</p>
 
@@ -24,10 +24,10 @@
 <h2>Surf Research Drive</h2>
 <img src="{{ url_for('static', filename = '/img/surf.png' ) }}" alt="surf">
 
-{% if data.connected==true %}
+{% if session.connected==true %}
     <div class="row mt-3 mb-3">
         <p>
-            {{ start_connected_to_rd | default("You are connected to Research Drive as") | safe }}: <b>{{data.username}}</b>
+            {{ start_connected_to_rd | default("You are connected to Research Drive as") | safe }}: <b>{{session.username}}</b>
         </p>
     </div>
     
@@ -36,8 +36,8 @@
             <input type="hidden" class="form-control" name="disconnect" value=True>
             <button type="submit" class="btn btn-secondary">{{ connect_disconnect | default("Disconnect") | safe }}</button>
         </form>
-        {% if data.cloud_service | lower == 'nextcloud' %}
-            {% if data.access_token == data.password %}
+        {% if session.cloud_service | lower == 'nextcloud' %}
+            {% if session.access_token == session.password %}
                 <p><small>{{ connect_make_persistent | default("Make connection to research drive <a href='/persistent-connection'>persistent</a>.") | safe }}</small></p>
             {% else %}
                 <p><small>{{ connect_persistent | default("Your connection is persistent.") | safe }}</small></p>
@@ -65,7 +65,7 @@
     {% if oauth_services|length > 0 %}
         
     {% for service in oauth_services %}
-        {% if ('showall' in data and data.showall) or (service not in data.hidden_services)%}
+        {% if ('showall' in session and session.showall) or (service not in session.hidden_services)%}
     
         {% set _ = glob.update({'oauth_services_set':True}) %}
         
@@ -79,7 +79,7 @@
         {% set service_website = service+'_website' %}
         <p><small>{{ all_vars[service_description] }}</small></p>
         <p><small>{{ connect_link_to | default("Link to") | safe }}: <a href="{{ all_vars[service_website] }}" target="_blank">{% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}</a></small></p>
-            {% if data[service + '_access_token'] %}
+            {% if session[service + '_access_token'] %}
                 <div class="row mt-3 mb-3">
                     <p>
                         {{ connect_connected_to | default("You are connected to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}. 
@@ -146,7 +146,7 @@
     {% if token_based_services|length > 0 %}
         
         {% for service in token_based_services %}
-            {% if ('showall' in data and data.showall) or (service not in data.hidden_services)%}
+            {% if ('showall' in session and session.showall) or (service not in session.hidden_services)%}
 
             {% set _ = glob.update({'token_based_services_set':True}) %}
 
@@ -159,10 +159,13 @@
             {% set service_description = service+'_description' %}
             {% set service_website = service+'_website' %}
             <p><small>{{ all_vars[service_description] }}</small></p>
+            {% if 'ssh.datastations.nl' in all_vars[service_website] %}
+            <p><small>(See Dans <a href="https://dans.knaw.nl/en/selection-policy-dans-data-stations/" target="_blank">Selection policy</a>)</small></p>
+            {% endif %}
             <p><small>{{ connect_link_to | default("Link to") | safe }}: <a href="{{ all_vars[service_website] }}" target="_blank">
                 {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}
             </a></small></p>
-            {% if data[service + '_access_token'] %}
+            {% if session[service + '_access_token'] %}
                 <div class="row mt-3 mb-3">
                     <p>
                         {{ connect_connected_to | default("You are connected to") | safe }} {% if service_website_name in all_vars %}{{all_vars[service_website_name]}}{% else %}{{ service }}{% endif %}.
@@ -245,24 +248,24 @@
         <form method="post" action="" class="needs-validation" novalidate>
             <div class="form-group">
                 <label for="Username">Username: </label>
-                <input type="text" class="form-control" name="username" value="{{data.username}}" required>
+                <input type="text" class="form-control" name="username" value="{{session.username}}" required>
                 <div class="invalid-feedback">
                     Please fill out your Research Drive Username
                 </div>
             </div>
             <div class="form-group">
                 <label for="Password">Password: </label>
-                <input type="password" class="form-control rounded-right" name="password" value="{{data.password}}" required>
+                <input type="password" class="form-control rounded-right" name="password" value="{{session.password}}" required>
                 <button id="toggle-password" type="button" class="d-none"
                     aria-label="Show password as plain text. Warning: this will display your password on the screen.">
                 </button>
                 <div class="invalid-feedback">
                     Please fill out an application password for accessing your Research Drive by Webdav
                 </div>
-                {% if data.cloud_service | lower == 'owncloud' %}
+                {% if session.cloud_service | lower == 'owncloud' %}
                 <P>You can generate an application password <a href="{{drive_url}}/index.php/settings/personal?sectionid=security#apppasswords" target="_top">here</a>.</P>
                 {% endif %}
-                {% if data.cloud_service | lower == 'nextcloud' %}
+                {% if session.cloud_service | lower == 'nextcloud' %}
                 <P>You can generate an application password <a href="{{drive_url}}/index.php/settings/user/security" target="_top">here</a>.</P>
                 {% endif %}
             </div>

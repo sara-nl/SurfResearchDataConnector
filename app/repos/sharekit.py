@@ -275,7 +275,7 @@ class Sharekit(object):
         if email:
             url = f"{self.sharekit_api_address}/upload/v1/persons?filter[email][LIKE]=%{email}%&pageNumber=1&pageSize=1"
         elif name:
-            url = f"{self.sharekit_api_address}/upload/v1/persons?filter[name][LIKE]=%{name}%&pageNumber=1&pageSize=1"
+            url = f"{self.sharekit_api_address}/upload/v1/persons?filter[name][EQ]={name}&pageNumber=1&pageSize=1"
         else:
             url = f"{self.sharekit_api_address}/upload/v1/persons?pageNumber=1&pageSize=1"
         payload = {}
@@ -381,7 +381,7 @@ class Sharekit(object):
 
             url = f"{self.sharekit_api_address}/upload/v1/repoitems"
 
-            owner = sharekit_owner
+            owner = 'unknown'
 
             if 'owner' in metadata:
                 owner = metadata['owner']

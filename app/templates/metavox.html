@@ -1,0 +1,84 @@
+{% if metavoxdata | length > 0 %}
+<h2>{{ metavox_h2 | default("Metavox metadata available for team folder") | safe }}: {{ folder }}</h2>
+<p>{{ metavox_generate_rocrate | default("This data will be added to the ro-crate metadata file if you choose to generate this file during export.") | safe }}</p>
+<p>{{ metavox_map_fields | default("In below table you can also map the metavox data to the project metadata fields.") | safe }}</p>
+<table class="table table-striped table-hover table-sm table-bordered table-responsive-sm">
+    <thead class="table-light">
+        <tr>
+            <th>{{ metavox_label | default("Label") | safe }}</th>
+            <th>{{ metavox_value | default("Value") | safe }}</th>
+            <th>{{ metavox_map | default("Map to metadata field") | safe }}</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for field in metavoxdata %}        
+        <tr>
+            <td>{{ field.field_label }}</td>
+            <td >{{ field.value }}</td>
+            <input id="metadata-value-{{ field.field_name }}" value="{{ field.value }}" hidden>
+            <td>
+                <select class="form-select" name="metadata-field" id="metadata-field-{{ field.field_name }}">
+                    <option value=""></option>
+                    <option value="title">Title</option>
+                    <option value="author">Author</option>
+                    <option value="affiliation">Affiliation</option>
+                    <option value="subject">Subject</option>
+                    <option value="description">Description</option>
+                    <option value="contact_name">Contact name</option>
+                    <option value="contact_email">Contact email</option>
+                </select>
+            </td>
+        </tr>
+
+        <script>
+        $('#metadata-field-{{ field.field_name }}').on( "change", function() {
+            let name = $('#metadata-field-{{ field.field_name }}').val();
+            $('input[name="' + name + '"]').prop("value", $('#metadata-value-{{ field.field_name }}').val());
+            $('textarea[name="' + name + '"]').prop("value", $('#metadata-value-{{ field.field_name }}').val());
+        });
+        $('#copy-metadata-fileds').on( "click", function() {
+            let name = $('#metadata-field-{{ field.field_name }}').val();
+            $('input[name="' + name + '"]').prop("value", $('#metadata-value-{{ field.field_name }}').val());
+            $('textarea[name="' + name + '"]').prop("value", $('#metadata-value-{{ field.field_name }}').val());
+        });
+        </script>
+
+    {% endfor %}
+    </tbody>
+</table>
+<div class="btn btn-secondary" id="copy-metadata-fileds">{{ metavox_copy | default("Copy to metadata fields") | safe }}</div>
+
+{% endif %}
+
+{% if metavoxfilesdata | length > 0 %}
+<h2>{{ metavox_h2_files | default("Metavox metadata available for files and sub-folders of team folder") | safe }}: {{ folder }}</h2>
+<p>{{ metavox_generate_rocrate | default("This data will be added to the ro-crate metadata file if you choose to generate this file during export.") | safe }}</p>
+<table class="table table-striped table-hover table-sm table-bordered table-responsive-sm">
+    <thead class="table-light">
+        <tr>
+            <th>{{ metavox_path | default("Path") | safe }}</th>
+            <th>{{ metavox_label | default("Label") | safe }}</th>
+            <th>{{ metavox_value | default("Value") | safe }}</th>
+        </tr>
+    </thead>
+    <tbody id="toggle-tbody">
+    {% for key in metavoxfilesdata %}
+    {% for item in metavoxfilesdata[key] %}
+        <tr>
+            <td>{{ key }}</td>
+            <td>{{ item.field_label }}</td>
+            <td >{{ item.value }}</td>
+        </tr>
+    {% endfor %}
+    {% endfor %}
+    </tbody>
+</table>
+<div class="btn btn-secondary" id="toggle-metavox-fileds">{{ metavox_toggle | default("Show / Hide Table") | safe }}</div>
+<script>
+$(document).ready(function(){
+  $("#toggle-metavox-fileds").click(function(){
+    $("#toggle-tbody").toggle();
+  });
+});
+</script>
+{% endif %}

@@ -3,15 +3,17 @@ from authlib.integrations.flask_client import OAuth
 try:
     from app.models import app
     from app.globalvars import *
+    from app.logs import *
 except:
     # for testing this file locally
     from models import app, db, History
     from globalvars import *
+    from logs import *
     print("testing")
 
 oauth = OAuth(app)
 
-# Oauth connection config for owncloud
+# Oauth connection config for rdrive
 try:
     oauth.register(
         name='rdrive',
@@ -41,7 +43,8 @@ try:
         authorize_params=None,
         api_base_url=f'{figshare_api_url}',
         client_kwargs={'scope': 'all',
-                        'grant_type': 'authorization_code'},
+                        'grant_type': 'authorization_code',
+                        },
     )
 except:
     pass
@@ -89,7 +92,7 @@ if 'token_based_services' not in all_vars:
 if 'oauth_services' not in all_vars:
     try:
         oauth_services = list(oauth._registry.keys())
-        oauth_services.remove('owncloud')
+        oauth_services.remove('rdrive')
     except:
         oauth_services = []
 

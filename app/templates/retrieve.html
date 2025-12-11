@@ -9,8 +9,8 @@
 {% block content %}
 
 <!-- ### BEGIN HELPER LOGIC ### -->
-{% if data.connected==True %}
-    {% if data.query_status==None or data.query_status=='ready' %}
+{% if session.connected==True %}
+    {% if session.query_status==None or session.query_status=='ready' %}
         {% set vars = {'folder_exists_message' : False, 'url_exists_message' : False} %}
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -31,11 +31,11 @@
 {% if not preview %}
     <h1>Import Open Data</h1>
     <p>Import open data to your Research Drive using <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a>.</p>
-    <p>Datahugger is used in the background to try and retrieve metadata and to import the data. If you encounter any issues with retrieving metadata or the data itself, then please consider providing feedback about this to the Datahugger project.</p>
+    <p>Datahugger is used in the background to try and retrieve metadata and to import the session. If you encounter any issues with retrieving metadata or the data itself, then please consider providing feedback about this to the Datahugger project.</p>
 {% endif %}
 
-{% if data.connected==True %}
-    {% if data.query_status==None or data.query_status=='ready' %}
+{% if session.connected==True %}
+    {% if session.query_status==None or session.query_status=='ready' %}
     
         <!-- ### BEGIN FORM ### -->
         
@@ -43,15 +43,15 @@
             <div {% if preview %} hidden {% endif %}>
                 <div class="form-group mt-3 mb-3">
                     <label for="Url">Url:</label>
-                    <input type="url" pattern="https://.*" class="form-control" name="url" value="{{data.url}}" placeholder="https://doi.org/10.5281/example.8026179" required>
+                    <input type="url" pattern="https://.*" class="form-control" name="url" value="{{session.url}}" placeholder="https://doi.org/10.5281/example.8026179" required>
                     <div class="invalid-feedback">
                         Please fill out a doi.org url to a public research dataset or a preview url to a private dataset.
                     </div>
                 </div>
 
-                {% if (vars.url_exists_message==True or data.accept_url_in_history==True) and check_accept_url_in_history_first!=None %}
+                {% if (vars.url_exists_message==True or session.accept_url_in_history==True) and check_accept_url_in_history_first!=None %}
                 <div class="form-check mt-3 mb-3">
-                    <input class="form-check-input" type="checkbox" value="" {% if data.accept_url_in_history %} checked {% endif %} id="flexCheckUrl" name="accept_url_in_history" required>
+                    <input class="form-check-input" type="checkbox" value="" {% if session.accept_url_in_history %} checked {% endif %} id="flexCheckUrl" name="accept_url_in_history" required>
                     <label class="form-check-label" for="flexCheckUrl">
                     Check this to retrieve even if this url is in your history of imports.
                     </label>
@@ -63,15 +63,15 @@
                     {{ load_async("folderpaths", "/folder-paths/down", 55000) }}
                     <!-- end async -->
 
-                    <input type="text" class="form-control" name="folder" value="{{data.folder}}" placeholder="New Folder (optional)" pattern="[\--_-A-Za-z0-9]+" >
+                    <input type="text" class="form-control" name="folder" value="{{session.folder}}" placeholder="New Folder (optional)" pattern="[\--_-A-Za-z0-9]+" >
                     <div class="invalid-feedback">
-                        Please fill out the folder name where you want store the data.
+                        Please fill out the folder name where you want store the session.
                     </div>
                 </div>
                 
-                {% if (vars.folder_exists_message==True or data.accept_folder_exist==True) and check_accept_folder_first!=None %}
+                {% if (vars.folder_exists_message==True or session.accept_folder_exist==True) and check_accept_folder_first!=None %}
                 <div class="form-check mt-3 mb-3">
-                    <input class="form-check-input" type="checkbox" value="" {% if data.accept_folder_exist %} checked {% endif %} id="flexCheckFolder" name="accept_folder_exist" required>
+                    <input class="form-check-input" type="checkbox" value="" {% if session.accept_folder_exist %} checked {% endif %} id="flexCheckFolder" name="accept_folder_exist" required>
                     <label class="form-check-label" for="flexCheckFolder">
                     Check this to retrieve even if this folder already exists on your drive. The data will be added to the folder.
                     </label>

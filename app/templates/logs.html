@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="content object">
+    <h1>Logs</h1>
+      {% for logline in loglines %}
+        <p>{{ logline }}</p>
+      {% endfor %}
+{% endblock %}

@@ -10,10 +10,10 @@
 
 
 <!-- BEGIN AUTOCONNECT -->
-{% if not data.connected and not data.failed %}
+{% if not session.connected and not session.failed %}
 <script>
     var a = document.createElement('a');
-    a.href= '{{ data.srdc_url }}/login';
+    a.href= '{{ session.srdc_url }}/login';
     document.body.appendChild(a);
     a.click();
 </script>
@@ -35,8 +35,8 @@
 
 <p>{{ home_repos | default("The following repositories are available in your SRDC:") | safe }}</p>
 <ul>
-    {% for service in data.registered_services %}
-    {% if service not in data.hidden_services %}
+    {% for service in session.registered_services %}
+    {% if service not in session.hidden_services %}
     {% if service == 'data4tu'%}
     <li>4TU.ResearchData</li>
     {% else %}
@@ -54,7 +54,7 @@
 <p>{{ home_paragraph3 | default("This extension also allows you to import data from your private repositories. This enables you to import your own data or data that has been shared with you on these repositories.") | safe }}</p>
 
 <!-- BEGIN DATAHUGGER -->
-{% if 'datahugger' not in data.hidden_services or data.showall %}
+{% if 'datahugger' not in session.hidden_services or session.showall %}
 <h4>{{ home_h4_3 | default("Import open data") }}</h4>
 <p>{{ home_paragraph4 | default('
     In the backend the SRDC uses <a href="https://j535d165.github.io/datahugger/" target="new">Datahugger</a> to <b>import open data</b>.
@@ -77,10 +77,10 @@
    
 <!-- BEGIN NC LOGIN -->
 {% if poll_login %}
-{{ data.poll_info.poll_login }}
+{{ session.poll_info.poll_login }}
 <script>
     var a = document.createElement('a');
-    a.href= '{{ data.poll_info.poll_endpoint }}';
+    a.href= '{{ session.poll_info.poll_endpoint }}';
     a.target = 'popup';
     document.body.appendChild(a);
     a.click();

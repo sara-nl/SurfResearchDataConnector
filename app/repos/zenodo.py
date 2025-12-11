@@ -168,7 +168,7 @@ class Zenodo(object):
             timeout=timeout
         )
 
-        log.error(
+        log.debug(
             "Create new deposition: Status Code: {}".format(r.status_code))
 
         if r.status_code != 200:

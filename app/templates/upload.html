@@ -12,18 +12,18 @@
 
 {% if not preview %}
 
-{% if data.query_status==None or data.query_status=='ready' and data.process==None%}
+{% if session.query_status==None or session.query_status=='ready' and session.process==None%}
 <h1>Export</h1>
 <p>{{ upload_intro | default("Export data from your Research Drive to your connected repositories. Your data is always only exported and never published. You can review your data on the repository platform and then decide to publish from within that platform.") | safe }}</p>
 {% else %}
 
 <h1>{{ upload_h1_export | default("Processing export") | safe }}</h1>
 {% endif %}
-<p>{{ upload_reference | default("Export reference") | safe }}: <b>{{ data.projectname }}</b></p>
+<p>{{ upload_reference | default("Export reference") | safe }}: <b>{{ session.projectname }}</b></p>
 {% endif %}
 
-{% if data.connected==True %}
-    {% if data.query_status==None or data.query_status=='ready' and data.process==None %}
+{% if session.connected==True %}
+    {% if session.query_status==None or session.query_status=='ready' and session.process==None %}
         <form method="post" action="/upload" class="needs-validation mt-3 mb-3" novalidate >
             <div {% if preview %} hidden {% endif %}>
                 <!-- async loading repo selection -->
@@ -40,7 +40,7 @@
                 {% else %}
                 <!-- load in the selected folder to a form. no need to get all the folderpaths again -->
                 <select name="folder_path" class="form-select" required >
-                        <option value="{{data.folder_path}}" selected='selected' >{{ data.folder_path }}</option>
+                        <option value="{{session.folder_path}}" selected='selected' >{{ session.folder_path }}</option>
                 </select>
                 {% endif %}
                 
@@ -59,16 +59,16 @@
 
                 <!-- ### BEGIN PREVIEW ### -->
                 <h1>{{ upload_h1_preview | default("Export - Preview") | safe }}</h1>
-                <p>{{ upload_reference | default("Export reference") | safe }}: <b>{{ data.projectname }}</b></p>
+                <p>{{ upload_reference | default("Export reference") | safe }}: <b>{{ session.projectname }}</b></p>
                 
                 <h2>{{ upload_h2_repository | default("Repository") | safe }}</h2>
                 <!-- async loading check connection -->
-                {% set checkconnectionurl = '/check-connection/' + data.repo %}
+                {% set checkconnectionurl = '/check-connection/' + session.repo %}
                 {{ load_async("check_connection", checkconnectionurl) }}
                 <!-- end async -->
 
-                {% if data.repo == 'dataverse' %}
-                <div>{{ upload_dataverse | default("Exporting to dataverse") | safe }}: {{data.dataverse.title}}</div>
+                {% if session.repo == 'dataverse' %}
+                <div>{{ upload_dataverse | default("Exporting to dataverse") | safe }}: {{session.dataverse.title}}</div>
                 {% endif %}
                 
                 
@@ -76,34 +76,34 @@
                 <!-- async loading folder content -->
                 {{ load_async("foldercontent", "/folder-content/up", 55000) }}
                 <!-- end async -->
-                {{data.selected_folder_content}}
+                {{session.selected_folder_content}}
                 
                 <!-- async loading metadata -->
-                {% if data.repo=='figshare' %}
+                {% if session.repo=='figshare' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=figshare") }}
                 {% endif %}
-                {% if data.repo=='data4tu' %}
+                {% if session.repo=='data4tu' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=data4tu") }}
                 {% endif %}
-                {% if data.repo=='zenodo' %}
+                {% if session.repo=='zenodo' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=zenodo") }}
                 {% endif %}
-                {% if data.repo=='osf' %}
+                {% if session.repo=='osf' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=osf") }}
                 {% endif%}
-                {% if data.repo=='dataverse' %}
+                {% if session.repo=='dataverse' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=dataverse", 30000) }}
                 {% endif%}
-                {% if data.repo=='datastation' %}
+                {% if session.repo=='datastation' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=datastation", 30000) }}
                 {% endif%}
-                {% if data.repo=='irods' %}
+                {% if session.repo=='irods' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=irods") }}
                 {% endif%}
-                {% if data.repo=='sharekit' %}
+                {% if session.repo=='sharekit' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=sharekit") }}
                 {% endif%}
-                {% if data.repo=='surfs3' %}
+                {% if session.repo=='surfs3' %}
                 {{ load_async("metadata_disabled", "/metadata?disabled=true&repo=surfs3") }}
                 {% endif%}
                 <!-- end async --> 
@@ -112,7 +112,7 @@
 
                 <a href="/upload" class="btn btn-secondary">{{ upload_back | default("Back") | safe}}</a>
                 <button type="submit" id="action-button" class="btn btn-secondary">{{ upload_start | default("Start Export") | safe }}</button>
-                {% if data.repo !='dataverse' and data.repo!='datastation' %}
+                {% if session.repo !='dataverse' and session.repo!='datastation' %}
                 <div class="form-check mt-3 mb-3">
                     <input class="form-check-input" type="checkbox" id="flexUploadZip" value="" name="use_zip">
                     <label class="form-check-label" for="flexUploadZip">

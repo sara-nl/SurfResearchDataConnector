@@ -1,6 +1,6 @@
 {% if direction == 'up' %}
     <p>{{ folder_content_folder_size |default("Folder size") | safe }}: {{folder_content_can_be_processed['total_size'] | convert_size}}</p>
-    {% if data['showall']==True%}
+    {% if session['showall']==True%}
         <p>{{ folder_content_free_diskspace | default("Free diskspace for processing") | safe }}: {{folder_content_can_be_processed['free_bytes'] | convert_size}}</p>
     {% endif %}
 {% endif %}
@@ -12,7 +12,7 @@
         $( "#action-button" ).prop('disabled', true);
     </script>
     {% endif %}
-    <p>{{ folder_content_root_folder | default("Root folder") | safe }}: <b>{{ data.complete_folder_path }}</b></p>
+    <p>{{ folder_content_root_folder | default("Root folder") | safe }}: <b>{{ session.complete_folder_path }}</b></p>
     <p>{{ folder_content_content | default("This is the content of the data folder you will be working with:") | safe }}</p>
     <ul>
         {% for item in folder_content %}
@@ -22,18 +22,18 @@
         {% endfor %}
     </ul>
 {% else %}
-    {%if data.permission %}
-        {% if data.folder and direction == 'down' %}
-        <p>{{ folder_content_new_folder | default("A new folder will be created at") | safe }} <b>{{ data.complete_folder_path }}</b>.</p>
+    {%if session.permission %}
+        {% if session.folder and direction == 'down' %}
+        <p>{{ folder_content_new_folder | default("A new folder will be created at") | safe }} <b>{{ session.complete_folder_path }}</b>.</p>
         {% else %}
-        <p>{{ folder_content_no_content | default("There is no content in folder") | safe }}: <b>{{ data.complete_folder_path }}</b>.</p>
+        <p>{{ folder_content_no_content | default("There is no content in folder") | safe }}: <b>{{ session.complete_folder_path }}</b>.</p>
         <script>
             // disable all action buttons, so user will not be able to proceed
             $( "#action-button" ).prop('disabled', true);
         </script>
         {% endif %}
     {% else %}
-        <p>{{ folder_content_permission | default("Your account does not have permission to manage this folder") | safe }}: <b>{{ data.complete_folder_path }}</b>.</p>
+        <p>{{ folder_content_permission | default("Your account does not have permission to manage this folder") | safe }}: <b>{{ session.complete_folder_path }}</b>.</p>
         <script>
             // disable all action buttons, so user will not be able to proceed
             $( "#action-button" ).prop('disabled', true);

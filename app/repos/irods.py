@@ -12,7 +12,7 @@ from irods.meta import iRODSMeta
 from RDS import ROParser
 
 try:
-    from app.globalvars import irods_zone, irods_base_folder
+    from app.globalvars import irods_zone, irods_base_folder, irods_api_url
 except:
     # for testing this file locally
     import sys
@@ -20,16 +20,18 @@ except:
     from globalvars import irods_zone, irods_base_folder
     print("testing")
 
-ssl_settings = {'client_server_negotiation': 'request_server_negotiation',
-                'client_server_policy': 'CS_NEG_REQUIRE',
-                'encryption_algorithm': 'AES-256-CBC',
-                'encryption_key_size': 32,
-                'encryption_num_hash_rounds': 16,
-                'encryption_salt_size': 8,
-                }
-
 zone = os.getenv("ZONE", irods_zone)
-folder = os.getenv("BASE_FOLDER", irods_base_folder)
+base_folder = os.getenv("BASE_FOLDER", irods_base_folder)
+
+ssl_settings = {
+    "irods_authentication_scheme": "pam_password",
+    "irods_encryption_algorithm": "AES-256-CBC",
+    "irods_encryption_key_size": 32,
+    "irods_encryption_num_hash_rounds": 16,
+    "irods_encryption_salt_size": 8,
+    "irods_client_server_negotiation": "request_server_negotiation",
+    "irods_client_server_policy": "CS_NEG_REQUIRE"
+}
 
 log = logging.getLogger()
 
@@ -66,11 +68,22 @@ class Irods(object):
         self.irods_api_address = api_address
         if api_address is None:
             self.irods_api_address = os.getenv(
-                "API_ADDRESS", "surf-yoda.irods.surfsara.nl"
+                "IRODS_API_URL", "surf-yoda.irods.surfsara.nl"
             )
 
         self.api_key = api_key
         self.user = user
+        home = f"/{zone}/home"
+
+        self.settings = {
+            "irods_host" : self.irods_api_address,
+            "irods_port" : 1247,
+            "irods_home" : home,
+            "irods_zone_name" : zone,
+            "irods_user_name" : self.user,
+            "irods_password" : self.api_key
+            }
+
 
         # monkeypatching all functions with internals
         self.get_collection = self.get_collection_internal
@@ -88,8 +101,12 @@ class Irods(object):
 
         Returns `True` if the token is correct and usable, otherwise `False`."""
         try:
-            r = self.get_collection()
-            return True
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
+                r =irods_session._server_version()
+            if r:
+                return True
+            else:
+                return False
         except Exception as e:
             log.error(e)
             return False
@@ -118,15 +135,14 @@ class Irods(object):
             if path is None:
                 path = f"/{zone}/home"
 
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
 
-                coll = irods_session.collections.get(path)
+                try:
+                    coll = irods_session.collections.get(path)
+                except Exception as e:
+                    log.error(f'exception at irods get_collection_internal 1: {e}')
+                    return
+                
                 if len(coll.subcollections) > 0:
                     available_collections = []
                     for col in coll.subcollections:
@@ -162,14 +178,16 @@ class Irods(object):
                     return available_collection
         except Exception as e:
             log.error(f'exception at irods get_collection_internal: {e}')
+            return
 
 
-    def create_new_collection_internal(self, metadata: dict = None):
+    def create_new_collection_internal(self, metadata: dict = None, irods_subcollection: str = None):
         """Creates a new untitled collection.
         If metadata is specified, it will changes metadata after creating.
 
         Args:
             metadata (dict, optional): Metadata for the collection. Defaults to None.
+            irods_subcollection (str, optional): Sub collection to upload to. Defaults to None.
 
         Returns:
             json: API response
@@ -181,19 +199,27 @@ class Irods(object):
         try:
             if metadata is not None and 'title' in metadata:
                 title = metadata['title']
-                path = f"/{zone}/home/{folder}/{title}-{str(time.time()).replace('.','')}"
             else:
-                path = f"/{zone}/home/{folder}/SurfRDC-Upload-{str(time.time()).replace('.','')}"
+                title = 'SurfRDC-Upload'
 
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            sub_path = f"/{zone}/home/{base_folder}"
+
+            if irods_subcollection:
+                sub_path = irods_subcollection
+
+            path = f"{sub_path}/{title}-{str(time.time()).replace('.','')}"
+            
+            # log.error(f"creating collection at path: {path}")
+            
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 coll = irods_session.collections.create(path)
+            
+                # log.error(f"created collection: {coll}")
+        except Exception as e:
+            log.error(f'exception at irods create_new_collection_internal 1: {e}')
+            return {"message": str(e)}
 
+        try:
             available_collection = {'create_time': str(coll.create_time),
                                     'data_objects': [data_object.id for data_object in coll.data_objects],
                                     'id': coll.id,
@@ -209,6 +235,11 @@ class Irods(object):
                                     }
 
             log.debug(f"Metadata: {metadata}")
+        except Exception as e:
+            log.error(f'exception at irods create_new_collection_internal 2: {e}')
+            return {"message": str(e)}
+        
+        try:
             if metadata is not None and isinstance(metadata, dict):
                 log.debug(metadata)
                 self.change_metadata_in_collection_internal(
@@ -217,7 +248,7 @@ class Irods(object):
 
             return available_collection
         except Exception as e:
-            log.error(f'exception at irods create_new_collection_internal: {e}')
+            log.error(f'exception at irods create_new_collection_internal 3: {e}')
             return {"message": str(e)}
 
 
@@ -233,13 +264,7 @@ class Irods(object):
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
-            with iRODSSession(host=self.irods_api_address,
-                              port=1247,
-                              user=self.user,
-                              password=self.api_key,
-                              zone=zone,
-                              authentication_scheme='pam',
-                              **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 r = irods_session.collections.remove(path=path)
             if r is None:
                 return True
@@ -263,7 +288,7 @@ class Irods(object):
             yodametadata["links"] = [
                 {
                     "rel": "describedby",
-                    "href": "https://yoda.uu.nl/schemas/default-2/metadata.json"
+                    "href": "https://yoda.uu.nl/schemas/default-3/metadata.json"
                 }
             ]
 
@@ -277,15 +302,16 @@ class Irods(object):
                 if metadata['Language'] in schema["definitions"]["optionsISO639-1"]["enum"]:
                     yodametadata["Language"] = metadata['Language']
 
-            # setting some fixe parameters for now
+            # setting some fixed parameters for now
             yodametadata["Collected"] = {}
             yodametadata["Covered_Period"] = {}
-            yodametadata["Related_Datapackage"] = [
-                {
-                    "Persistent_Identifier": {}
-                }
-            ]
-            yodametadata["Retention_Period"] = 10
+
+
+            if "yoda_retention" in metadata:
+                yodametadata["Retention_Period"] = metadata['yoda_retention']
+            else:
+                yodametadata["Retention_Period"] = 10
+
             yodametadata["Data_Type"] = "Dataset"
 
             try:
@@ -299,15 +325,17 @@ class Irods(object):
             yodametadata["License"] = "Custom"
 
             # set discipline only of correctly specified
-            if "Discipline" in metadata:
-                if metadata['Discipline'] in schema["definitions"]["optionsDiscipline"]["enum"]:
+            if "yoda_discipline" in metadata:
+                if metadata['yoda_discipline'] in schema["definitions"]["optionsDiscipline"]["enum"]:
                     yodametadata["Discipline"] = [
-                        metadata['Discipline']
+                        metadata['yoda_discipline']
                     ]
 
             # set tag if specified in metadata
-            if "keywords" in metadata:
-                yodametadata["Tag"] = metadata["keywords"].split(", ")
+            if "yoda_keywords" in metadata:
+                yodametadata["Keyword"] = metadata["yoda_keywords"].split(", ")
+            else:
+                yodametadata["Keyword"] = ["not set"]
 
             # set creator
             try:
@@ -323,16 +351,13 @@ class Irods(object):
                             "Family_Name": Family_Name
                         }
                 except Exception as e:
-                    logger.error(e)
+                    log.error(e)
                 try:
-                    Creator_Affiliation = metadata["publisher"]
-                    yodametadata["Creator"][0]["Affiliation"] = [
-                        Creator_Affiliation
-                    ]
-                except:
-                    pass
-            except:
-                pass
+                    yodametadata["Creator"][0]["Affiliation"][0]["Affiliation_Name"] = metadata["affiliation"]
+                except Exception as e:
+                    log.error(e)
+            except Exception as e:
+                log.error(e)
 
 
             # set contributor
@@ -348,29 +373,35 @@ class Irods(object):
                             "Given_Name": Given_Name,
                             "Family_Name": Family_Name
                         }
-                except:
-                    pass
+                except Exception as e:
+                    log.error(e)
                 try:
                     Contributor_Affiliation = metadata["contributor"][1]
                     yodametadata["Contributor"][0]["Affiliation"] = [
-                        Contributor_Affiliation
+                        {
+                            "Affiliation_Name" : Contributor_Affiliation,
+                        }
                     ]
-                except:
-                    pass
-            except:
-                pass
+                except Exception as e:
+                    log.error(e)
+            except Exception as e:
+                log.error(e)
+
+
+            # set discipline
+            yodametadata['Discipline'] = [metadata["yoda_discipline"]]
 
             # set title
             try:
                 yodametadata["Title"] = metadata["title"]
-            except:
-                pass
+            except Exception as e:
+                log.error(e)
 
             # set description
             try:
                 yodametadata["Description"] = metadata["description"]
-            except:
-                pass
+            except Exception as e:
+                log.error(e)
 
             yodametadata = json.dumps(yodametadata)
 
@@ -396,13 +427,7 @@ class Irods(object):
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
 
-            with iRODSSession(host=self.irods_api_address,
-                              port=1247,
-                              user=self.user,
-                              password=self.api_key,
-                              zone=zone,
-                              authentication_scheme='pam',
-                              **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 irods_session.connection_timeout = 300
                 # create a relative path if the file is in a subfolder
                 # basically ignore the first folder. Any subsequent folders need to be created under the path
@@ -435,13 +460,7 @@ class Irods(object):
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 coll = irods_session.collections.get(path)
                 result = []
                 for obj in coll.data_objects:
@@ -477,13 +496,7 @@ class Irods(object):
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 irods_session.connection_timeout = 300
 
                 obj = irods_session.collections.get(path)
@@ -532,13 +545,7 @@ class Irods(object):
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
-            with iRODSSession(host=self.irods_api_address,
-                              port=1247,
-                              user=self.user,
-                              password=self.api_key,
-                              zone=zone,
-                              authentication_scheme='pam',
-                              **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 coll = irods_session.collections.get(path)
                 for obj in coll.data_objects:
                     obj.unlink(force=True)
@@ -558,13 +565,7 @@ class Irods(object):
         log.debug(
             f"Entering at lib/upload_irods.py {inspect.getframeinfo(inspect.currentframe()).function}")
         try:
-            with iRODSSession(host=self.irods_api_address,
-                              port=1247,
-                              user=self.user,
-                              password=self.api_key,
-                              zone=zone,
-                              authentication_scheme='pam',
-                              **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 obj = irods_session.data_objects.get(path)
                 r = obj.unlink(force=True)
 
@@ -583,13 +584,7 @@ class Irods(object):
             path (str): path to start getting the file info
         """
         try:
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 coll = irods_session.collections.get(path)
 
                 for obj in coll.data_objects:
@@ -636,13 +631,7 @@ class Irods(object):
         """
         try:
             path = f"/{irods_zone}/home{path}"
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 irods_session.connection_timeout = 300
                 coll = irods_session.collections.get(path)
             result = {}
@@ -679,13 +668,7 @@ class Irods(object):
             if not os.path.exists(to_create_path):
                 os.makedirs(to_create_path)  # create folder if it does not exist
             write_to_path = f"{dest_folder}/{subfolder}/{filename}"
-            with iRODSSession(host=self.irods_api_address,
-                            port=1247,
-                            user=self.user,
-                            password=self.api_key,
-                            zone=zone,
-                            authentication_scheme='pam',
-                            **ssl_settings) as irods_session:
+            with iRODSSession(**self.settings, **ssl_settings) as irods_session:
                 irods_session.connection_timeout = 300
                 irods_session.data_objects.get(link, write_to_path, )
         except Exception as e:

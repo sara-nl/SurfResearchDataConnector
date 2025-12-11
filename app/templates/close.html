@@ -63,15 +63,15 @@
         <div class="row footer-bar">
             <div class="col-4"></div>
             <div class="col-8 footer-text-right">
-                {% if data.cloud_service == 'owncloud' %}
+                {% if session.cloud_service == 'owncloud' %}
                 SURF Research Data Connector | <a href="https://servicedesk.surf.nl/wiki/display/WIKI/Changelog"
-                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | Een dienst van <a
+                    target="_blank">{{ session.code_version | default('Unknown') }}</a> | Een dienst van <a
                     href="https://www.surf.nl" class="underline hover:no-underline font-bold" target="_blank">SURF</a> |
                 SURF <a href="https://servicedesk.surf.nl/wiki/display/WIKI/"
                     class="underline hover:no-underline font-bold" target="_blank">wiki</a>
                 {% else %}
                 SURF Research Data Connector | <a href="https://servicedesk.surf.nl/wiki/display/WIKI/RD%3A+Changelog"
-                    target="_blank">{{ data.code_version | default('Unknown') }}</a> | Een dienst van <a
+                    target="_blank">{{ session.code_version | default('Unknown') }}</a> | Een dienst van <a
                     href="https://www.surf.nl" class="underline hover:no-underline font-bold" target="_blank">SURF</a> |
                 SURF <a href="https://servicedesk.surf.nl/wiki/display/WIKI/RD%3A+SURF+Research+Data+Connector"
                     class="underline hover:no-underline font-bold" target="_blank">wiki</a>
