@@ -27,12 +27,46 @@ fast_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 SANITIZE_PATTERN = re.compile(r'[^a-zA-Z0-9_-]')
 MAX_PROJECT_NAME_LENGTH = 128
+MAX_PATH_LENGTH = 1024
+
+PATH_TRAVERSAL_PATTERN = re.compile(r'(^|/)\.\.($|/)|/\./')
+INVALID_PATH_CHARS = re.compile(r'[\x00-\x1f\x7f]')
 
 def _sanitize_input(value, max_length=64):
     if value is None:
         return ""
     sanitized = SANITIZE_PATTERN.sub('_', str(value))
     return sanitized[:max_length]
+
+def _validate_folder_path(path):
+    if not path or not isinstance(path, str):
+        return False, "Invalid path: empty or not a string"
+    
+    if len(path) > MAX_PATH_LENGTH:
+        return False, f"Invalid path: exceeds maximum length of {MAX_PATH_LENGTH}"
+    
+    if PATH_TRAVERSAL_PATTERN.search(path):
+        return False, "Invalid path: path traversal detected"
+    
+    if INVALID_PATH_CHARS.search(path):
+        return False, "Invalid path: contains control characters"
+    
+    if ".." in path:
+        return False, "Invalid path: parent directory reference not allowed"
+    
+    return True, None
+
+def _normalize_folder_path(path):
+    if not path:
+        return "/"
+    path = path.replace("\\", "/")
+    if not path.startswith("/"):
+        path = "/" + path
+    while "//" in path:
+        path = path.replace("//", "/")
+    if len(path) > 1 and path.endswith("/"):
+        path = path.rstrip("/")
+    return path
 
 ### defining the post request bodies using pydantic ###
 
@@ -91,9 +125,18 @@ def fast_app_folders(request: Request, data: folderData, response: Response):
     r_status = "OK"
     try:
         if make_connection(username=data.cloud_username, password=data.cloud_password):
-            folder = "/"
+            folder = "/" if not data.folder else data.folder
+            
             if data.folder:
-                folder = data.folder
+                normalized_folder = _normalize_folder_path(data.folder)
+                is_valid, error_msg = _validate_folder_path(normalized_folder)
+                if not is_valid:
+                    r_status = "BAD_REQUEST"
+                    result = error_msg
+                    response.status_code = status.HTTP_400_BAD_REQUEST
+                    return {"status": r_status, "data": data, "result": result}
+                folder = normalized_folder
+            
             if data.cached:
                 result = get_cached_folders(data.cloud_username, cloud_password, folder)
             else:
@@ -121,7 +164,13 @@ def fast_app_export(request: Request, data: exportData, response: Response):
         if make_connection(username=data.cloud_username, password=data.cloud_password):
             username = data.cloud_username
             password = data.cloud_password
-            complete_folder_path = data.complete_folder_path
+            complete_folder_path = _normalize_folder_path(data.complete_folder_path)
+            is_valid, error_msg = _validate_folder_path(complete_folder_path)
+            if not is_valid:
+                r_status = "BAD_REQUEST"
+                result = error_msg
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return {"status": r_status, "result": result}
             metadata = data.metadata
 
             repo = data.repo
@@ -236,7 +285,13 @@ def fast_app_import(request: Request, data: importData, response: Response):
         if make_connection(username=data.cloud_username, password=data.cloud_password):
             username = data.cloud_username
             password = data.cloud_password
-            complete_folder_path = data.complete_folder_path
+            complete_folder_path = _normalize_folder_path(data.complete_folder_path)
+            is_valid, error_msg = _validate_folder_path(complete_folder_path)
+            if not is_valid:
+                r_status = "BAD_REQUEST"
+                result = error_msg
+                response.status_code = status.HTTP_400_BAD_REQUEST
+                return {"status": r_status, "result": result}
             url = data.url
             repo = data.repo
 
