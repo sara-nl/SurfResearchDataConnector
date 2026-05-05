@@ -4,6 +4,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy.sql import func
 from flask_session import Session
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import redis
 
 # FASTAPI imports
@@ -32,6 +34,13 @@ except:
     from logs import *
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[os.environ.get('RATE_LIMIT_DEFAULT', '200 per day')],
+    storage_uri=os.environ.get('REDIS_URL', f'redis://localhost:6379')
+)
 
 try:
     redis_port = 6379

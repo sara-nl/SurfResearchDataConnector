@@ -206,3 +206,9 @@ env:
     value: Connection to ACC environment of Sharekit.
   - name: SHAREKIT_WEBSITE
     value: https://acc.surfsharekit.nl
+
+  # Rate limiting
+  - name: RATE_LIMIT_DEFAULT
+    value: "200 per day"
+  - name: REDIS_URL
+    value: "redis://localhost:6379"

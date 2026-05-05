@@ -1,9 +1,14 @@
 import random
 import re
+import os
 from threading import Thread
-from fastapi import Response, status
+from fastapi import Response, status, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import and_
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import pandas as pd
 import matplotlib.pyplot as plt
 import json
@@ -15,6 +20,10 @@ from app.utils import folder_content_can_be_processed, repo_content_fits, update
 from app.repos import check_connection, get_repocontent
 from app.globalvars import *
 from app.logs import *
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[os.environ.get('RATE_LIMIT_DEFAULT', '200 per day')])
+fast_app.state.limiter = limiter
+fast_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 SANITIZE_PATTERN = re.compile(r'[^a-zA-Z0-9_-]')
 MAX_PROJECT_NAME_LENGTH = 128
@@ -76,8 +85,9 @@ def fast_app_version(response: Response):
     return {"version": f"{code_version}"}
 
 
+@limiter.limit("50 per day")
 @fast_app.post("/folders", status_code=200)
-def fast_app_folders(data: folderData, response: Response):
+def fast_app_folders(request: Request, data: folderData, response: Response):
     r_status = "OK"
     try:
         if make_connection(username=data.cloud_username, password=data.cloud_password):
@@ -102,8 +112,9 @@ def fast_app_folders(data: folderData, response: Response):
             "result": result}
 
 
+@limiter.limit("10 per day")
 @fast_app.post("/export", status_code=200)
-def fast_app_export(data: exportData, response: Response):
+def fast_app_export(request: Request, data: exportData, response: Response):
     logger.info("export called")
     r_status = "OK"
     try:
@@ -194,8 +205,9 @@ def fast_app_export(data: exportData, response: Response):
             "result": result}
 
 
+@limiter.limit("60 per minute")
 @fast_app.post("/status", status_code=200)
-def fast_app_status(data: statusData, response: Response):
+def fast_app_status(request: Request, data: statusData, response: Response):
     r_status = "OK"
     try:
         if make_connection(username=data.cloud_username, password=data.cloud_password):
@@ -215,8 +227,9 @@ def fast_app_status(data: statusData, response: Response):
             "result": result}
 
 
+@limiter.limit("10 per day")
 @fast_app.post("/import", status_code=200)
-def fast_app_import(data: importData, response: Response):
+def fast_app_import(request: Request, data: importData, response: Response):
     logger.info("import called")
     r_status = "OK"
     try:
@@ -306,19 +319,32 @@ def fast_app_import(data: importData, response: Response):
             "data": data,
             "result": result}
 
+@limiter.limit("30 per minute")
 @fast_app.post("/history", status_code=200)
-def fast_app_history(data: historyData, response: Response):
+def fast_app_history(request: Request, data: historyData, response: Response):
     r_status = "OK"
     history = []
     id = data.id
     username = data.cloud_username
     password = data.cloud_password
-    # check if we can make connection
     try:
         if make_connection(username=data.cloud_username, password=data.cloud_password):
             with app.app_context():
                 if id:
-                    hist_of_id = History.query.filter_by(id=id).one()
+                    try:
+                        hist_of_id = History.query.filter_by(id=id).one()
+                    except Exception:
+                        r_status = "NOT_FOUND"
+                        result = None
+                        response.status_code = status.HTTP_404_NOT_FOUND
+                        return {"status": r_status, "result": result}
+
+                    if hist_of_id.username != username:
+                        r_status = "FORBIDDEN"
+                        result = None
+                        response.status_code = status.HTTP_403_FORBIDDEN
+                        return {"status": r_status, "result": result}
+
                     folder = hist_of_id.folder
                     url = hist_of_id.url
                     projectname = hist_of_id.projectname
@@ -336,7 +362,6 @@ def fast_app_history(data: historyData, response: Response):
                         ).order_by(History.id.desc())
                     tmp_hist = []
                     latest_folder_url = []
-                    # only get latest status per retrieval
                     for item in history:
                         if [item.folder, item.url, item.projectname] != latest_folder_url:
                             tmp_hist.append(item)
@@ -357,8 +382,9 @@ def fast_app_history(data: historyData, response: Response):
             "result": result}
 
 
+@limiter.limit("10 per minute")
 @fast_app.get("/stats", status_code=200)
-def fast_app_stats(response: Response):
+def fast_app_stats(request: Request, response: Response):
     r_status = "OK"
     result = {"images" : {}}
     try:

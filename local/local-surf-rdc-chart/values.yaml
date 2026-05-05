@@ -95,6 +95,18 @@ tolerations: []
 affinity: {}
 
 # enviroment vars
+
+env:
+  # Flask
+  - name: FLASK_SECRET_KEY
+    value: b'V\x8b\x100\xfa\x01)\xd6\xe4`\x10\x16\xef9\x1b\xba\x128N\xf6\xe3\xbb\x90\xec'
+
+  # Rate limiting
+  - name: RATE_LIMIT_DEFAULT
+    value: "200 per day"
+  - name: REDIS_URL
+    value: "redis://localhost:6379"
+
 env:
   - name: DRIVE_URL
     value: https://acc-aperture.data.surfsara.nl
