@@ -31,8 +31,7 @@ except:
     from globalvars import *
     from logs import *
 
-# os.urandom(24)
-app.secret_key = b'V\x8b\x100\xfa\x01)\xd6\xe4`\x10\x16\xef9\x1b\xba\x128N\xf6\xe3\xbb\x90\xec'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
 try:
     redis_port = 6379

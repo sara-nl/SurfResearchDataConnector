@@ -96,6 +96,10 @@ affinity: {}
 
 # enviroment vars
 env:
+  # Flask
+  - name: FLASK_SECRET_KEY
+    value: b'V\x8b\x100\xfa\x01)\xd6\xe4`\x10\x16\xef9\x1b\xba\x128N\xf6\xe3\xbb\x90\xec'
+
   # Main
   - name: EMBED_APP_URL
     value: https://aperture.data.surfsara.nl/index.php/apps/external/2
