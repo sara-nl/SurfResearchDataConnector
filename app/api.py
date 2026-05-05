@@ -1,4 +1,5 @@
 import random
+import re
 from threading import Thread
 from fastapi import Response, status
 from sqlalchemy import and_
@@ -14,6 +15,15 @@ from app.utils import folder_content_can_be_processed, repo_content_fits, update
 from app.repos import check_connection, get_repocontent
 from app.globalvars import *
 from app.logs import *
+
+SANITIZE_PATTERN = re.compile(r'[^a-zA-Z0-9_-]')
+MAX_PROJECT_NAME_LENGTH = 128
+
+def _sanitize_input(value, max_length=64):
+    if value is None:
+        return ""
+    sanitized = SANITIZE_PATTERN.sub('_', str(value))
+    return sanitized[:max_length]
 
 ### defining the post request bodies using pydantic ###
 
@@ -111,9 +121,12 @@ def fast_app_export(data: exportData, response: Response):
 
             if data.project_name == None or data.project_name == "":
                 num = int(random.random() * 100)
-                project_name = f"api_{username}_{complete_folder_path}_{repo}_{num}"
+                safe_username = _sanitize_input(username)
+                safe_folder = _sanitize_input(complete_folder_path)
+                safe_repo = _sanitize_input(repo)
+                project_name = f"api_{safe_username}_{safe_folder}_{safe_repo}_{num}"[:MAX_PROJECT_NAME_LENGTH]
             else:
-                project_name = data.project_name
+                project_name = _sanitize_input(data.project_name, MAX_PROJECT_NAME_LENGTH)
 
             set_projectname(username=username,folder=complete_folder_path,url=repo,projectname=project_name)
 
@@ -210,9 +223,12 @@ def fast_app_import(data: importData, response: Response):
 
             if data.project_name == None or data.project_name == "":
                 num = int(random.random() * 100)
-                project_name = f"api_{username}_{complete_folder_path}_{repo}_{num}"
+                safe_username = _sanitize_input(username)
+                safe_folder = _sanitize_input(complete_folder_path)
+                safe_repo = _sanitize_input(repo)
+                project_name = f"api_{safe_username}_{safe_folder}_{safe_repo}_{num}"[:MAX_PROJECT_NAME_LENGTH]
             else:
-                project_name = data.project_name
+                project_name = _sanitize_input(data.project_name, MAX_PROJECT_NAME_LENGTH)
             set_projectname(username=username,folder=complete_folder_path,url=url,projectname=project_name)
 
             try:
