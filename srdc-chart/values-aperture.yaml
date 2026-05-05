@@ -106,6 +106,14 @@ env:
   - name: REDIS_URL
     value: "redis://localhost:6379"
 
+  # Security headers (Flask-Talisman)
+  - name: ENABLE_TALISMANS
+    value: "true"
+  - name: FORCE_HTTPS
+    value: "false"
+  - name: CONTENT_SECURITY_POLICY
+    value: "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:"
+
   # Main
   - name: EMBED_APP_URL
     value: https://aperture.data.surfsara.nl/index.php/apps/external/2

@@ -6,6 +6,7 @@ from sqlalchemy.sql import func
 from flask_session import Session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 import redis
 
 # FASTAPI imports
@@ -41,6 +42,20 @@ limiter = Limiter(
     default_limits=[os.environ.get('RATE_LIMIT_DEFAULT', '200 per day')],
     storage_uri=os.environ.get('REDIS_URL', f'redis://localhost:6379')
 )
+
+if os.environ.get('ENABLE_TALISMANS', 'true').lower() == 'true':
+    talisman = Talisman(
+        app=app,
+        force_https=os.environ.get('FORCE_HTTPS', 'false').lower() == 'true',
+        content_security_policy=os.environ.get('CONTENT_SECURITY_POLICY', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:"),
+        content_security_policy_nonce_in=['script-src'],
+        frame_deny=True,
+        strict_transport_security=True,
+        strict_transport_security_max_age=31536000,
+        x_content_type_nosniff=True,
+        x_frame_options='DENY',
+        x_xss_protection=True,
+    )
 
 try:
     redis_port = 6379
