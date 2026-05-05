@@ -3,26 +3,35 @@ import sys
 import configparser
 import json
 import glob
+import re
 
 datastation_basicauth_token = None
 code_version = None
 dataverse_create_user_dataverse = 'No'
-# get all env vars from the environment in the pod, which are set in the helm charts
+
+VALID_VAR_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+def _is_valid_variable_name(name):
+    return bool(VALID_VAR_PATTERN.match(name))
 
 all_vars = {}
 for key in os.environ:
     try:
         value = os.getenv(key)
+        var_name = key.lower()
+
+        if not _is_valid_variable_name(var_name):
+            continue
+
         if key.upper() in ['HIDDEN_SERVICES','TOKEN_BASED_SERVICES','OAUTH_SERVICES']:
             value = value.split(",")
             value = [v.strip() for v in value]
-            all_vars[key.lower()]=value
-            expr1 = f"{key.lower()}={value}"
-            exec(expr1)
+            all_vars[var_name] = value
         else:
-            all_vars[key.lower()]=value
-            expr2 = f"{key.lower()}='{value}'"
-            exec(expr2)
+            all_vars[var_name] = value
+
+        if value is not None:
+            setattr(sys.modules[__name__], var_name, value)
     except Exception as e:
         print(e)
         pass
