@@ -25,6 +25,10 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[os.environ.get('R
 fast_app.state.limiter = limiter
 fast_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+DEBUG_MODE = os.environ.get('DEBUG', 'false').lower() == 'true'
+GENERIC_ERROR_MESSAGE = "An internal error occurred. Please try again later."
+LOGGED_ERROR_CODES = {'VALIDATION_ERROR', 'AUTH_ERROR', 'NOT_FOUND', 'FORBIDDEN'}
+
 SANITIZE_PATTERN = re.compile(r'[^a-zA-Z0-9_-]')
 MAX_PROJECT_NAME_LENGTH = 128
 MAX_PATH_LENGTH = 1024
@@ -37,6 +41,13 @@ def _sanitize_input(value, max_length=64):
         return ""
     sanitized = SANITIZE_PATTERN.sub('_', str(value))
     return sanitized[:max_length]
+
+def _log_error(error_code, message, exc_info=None):
+    logger.error(f"[{error_code}] {message}", exc_info=exc_info)
+
+def _handle_error(error_code, user_message, exc=None):
+    _log_error(error_code, user_message, exc)
+    return user_message if DEBUG_MODE else GENERIC_ERROR_MESSAGE
 
 def _validate_folder_path(path):
     if not path or not isinstance(path, str):
@@ -146,9 +157,8 @@ def fast_app_folders(request: Request, data: folderData, response: Response):
             result = None
             response.status_code = status.HTTP_401_UNAUTHORIZED
     except Exception as e:
-        logger.error(e)
+        result = _handle_error("FOLDERS_GET", str(e), exc=e)
         r_status = "BAD_REQUEST"
-        result = None
         response.status_code = status.HTTP_400_BAD_REQUEST
     return {"status": r_status,
             "data": data,
@@ -245,10 +255,9 @@ def fast_app_export(request: Request, data: exportData, response: Response):
             result = None
             response.status_code = status.HTTP_401_UNAUTHORIZED
     except Exception as e:
-        logger.error(e)
+        result = _handle_error("EXPORT_API", str(e), exc=e)
         r_status = "BAD_REQUEST"
-        result = e
-        update_history(username=username, folder=complete_folder_path, url=repo, status=result)
+        update_history(username=username, folder=complete_folder_path, url=repo, status='export failed')
     return {"status": r_status,
             "data": data,
             "result": result}
@@ -266,10 +275,8 @@ def fast_app_status(request: Request, data: statusData, response: Response):
             result = None
             response.status_code = status.HTTP_401_UNAUTHORIZED
     except Exception as e:
-        message = f"An exception occured: {e}"
-        logger.error(message)
+        result = _handle_error("IMPORT_API", str(e), exc=e)
         r_status = "BAD_REQUEST"
-        result = None
         response.status_code = status.HTTP_400_BAD_REQUEST
     return {"status": r_status,
             "data": data,
@@ -364,12 +371,10 @@ def fast_app_import(request: Request, data: importData, response: Response):
             result = None
             response.status_code = status.HTTP_401_UNAUTHORIZED
     except Exception as e:
+        result = _handle_error("IMPORT_START", str(e), exc=e)
         r_status = "BAD_REQUEST"
-        result = None
         response.status_code = status.HTTP_400_BAD_REQUEST
-        message = f"Import could not be started: {e}"
-        update_history(username=username, folder=complete_folder_path, url=url, status=message)
-        logger.error(message)
+        update_history(username=username, folder=complete_folder_path, url=url, status='import failed')
     return {"status": r_status,
             "data": data,
             "result": result}
@@ -427,10 +432,8 @@ def fast_app_history(request: Request, data: historyData, response: Response):
             result = None
             response.status_code = status.HTTP_401_UNAUTHORIZED
     except Exception as e:
-        message = f"An exception occurred while getting the history: {e}"
-        logger.error(message)
+        result = _handle_error("HISTORY_GET", str(e), exc=e)
         r_status = "BAD_REQUEST"
-        result = None
         response.status_code = status.HTTP_400_BAD_REQUEST
     return {"status": r_status,
             "data": data,
@@ -794,12 +797,10 @@ def fast_app_stats(request: Request, response: Response):
             plt.close()
 
             result["images"]["mainstats"] = "/static/img/mainstats.png"
-        result = json.loads(str(result).replace("'",'"'))
+        result = json.loads(str(result).replace("'", '"'))
     except Exception as e:
-        message = f"An exception occured: {e}"
-        logger.error(message)
+        result = _handle_error("STATS_GET", str(e), exc=e)
         r_status = "BAD_REQUEST"
-        result = message
         response.status_code = status.HTTP_400_BAD_REQUEST
 
     return {"status": r_status, "result": result}
