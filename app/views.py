@@ -691,7 +691,6 @@ def statsreport():
         str: html for the statsreport page
     """
 
-    bcrypted_pw = b'$2b$12$TfIzIMj0ng/kLtbmWNXTEuwRUmKyJi7PIR6FoYVL4lRL5j5xH6yOS'
     if 'pw' in request.args:
         import bcrypt
         pw = request.args['pw'].encode("utf-8")
