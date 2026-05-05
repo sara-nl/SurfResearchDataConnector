@@ -6,6 +6,7 @@ from sqlalchemy.sql import func
 from flask_session import Session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
 import redis
 
@@ -35,6 +36,8 @@ except:
     from logs import *
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
+
+csrf = CSRFProtect(app)
 
 limiter = Limiter(
     app=app,
