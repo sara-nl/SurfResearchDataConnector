@@ -67,6 +67,21 @@ query_projectname = {}
 global query_project_id
 query_project_id = {}
 
+DEFAULT_MAX_FOLDER_SIZE_GB = 10
+DEFAULT_FREE_SPACE_MULTIPLIER = 2.0
+
+def _get_max_folder_size_limit():
+    try:
+        return int(os.environ.get('MAX_FOLDER_SIZE_BYTES', DEFAULT_MAX_FOLDER_SIZE_GB * 1024 * 1024 * 1024))
+    except ValueError:
+        return DEFAULT_MAX_FOLDER_SIZE_GB * 1024 * 1024 * 1024
+
+def _get_min_free_space_multiplier():
+    try:
+        return float(os.environ.get('MIN_FREE_SPACE_MULTIPLIER', DEFAULT_FREE_SPACE_MULTIPLIER))
+    except ValueError:
+        return DEFAULT_FREE_SPACE_MULTIPLIER
+
 global memo
 memo = {}
 def global_memoize(function):
@@ -1095,9 +1110,11 @@ def folder_content_can_be_processed(username, password, folder):
     Returns:
         bool: True is processing can be done
     """
-    result = {'can_be_processed' : False, 'total_size': 0, 'free_bytes' : 0}
+    max_folder_size_bytes = _get_max_folder_size_limit()
+    min_free_space_multiplier = _get_min_free_space_multiplier()
+
+    result = {'can_be_processed' : False, 'total_size': 0, 'free_bytes' : 0, 'max_allowed': max_folder_size_bytes}
     try:
-        # calculate the total size in bytes that the files will take up
         if make_connection(username, password):
             list_result = cloud.list(folder, depth=100)
             for item in list_result:
@@ -1105,12 +1122,13 @@ def folder_content_can_be_processed(username, password, folder):
                     result['total_size'] += item.get_size()
                 except:
                     pass
-        
-        # get the free bytes on the pod disk
+
         result['free_bytes'] = int(shutil.disk_usage("/").free)
 
-        # compare: we need twice the folder_content size as diskspace as we also create the content as a zip
-        if result['free_bytes'] > result['total_size'] * 2.0:
+        if result['total_size'] > max_folder_size_bytes:
+            result['can_be_processed'] = False
+            result['reason'] = f'exceeds_max_size'
+        elif result['free_bytes'] > result['total_size'] * min_free_space_multiplier:
             result['can_be_processed'] = True
     except Exception as e:
         logger.error(e, exc_info=True)

@@ -166,7 +166,13 @@ def fast_app_export(data: exportData, response: Response):
                     r_status = "REQUEST_ENTITY_TOO_LARGE"
                     total_size = content_can_be_processed['total_size']
                     free_bytes = content_can_be_processed['free_bytes']
-                    result = f"The dataset is too large to be processed. To be processed: {total_size} bytes. Available for processing: {free_bytes} bytes"
+                    max_allowed = content_can_be_processed.get('max_allowed', 'unknown')
+                    reason = content_can_be_processed.get('reason', 'insufficient_disk_space')
+
+                    if reason == 'exceeds_max_size':
+                        result = f"The dataset exceeds the maximum allowed size. Size: {total_size} bytes. Maximum allowed: {max_allowed} bytes"
+                    else:
+                        result = f"The dataset is too large to be processed. Size: {total_size} bytes. Available disk space: {free_bytes} bytes"
                     update_history(username=username, folder=complete_folder_path, url=repo, status=result)
                     response.status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
             else:
